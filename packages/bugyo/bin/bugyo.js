@@ -9,7 +9,7 @@ const usage = `使い方:
   bugyo init <dir>             土台入りの新しいプロジェクトを作る
   bugyo new feature <id>       feature を ui/model/api・feature map・spec つきで作る
   bugyo verify <id>            その feature を実際に動かし、合否と証拠の場所だけを出す
-  bugyo verify --all           feature map の回帰の順番で全部を確かめる`;
+  bugyo verify --all           feature map にあるすべての feature を確かめる`;
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -18,10 +18,15 @@ const reportFile = 'artifacts/results.json';
 /** @param {string[]} specs */
 function runPlaywright(specs) {
   rmSync('artifacts', { recursive: true, force: true });
-  return spawnSync('pnpm', ['exec', 'playwright', 'test', ...specs, '--reporter=line,json'], {
+  return spawnSync('pnpm', ['exec', 'playwright', 'test', ...specs, '--reporter=line,json,html'], {
     encoding: 'utf8',
     shell: process.platform === 'win32',
-    env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile },
+    env: {
+      ...process.env,
+      PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
+      PLAYWRIGHT_HTML_OUTPUT_DIR: 'artifacts/report',
+      PLAYWRIGHT_HTML_OPEN: 'never',
+    },
   });
 }
 
