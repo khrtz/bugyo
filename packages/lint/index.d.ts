@@ -28,9 +28,31 @@ export interface RestrictedSyntax {
   message: string;
 }
 
+/**
+ * 組み合わせられる設定の部品。同じスコープの禁止（no-restricted-imports など）は bugyo() が1つのルールに合成する。
+ */
+export interface BugyoPart {
+  readonly name: string;
+  readonly rank: number;
+}
+
+/** 共通: 厳しい型検査、any・型アサーション・非 null アサーション・待っていない Promise・switch の漏れ、理由のない eslint-disable、コメント、extra の合成。必須 */
+export const common: BugyoPart;
+/** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止、fetch は apiClientDir だけ */
+export const structure: BugyoPart;
+/** React: useEffect の禁止と例外の場所、react-hooks、feature の UI でのタイマー禁止、model から React への依存の禁止 */
+export const react: BugyoPart;
+
 export interface BugyoOptions {
   /** eslint.config.js で `import.meta.dirname` を渡す */
   root: string;
+  /** 使う部品。既定は `[common, structure, react]`。common は必須。順番は結果に影響しない */
+  parts?: readonly BugyoPart[];
+  /**
+   * import に拡張子を書くプロジェクト（Node の型除去で .ts を直接動かすなど）で true にする。
+   * `features/<id>/index.ts` をファイル名つきで import できるようにする。既定は false
+   */
+  explicitExtensions?: boolean;
   /** ソースのルート。既定は `src` */
   src?: string;
   /** useEffect を書いてよい場所。既定は `<src>/shared/lib` */

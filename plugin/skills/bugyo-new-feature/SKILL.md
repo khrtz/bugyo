@@ -9,7 +9,10 @@ description: bugyo の土台を使うプロジェクトに、新しい機能（�
 
 1. **名前を決める。** 小文字とハイフン（例: `user-settings`）。既存の `src/features/` と重ならないこと
 2. **雛形を作る。** `pnpm exec bugyo new feature <id>`
-   - 作られるもの: `src/features/<id>/{ui,model,api}/`、`index.ts`、model のプロパティテスト、`e2e/<id>.spec.ts`、`docs/features/<id>.md`、`public/api/<id>.json`、README の回帰順への追記
+   - 作られるもの（`.bugyo/config.json` の `template` で変わる）
+     - `react-vite`（既定）: `src/features/<id>/{ui,model,api}/`、`index.ts`、model のプロパティテスト、`e2e/<id>.spec.ts`、`docs/features/<id>.md`、`public/api/<id>.json`、README の回帰順への追記
+     - `node-lib`: `src/features/<id>/model/` とそのテスト、`index.ts`、`checks/<id>.ts`（実際に動かして確かめるスクリプト）、`docs/features/<id>.md`、README の回帰順への追記。画面がないので下の 3・4 の UI の項目は飛ばし、`checks/<id>.ts` を本当の振る舞いに合わせ、外に見せるなら `src/index.ts` から、コマンドなら `src/app` から `index.ts` を使う
+   - 雛形のないテンプレートでは `bugyo new feature` が理由を言って断る。そのときは手で作らず、ユーザーに伝える
    - 手でフォルダを作らない。作ると feature map との対応が漏れ、`pnpm test` が落ちる
 3. **形を合わせる。** 雛形の `Item` スキーマ、表示、spec を本当の要件に書き換える
    - ドメインの計算は `model/` に純粋関数で書く（React を import できない）

@@ -2,7 +2,16 @@
 
 状態: 実装済み。このページの内容はすべて今のコードで動きます。
 
-土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。前提は pnpm、Vite、React、TypeScript、そして `@/` を `src/` に向けたパスの別名です。
+土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
+
+feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提で、React 用の禁止は部品の1つとして分かれています（下の「部品」）。
+
+雛形（`bugyo init --template <名前>`）は2つです。
+
+| テンプレート | 見本 | 前提 |
+| --- | --- | --- |
+| `react-vite`（既定） | [examples/todo-app](../examples/todo-app) | pnpm、Vite、React、Playwright、Vitest、`@/` を `src/` に向けたパスの別名 |
+| `node-lib` | [examples/node-lib](../examples/node-lib) | pnpm、Node 24 の型除去（`.ts` をそのまま実行する）、`node:test`。import に拡張子 `.ts` を書く。React・Vite・Playwright は使わない |
 
 ## フォルダ構成
 
@@ -24,6 +33,8 @@ e2e/<id>.spec.ts            その機能を実際に操作するテスト
 
 依存の向きは `app → features → shared`、feature の中では `ui → api → model` です。
 
+`node-lib` では画面がないので、feature は `model/` と `index.ts` だけです。`src/app` はコマンドの入口、`src/index.ts` はライブラリとして公開するもの、`checks/<id>.ts` はその機能を実際に動かして確かめるスクリプト（feature map の `spec`）です。
+
 ## `@bugyo/lint`
 
 ### ESLint
@@ -43,23 +54,39 @@ export default bugyo({ root: import.meta.dirname });
 | `apiClientDir` | `<src>/shared/api` | `fetch` を呼んでよい場所 |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `extra` | `{}` | 独自の禁止を足す（下の「独自の禁止を足す」） |
+| `parts` | `[common, structure, react]` | 使う部品（下の「部品」）。`common` は必須 |
+| `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
 
-どこで何が止まるかは次のとおりです。エラー文には、代わりに何を使うかが入っています。
+#### 部品
 
-| 範囲 | 止めるもの |
-| --- | --- |
-| すべてのファイル | `any`、型アサーション（`as`）、非 null アサーション（`!`）、待っていない Promise、`switch` の分岐漏れ、理由のない `eslint-disable`、対象を絞らない `eslint-disable`。加えて typescript-eslint の `strictTypeChecked` |
-| `src` の下 | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形、`fetch`、他の feature の内部ファイルの import、コメント、`shared` から `features` / `app` への依存、`features` から `app` への依存。加えて react-hooks の推奨ルール |
-| `src/features/*/ui` | 上に加えて `setTimeout`、`setInterval`、`requestAnimationFrame` |
-| `src/features/*/model` | 上に加えて `react`、`react-dom`、`@tanstack/*`、同じ feature の `ui` と `api`、`shared/ui`、`shared/api` |
+設定は3つの部品の組み合わせです。React を使わないプロジェクトは `common` と `structure` だけを渡します。同じ範囲の禁止（`no-restricted-imports` など）は、部品をまたいで1つのルールに合成されます。部品の順番は結果に影響しません。
+
+```js
+// eslint.config.js（React を使わないプロジェクト）
+import { bugyo, common, structure } from '@bugyo/lint';
+
+export default bugyo({ root: import.meta.dirname, parts: [common, structure], explicitExtensions: true });
+```
+
+| 部品 | 範囲 | 止めるもの |
+| --- | --- | --- |
+| `common` | すべてのファイル | `any`、型アサーション（`as`）、非 null アサーション（`!`）、待っていない Promise、`switch` の分岐漏れ、理由のない `eslint-disable`、対象を絞らない `eslint-disable`。加えて typescript-eslint の `strictTypeChecked` |
+| `common` | `src` の下 | コメント。`extra` で足した禁止 |
+| `structure` | `src` の下 | 他の feature の内部ファイルの import、`shared` から `features` / `app` への依存、`features` から `app` への依存、`fetch` |
+| `structure` | `src/features/*/model` | 同じ feature の `ui` と `api`、`shared/ui`、`shared/api` |
+| `react` | `src` の下 | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形。加えて react-hooks の推奨ルール |
+| `react` | `src/features/*/ui` | `setTimeout`、`setInterval`、`requestAnimationFrame` |
+| `react` | `src/features/*/model` | `react`、`react-dom`、`@tanstack/*` |
+
+エラー文には、代わりに何を使うかが入っています。他の feature の内部ファイルの import は、パスに `features/` を含む書き方（`@/features/<id>/...` や `../features/<id>/...`）を ESLint が止め、相対パスで feature の間をまたぐ書き方も含めて dependency-cruiser が止めます。
 
 場所による例外は次の3つだけです。
 
-| 場所 | 許されること |
-| --- | --- |
-| `effectHooksDir` | `useEffect` / `useLayoutEffect` |
-| `apiClientDir` | `fetch` |
-| `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形 |
+| 場所 | 許されること | 例外を持つ部品 |
+| --- | --- | --- |
+| `effectHooksDir` | `useEffect` / `useLayoutEffect`、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`react` |
+| `apiClientDir` | `fetch` | `structure` |
+| `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`structure`・`react` |
 
 コメントは、公開 API の JSDoc（`/** */`）と、理由つきの `eslint-disable`（`-- 理由`）だけ書けます。`.js` / `.cjs` / `.mjs` には型を使うルールを当てません。
 
@@ -96,7 +123,7 @@ export default bugyo({
 module.exports = require('@bugyo/lint/depcruise').config();
 ```
 
-`config({ src, tsConfig, forbidden })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。
+`config({ src, tsConfig, forbidden, react })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: false` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存を見なくなります（既定は `true`）。
 
 | ルール | 止めるもの |
 | --- | --- |
@@ -105,7 +132,7 @@ module.exports = require('@bugyo/lint/depcruise').config();
 | `app-only-via-feature-index` | `app` から feature の `index.ts` 以外への依存 |
 | `shared-is-leaf` | `shared` から `features` / `app` への依存 |
 | `features-not-to-app` | `features` から `app` への依存 |
-| `model-is-pure` | `model` から、自分の `model` と `shared/lib` 以外のソース、`react`、`react-dom`、`@tanstack/*` への依存 |
+| `model-is-pure` | `model` から、自分の `model` と `shared/lib` 以外のソースへの依存。`react: true` なら `react`、`react-dom`、`@tanstack/*` への依存も |
 | `not-to-unresolvable` | 解決できない import |
 
 境界は ESLint と dependency-cruiser の両方で見ます。循環依存を見るのは dependency-cruiser だけです。
@@ -142,16 +169,24 @@ spec: e2e/todos.spec.ts
 ## よく嘘をつくところ
 ```
 
-- `id` は小文字・数字・ハイフンで、`src/features/<id>` と同じ名前にします
-- `route` は `/` で始めます。`spec` は `e2e/` の下の `*.spec.ts` です
+- `id` は小文字・数字・ハイフンで、機能のフォルダ（既定は `src/features/<id>`）と同じ名前にします
+- `spec` は、その機能を確かめるファイルへの、プロジェクトのルートからの相対パスです（`/` 区切り。`..` と絶対パスは使えません）。形は問わず、実在だけを確かめます
+- `route` は任意です。画面のある機能で、辿り着く URL のパスを `/` から書きます
 - 4つの見出しは必須です。「よく嘘をつくところ」には、見た目は通るのに壊れていることが起きやすい点を書きます
 - `docs/features/README.md` に、全体を確かめるときの順番を `[id](id.md)` の形で並べます
 
 対応漏れはテストで落とします。
 
 ```ts
-// e2e/feature-map.test.ts
+// e2e/feature-map.test.ts（Vitest）
 import { registerFeatureMapTests } from 'bugyo/vitest';
+
+registerFeatureMapTests();
+```
+
+```ts
+// test/feature-map.test.ts（node:test）
+import { registerFeatureMapTests } from 'bugyo/node-test';
 
 registerFeatureMapTests();
 ```
@@ -161,11 +196,13 @@ registerFeatureMapTests();
 1. ファイル名と `id` が一致している
 2. すべての機能に4つの見出しがある
 3. すべての機能の `spec` が実在する
-4. `e2e/` のすべての `*.spec.ts` が、どれかの機能に対応している
-5. `src/features` のすべてのフォルダが feature map に載っている
+4. spec のフォルダ（既定は `e2e/`）の、名前が spec の末尾（既定は `.spec.ts`）で終わるすべてのファイルが、どれかの機能に対応している
+5. 機能のフォルダ（既定は `src/features`）のすべてのフォルダが feature map に載っている
 6. README の順番に、すべての機能がちょうど1回ずつ載っている
 
-`registerFeatureMapTests({ cwd, src })` で場所を変えられます。コードから読むときは `loadFeatures(cwd)` と `loadSweepOrder(cwd)` を使います。
+4と5は、該当するフォルダがないときや設定で `null` にしたとき「対象なし」として飛ばします。場所は `registerFeatureMapTests({ cwd, src, specDir, specSuffix, featuresDir })` の引数、`.bugyo/config.json` の `featureMap`、既定値の順に決まります（`src` だけを渡すと、機能のフォルダは `<src>/features`）。
+
+コードから読むときは `loadFeatures(cwd)` と `loadSweepOrder(cwd)` を使います。テストランナーを問わずに検査を使うときは `featureMapChecks(options)` が、検査ごとに `title`、`skip`（飛ばす理由か `null`）、`problems()`（見つかった問題の配列）を返します。
 
 ## 検証（Playwright）
 
@@ -193,38 +230,74 @@ export default defineBugyoConfig({ port: 5173 });
 
 | コマンド | すること |
 | --- | --- |
-| `bugyo init <dir>` | 土台入りの新しいプロジェクトを作る。`<dir>` が空でなければ断る |
-| `bugyo new feature <id>` | feature を一式作る。同じ名前のファイルがあれば上書きせずに断る |
+| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。既定のテンプレートは `react-vite`。使ったテンプレートの名前を `.bugyo/config.json` の `template` に残す。`<dir>` が空でなければ断り、存在しないテンプレート名は使える名前の一覧を出して断る |
+| `bugyo new feature <id>` | feature を一式作る。何を作るかは `.bugyo/config.json` の `template` で決まる（ないときは `react-vite`）。同じ名前のファイルがあれば上書きせずに断る。雛形のないテンプレートでは理由を出して断り、何も作らない |
 | `bugyo verify <id>` | その機能の spec を実行し、合否と証拠の場所だけを出す |
 | `bugyo verify --all` | feature map にあるすべての機能を確かめる |
 
-`new feature <id>` が作るものは次のとおりです。作ったあと、画面への組み込みと feature map の記入が残ります（組み込むまで knip が「未使用」として止めます）。
+タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) にあります。
 
-- `src/features/<id>/model/<id>.ts` と、そのテスト
-- `src/features/<id>/api/use<Id>Query.ts`
-- `src/features/<id>/ui/<Id>View.tsx`
-- `src/features/<id>/index.ts`
-- `public/api/<id>.json`（サンプルデータ）
-- `e2e/<id>.spec.ts`
-- `docs/features/<id>.md`（README の順番にも1行足す）
+`new feature <id>` が作るものは次のとおりです。どちらも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
 
-`verify` は次のように動きます。
+| `react-vite` | `node-lib` |
+| --- | --- |
+| `src/features/<id>/model/<id>.ts` と、そのテスト（Vitest と fast-check） | `src/features/<id>/model/<id>.ts` と、そのテスト（`node:test`） |
+| `src/features/<id>/api/use<Id>Query.ts` | — |
+| `src/features/<id>/ui/<Id>View.tsx` | — |
+| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` |
+| `public/api/<id>.json`（サンプルデータ） | — |
+| `e2e/<id>.spec.ts` | `checks/<id>.ts`（`featureMap.specDir` と `specSuffix` に従う） |
+
+`react-vite` では、作ったあとに画面への組み込みが残ります（組み込むまで knip が「未使用」として止めます）。`node-lib` では、作った直後から check・test・verify が通り、振る舞いの書き換えと feature map の記入が残ります。
+
+`verify` は次のように動きます。どちらの実行方法でも同じです。
 
 - 実行のたびに `artifacts/` を消してから始める
-- 機能ごとに `PASS` / `FAIL` を1行で出す。失敗したときだけ、出力の末尾30行を付ける
-- 証拠は `artifacts/test-results`（動画・スクリーンショット・トレース）と `artifacts/report/index.html` に残る
+- 機能ごとに `PASS` / `FAIL` を1行で出し、次の行に証拠の場所を出す。失敗したときだけ、出力の末尾30行を付ける
 - 終了コードは、すべて通れば 0、1つでも落ちれば 1、機能名が feature map になければ 2
-- 内部で `pnpm exec playwright test` を呼ぶ
+- 最後に、機能ごとの合否・中で実行したコマンド・証拠の場所の要約を `artifacts/verify.json` に書く（`bugyo task done` が証拠に写す）
+
+実行方法は `.bugyo/config.json` の `verify.runner` で選びます。
+
+| `runner` | 動き | 証拠の場所 |
+| --- | --- | --- |
+| `playwright`（既定） | 対象の spec をまとめて `pnpm exec playwright test` に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
+| `command` | `verify.command` を機能ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は frontmatter の `spec` に置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力） |
+
+`command` のコマンドはシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。
+
+## 設定ファイル（`.bugyo/config.json`）
+
+確かめ方と場所の設定は、プロジェクトのルートの `.bugyo/config.json` の1つにまとめます。ファイルがなければ、すべて既定値で動きます。知らないキーがあると、どのコマンドも断ります。
+
+```json
+{
+  "verify": { "runner": "command", "command": "node {spec}" },
+  "featureMap": { "specDir": "checks", "specSuffix": ".ts", "featuresDir": "src/features" }
+}
+```
+
+| キー | 既定 | 意味 |
+| --- | --- | --- |
+| `verify.runner` | `playwright` | `playwright` か `command`（上の「CLI」） |
+| `verify.command` | なし | `runner` が `command` のときは必須 |
+| `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
+| `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
+| `featureMap.featuresDir` | `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
+
+同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 
 ## プロジェクトに置くスクリプト
 
-見本（[examples/todo-app](../examples/todo-app)）は次の3つを使います。
+見本はどちらも次の3つを使います。
 
-| スクリプト | 中身 | いつ通すか |
-| --- | --- | --- |
-| `pnpm check` | `tsc --noEmit && eslint . && depcruise src && knip` | 変更のたび |
-| `pnpm test` | `vitest run`（ユニットテストと feature map の整合） | 変更のたび |
-| `pnpm verify <id>` | `bugyo verify <id>` | 完了を名乗る前 |
+| スクリプト | `react-vite`（[examples/todo-app](../examples/todo-app)） | `node-lib`（[examples/node-lib](../examples/node-lib)） | いつ通すか |
+| --- | --- | --- | --- |
+| `pnpm check` | `tsc --noEmit && eslint . && depcruise src && knip && bugyo task lint` | 同じ | 変更のたび |
+| `pnpm test` | `vitest run`（ユニットテストと feature map の整合） | `node --test "src/**/*.test.ts" "test/**/*.test.ts"`（ユニットテストと feature map の整合） | 変更のたび |
+| `pnpm verify <id>` | `bugyo verify <id>`（Playwright） | `bugyo verify <id>`（`node checks/<id>.ts`） | 完了を名乗る前 |
+
+`node-lib` の `.bugyo/config.json` は、`verify` を `command` 方式（`node {spec}`）にし、spec のフォルダを `checks`、`evidence.tree` を `src`・`checks`・`test` にしています。lint は `parts: [common, structure]` と `explicitExtensions: true`、dependency-cruiser は `config({ react: false })` です。
 
 `pnpm check` が通るだけでは完了ではありません。変更の種類ごとに必要な証拠は、見本の [docs/土台設計.md](../examples/todo-app/docs/土台設計.md) にあります。
 

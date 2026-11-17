@@ -10,7 +10,7 @@
     "check": "pnpm -r check",
     "test": "pnpm -r test",
     "e2e": "pnpm --filter todo-app e2e",
-    "verify": "pnpm --filter todo-app verify --all",
+    "verify": "pnpm --filter todo-app --filter node-lib verify --all",
     "validate-plugin": "claude plugin validate plugin --strict && claude plugin validate . --strict"
   }
 }

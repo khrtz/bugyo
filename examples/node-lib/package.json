@@ -1,0 +1,21 @@
+{
+  "name": "node-lib",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "check": "tsc --noEmit && eslint . && depcruise src && knip && bugyo task lint",
+    "test": "node --test \"src/**/*.test.ts\" \"test/**/*.test.ts\"",
+    "verify": "bugyo verify"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "dependency-cruiser": "^18.7.2",
+    "eslint": "^10.15.0",
+    "knip": "^6.45.1",
+    "typescript": "~6.0.3",
+    "@bugyo/lint": "workspace:*",
+    "bugyo": "workspace:*"
+  }
+}
