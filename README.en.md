@@ -74,7 +74,7 @@ With layer 1 alone, bugyo is a strict preset plus a scaffold. "An agent cannot c
 - **Lint** — `useEffect` only in `shared/lib`, `fetch` only in `shared/api`, no timers in feature UI, no `any`, no type assertions, no comments, no unexplained `eslint-disable`. `model/` stays pure.
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
-- **Verification** — `bugyo verify <id>` runs the feature's Playwright spec and keeps video, screenshots, and a trace for every run.
+- **Verification** — `bugyo verify <id>` runs the feature's check and reports pass/fail plus where the evidence is. By default it runs the Playwright spec and keeps video, screenshots, and a trace; with `"runner": "command"` in `.bugyo/config.json` it runs any command per feature and keeps its output.
 
 ## What is in the box
 
@@ -132,7 +132,7 @@ pnpm validate-plugin
 ```
 
 - The `packages/lint` tests run every rule against deliberately broken files in `test/fixture` and check that each one reports an error
-- The `packages/bugyo` tests check what `new feature` and `init` generate
+- The `packages/bugyo` tests check what `new feature` and `init` generate, and how `verify` passes and fails on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
 - TypeScript is pinned to 6.0
 
 ## License

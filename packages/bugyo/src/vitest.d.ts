@@ -1,1 +1,3 @@
-export function registerFeatureMapTests(options?: { cwd?: string; src?: string }): void;
+import type { FeatureMapOptions } from './index.js';
+
+export function registerFeatureMapTests(options?: FeatureMapOptions): void;

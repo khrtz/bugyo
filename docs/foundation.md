@@ -2,7 +2,9 @@
 
 状態: 実装済み。このページの内容はすべて今のコードで動きます。
 
-土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。前提は pnpm、Vite、React、TypeScript、そして `@/` を `src/` に向けたパスの別名です。
+土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
+
+feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint・フォルダ構成・Playwright の設定・見本は、pnpm、Vite、React、TypeScript、`@/` を `src/` に向けたパスの別名を前提にしています。
 
 ## フォルダ構成
 
@@ -142,8 +144,9 @@ spec: e2e/todos.spec.ts
 ## よく嘘をつくところ
 ```
 
-- `id` は小文字・数字・ハイフンで、`src/features/<id>` と同じ名前にします
-- `route` は `/` で始めます。`spec` は `e2e/` の下の `*.spec.ts` です
+- `id` は小文字・数字・ハイフンで、機能のフォルダ（既定は `src/features/<id>`）と同じ名前にします
+- `spec` は、その機能を確かめるファイルへの、プロジェクトのルートからの相対パスです（`/` 区切り。`..` と絶対パスは使えません）。形は問わず、実在だけを確かめます
+- `route` は任意です。画面のある機能で、辿り着く URL のパスを `/` から書きます
 - 4つの見出しは必須です。「よく嘘をつくところ」には、見た目は通るのに壊れていることが起きやすい点を書きます
 - `docs/features/README.md` に、全体を確かめるときの順番を `[id](id.md)` の形で並べます
 
@@ -161,11 +164,13 @@ registerFeatureMapTests();
 1. ファイル名と `id` が一致している
 2. すべての機能に4つの見出しがある
 3. すべての機能の `spec` が実在する
-4. `e2e/` のすべての `*.spec.ts` が、どれかの機能に対応している
-5. `src/features` のすべてのフォルダが feature map に載っている
+4. spec のフォルダ（既定は `e2e/`）の、名前が spec の末尾（既定は `.spec.ts`）で終わるすべてのファイルが、どれかの機能に対応している
+5. 機能のフォルダ（既定は `src/features`）のすべてのフォルダが feature map に載っている
 6. README の順番に、すべての機能がちょうど1回ずつ載っている
 
-`registerFeatureMapTests({ cwd, src })` で場所を変えられます。コードから読むときは `loadFeatures(cwd)` と `loadSweepOrder(cwd)` を使います。
+4と5は、該当するフォルダがないときや設定で `null` にしたとき「対象なし」として飛ばします。場所は `registerFeatureMapTests({ cwd, src, specDir, specSuffix, featuresDir })` の引数、`.bugyo/config.json` の `featureMap`、既定値の順に決まります（`src` だけを渡すと、機能のフォルダは `<src>/features`）。
+
+コードから読むときは `loadFeatures(cwd)` と `loadSweepOrder(cwd)` を使います。テストランナーを問わずに検査を使うときは `featureMapChecks(options)` が、検査ごとに `title`、`skip`（飛ばす理由か `null`）、`problems()`（見つかった問題の配列）を返します。
 
 ## 検証（Playwright）
 
@@ -208,13 +213,39 @@ export default defineBugyoConfig({ port: 5173 });
 - `e2e/<id>.spec.ts`
 - `docs/features/<id>.md`（README の順番にも1行足す）
 
-`verify` は次のように動きます。
+`verify` は次のように動きます。どちらの実行方法でも同じです。
 
 - 実行のたびに `artifacts/` を消してから始める
-- 機能ごとに `PASS` / `FAIL` を1行で出す。失敗したときだけ、出力の末尾30行を付ける
-- 証拠は `artifacts/test-results`（動画・スクリーンショット・トレース）と `artifacts/report/index.html` に残る
+- 機能ごとに `PASS` / `FAIL` を1行で出し、次の行に証拠の場所を出す。失敗したときだけ、出力の末尾30行を付ける
 - 終了コードは、すべて通れば 0、1つでも落ちれば 1、機能名が feature map になければ 2
-- 内部で `pnpm exec playwright test` を呼ぶ
+
+実行方法は `.bugyo/config.json` の `verify.runner` で選びます。
+
+| `runner` | 動き | 証拠の場所 |
+| --- | --- | --- |
+| `playwright`（既定） | 対象の spec をまとめて `pnpm exec playwright test` に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
+| `command` | `verify.command` を機能ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は frontmatter の `spec` に置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力） |
+
+`command` のコマンドはシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。
+
+## 設定ファイル（`.bugyo/config.json`）
+
+確かめ方と場所の設定は、プロジェクトのルートの `.bugyo/config.json` の1つにまとめます。ファイルがなければ、すべて既定値で動きます。知らないキーがあると、どのコマンドも断ります。
+
+```json
+{
+  "verify": { "runner": "command", "command": "node {spec}" },
+  "featureMap": { "specDir": "checks", "specSuffix": ".ts", "featuresDir": "src/features" }
+}
+```
+
+| キー | 既定 | 意味 |
+| --- | --- | --- |
+| `verify.runner` | `playwright` | `playwright` か `command`（上の「CLI」） |
+| `verify.command` | なし | `runner` が `command` のときは必須 |
+| `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
+| `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
+| `featureMap.featuresDir` | `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
 
 ## プロジェクトに置くスクリプト
 

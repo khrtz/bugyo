@@ -1,0 +1,4 @@
+{
+  "verify": { "runner": "command", "command": "node {spec}" },
+  "featureMap": { "specDir": "checks", "specSuffix": ".js", "featuresDir": "lib" }
+}

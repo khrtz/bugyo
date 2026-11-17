@@ -125,7 +125,7 @@ pnpm validate-plugin
 ```
 
 - `packages/lint` のテストは、わざと違反したファイル（`test/fixture`）に対して各ルールがエラーを出すことを確かめます
-- `packages/bugyo` のテストは `new feature` と `init` の生成物を確かめます
+- `packages/bugyo` のテストは `new feature` と `init` の生成物と、React も Playwright も使わないフィクスチャ（`test/fixtures/plain`）での `verify` の合否を確かめます
 - TypeScript は 6.0 系に固定しています
 
 ## ライセンス
