@@ -58,15 +58,15 @@ The two lines say: the steps to check are in `docs/features/todos.md`, and the e
 
 ## Three layers, and what exists today
 
-Built bottom-up. **Only layer 1 works today.** Layers 2 and 3 are designed, and their commands do not exist yet.
+Built bottom-up. **Layers 1 and 2 work today.** Layer 3 is designed, and its commands do not exist yet.
 
 | Layer | What it does | Status | Docs (Japanese) |
 | --- | --- | --- | --- |
 | **1. Foundation** | Enforces how code is written and checked: structure, lint, dependency rules, verification | Implemented | [docs/foundation.md](docs/foundation.md) |
-| **2. Task ledger and gate** | One file per task; a task cannot be closed unless its evidence passes | Design only | [docs/tasks.md](docs/tasks.md) |
+| **2. Task ledger and gate** | One file per task; a task cannot be closed unless its evidence passes | Implemented (CI and hooks not yet) | [docs/tasks.md](docs/tasks.md) |
 | **3. Resident agents** | Agents with a role patrol, delegate work, and bring results back to a human | Design only | [docs/agents.md](docs/agents.md) |
 
-With layer 1 alone, bugyo is a strict preset plus a scaffold. "An agent cannot claim done without evidence" only becomes true once layer 2 lands. The build order and the exit criteria for each stage are in [docs/roadmap.md](docs/roadmap.md).
+"An agent cannot claim done without evidence" is handled by `bugyo task done` in layer 2. It is the only way to close a task: it runs check, test, and verify itself, and writes an evidence file only when they pass. A task flipped to done by hand fails `bugyo task lint` inside `pnpm check`. The build order and the exit criteria for each stage are in [docs/roadmap.md](docs/roadmap.md).
 
 ### Layer 1 in short
 
@@ -81,7 +81,7 @@ With layer 1 alone, bugyo is a strict preset plus a scaffold. "An agent cannot c
 | Path | Contents |
 | --- | --- |
 | [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config, dependency-cruiser rules, a strict tsconfig, a no-comments rule |
-| [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify`), feature map loader and consistency tests, Playwright config |
+| [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify` / `task` / `mistake` / `gate`), feature map loader and consistency tests, Playwright config |
 | [plugin](plugin) | Claude Code plugin (five skills and a review subagent) |
 | [examples/todo-app](examples/todo-app) | A sample app using both packages; also the source of the `bugyo init` template |
 
@@ -132,7 +132,7 @@ pnpm validate-plugin
 ```
 
 - The `packages/lint` tests run every rule against deliberately broken files in `test/fixture` and check that each one reports an error
-- The `packages/bugyo` tests check what `new feature` and `init` generate, and how `verify` passes and fails on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
+- The `packages/bugyo` tests check what `new feature` and `init` generate, and how `verify` and the task ledger behave (including that what should be refused is refused) on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
 - TypeScript is pinned to 6.0
 
 ## License

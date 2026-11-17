@@ -41,6 +41,24 @@ export function loadFeatures(cwd = process.cwd()) {
     .map((name) => parse(`${featureDir}/${name}`, readFileSync(join(dir, name), 'utf8')));
 }
 
+/**
+ * 4つの見出しのうち、中身が空か雛形のまま（`（…）` だけの項目や、`：` の後が空の項目が残っている）のものを返す。
+ *
+ * @param {import('./index.js').Feature} feature
+ * @returns {string[]}
+ */
+export function unfilledSections(feature) {
+  const lines = feature.body.split(/\r?\n/);
+  return requiredSections.filter((section) => {
+    const start = lines.findIndex((line) => line.trim() === `## ${section}`);
+    if (start < 0) return true;
+    const rest = lines.slice(start + 1);
+    const end = rest.findIndex((line) => /^#{1,2} /.test(line));
+    const content = (end < 0 ? rest : rest.slice(0, end)).map((line) => line.trim()).filter((line) => line !== '');
+    return content.length === 0 || content.some((line) => /^- （[^）]*）$/.test(line) || /^- [^：]+：$/.test(line));
+  });
+}
+
 /** @param {string} [cwd] */
 export function loadSweepOrder(cwd = process.cwd()) {
   const readme = readFileSync(join(cwd, featureDir, 'README.md'), 'utf8');

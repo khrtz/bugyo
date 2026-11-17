@@ -7,6 +7,8 @@ import { runCommand, tail } from './run.js';
 
 const artifactsDir = 'artifacts';
 const reportFile = `${artifactsDir}/results.json`;
+/** verify が最後に書く、機能ごとの合否と証拠の場所の要約。task done が証拠に写す */
+export const summaryFile = `${artifactsDir}/verify.json`;
 
 /**
  * @param {string} cwd
@@ -126,5 +128,10 @@ export function verify(target, cwd = process.cwd()) {
   });
   lines.push(`証拠: ${outcome.evidence.join(', ')}`);
   if (!outcome.passed) lines.push(tail(outcome.output));
+  mkdirSync(join(cwd, artifactsDir), { recursive: true });
+  writeFileSync(
+    join(cwd, summaryFile),
+    `${JSON.stringify({ runner: config.verify.runner, passed: outcome.passed, features: outcome.results, evidence: outcome.evidence }, null, 2)}\n`,
+  );
   return { status: outcome.passed ? 0 : 1, lines, results: outcome.results, evidence: outcome.evidence };
 }

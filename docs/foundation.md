@@ -203,6 +203,8 @@ export default defineBugyoConfig({ port: 5173 });
 | `bugyo verify <id>` | その機能の spec を実行し、合否と証拠の場所だけを出す |
 | `bugyo verify --all` | feature map にあるすべての機能を確かめる |
 
+タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) にあります。
+
 `new feature <id>` が作るものは次のとおりです。作ったあと、画面への組み込みと feature map の記入が残ります（組み込むまで knip が「未使用」として止めます）。
 
 - `src/features/<id>/model/<id>.ts` と、そのテスト
@@ -218,6 +220,7 @@ export default defineBugyoConfig({ port: 5173 });
 - 実行のたびに `artifacts/` を消してから始める
 - 機能ごとに `PASS` / `FAIL` を1行で出し、次の行に証拠の場所を出す。失敗したときだけ、出力の末尾30行を付ける
 - 終了コードは、すべて通れば 0、1つでも落ちれば 1、機能名が feature map になければ 2
+- 最後に、機能ごとの合否と証拠の場所の要約を `artifacts/verify.json` に書く（`bugyo task done` が証拠に写す）
 
 実行方法は `.bugyo/config.json` の `verify.runner` で選びます。
 
@@ -247,13 +250,15 @@ export default defineBugyoConfig({ port: 5173 });
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
 
+同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
+
 ## プロジェクトに置くスクリプト
 
 見本（[examples/todo-app](../examples/todo-app)）は次の3つを使います。
 
 | スクリプト | 中身 | いつ通すか |
 | --- | --- | --- |
-| `pnpm check` | `tsc --noEmit && eslint . && depcruise src && knip` | 変更のたび |
+| `pnpm check` | `tsc --noEmit && eslint . && depcruise src && knip && bugyo task lint` | 変更のたび |
 | `pnpm test` | `vitest run`（ユニットテストと feature map の整合） | 変更のたび |
 | `pnpm verify <id>` | `bugyo verify <id>` | 完了を名乗る前 |
 

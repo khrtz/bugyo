@@ -1,3 +1,1 @@
-export function greet(name) {
-  return `hello, ${name}`;
-}
+export { greet } from './model/greet.js';

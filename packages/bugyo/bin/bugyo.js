@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 import { init, newFeature } from '../src/scaffold.js';
+import { UsageError, gateCommand, mistakeCommand, taskCommand, taskUsage } from '../src/task-cli.js';
 import { verify } from '../src/verify.js';
 
 const usage = `使い方:
   bugyo init <dir>             土台入りの新しいプロジェクトを作る
   bugyo new feature <id>       feature を ui/model/api・feature map・spec つきで作る
   bugyo verify <id>            その feature を実際に動かし、合否と証拠の場所だけを出す
-  bugyo verify --all           feature map にあるすべての feature を確かめる`;
+  bugyo verify --all           feature map にあるすべての feature を確かめる
+${taskUsage}`;
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -21,6 +23,12 @@ function main() {
   switch (command) {
     case 'verify':
       return runVerify();
+    case 'task':
+      return taskCommand(args);
+    case 'mistake':
+      return mistakeCommand(args);
+    case 'gate':
+      return gateCommand(args);
     case 'new': {
       const [kind, id] = args;
       if (kind !== 'feature' || id === undefined) break;
@@ -50,5 +58,6 @@ try {
   process.exit(main());
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+  if (error instanceof UsageError) console.error(`\n${usage}`);
+  process.exit(error instanceof UsageError ? 2 : 1);
 }

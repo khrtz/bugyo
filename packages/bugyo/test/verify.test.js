@@ -39,7 +39,7 @@ test('command 方式: React も Playwright もないプロジェクトで verify
 
 test('command 方式: 壊すと FAIL と終了コード 1、末尾に失敗の出力が付く', () => {
   const cwd = plainProject();
-  writeFileSync(join(cwd, 'lib/greet/index.js'), 'export function greet(name) {\n  return `hi ${name}`;\n}\n');
+  writeFileSync(join(cwd, 'lib/greet/model/greet.js'), 'export function greet(name) {\n  return `hi ${name}`;\n}\n');
   const run = bugyo(cwd, 'verify', '--all');
   assert.equal(run.status, 1);
   const lines = run.stdout.trim().split('\n');
@@ -68,6 +68,8 @@ test('設定がなければ playwright 方式と今までの場所になる', ()
   assert.deepEqual(loadConfig(cwd), {
     verify: { runner: 'playwright' },
     featureMap: { specDir: 'e2e', specSuffix: '.spec.ts', featuresDir: 'src/features' },
+    evidence: { tree: ['src', 'e2e'] },
+    gate: { window: 20, maxRework: 2, minFirstPass: 16 },
   });
 });
 

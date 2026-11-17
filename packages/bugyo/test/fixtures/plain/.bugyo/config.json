@@ -1,4 +1,9 @@
 {
   "verify": { "runner": "command", "command": "node {spec}" },
-  "featureMap": { "specDir": "checks", "specSuffix": ".js", "featuresDir": "lib" }
+  "featureMap": { "specDir": "checks", "specSuffix": ".js", "featuresDir": "lib" },
+  "commands": {
+    "check": "node scripts/check.js",
+    "test": "node --test \"lib/**/*.test.js\""
+  },
+  "evidence": { "tree": ["lib", "checks"] }
 }
