@@ -53,6 +53,8 @@ test('init はテンプレートをコピーし、依存を公開版に向ける
   assert.equal(pkg.name, 'my-app');
   assert.match(pkg.devDependencies['bugyo'], /^\^\d/);
   assert.match(pkg.devDependencies['@bugyo/lint'], /^\^\d/);
+  assert.match(pkg.devDependencies['@bugyo/lint-react'], /^\^\d/);
+  assert.deepEqual(Object.values(pkg.devDependencies).filter((version) => version.startsWith('workspace:')), []);
   assert.ok(existsSync(join(dir, 'CLAUDE.md')));
   assert.ok(existsSync(join(dir, '.gitignore')));
   assert.ok(!existsSync(join(dir, 'node_modules')));
@@ -74,7 +76,7 @@ test('init --template node-lib は React・Vite・Playwright を依存に入れ�
   assert.match(pkg.devDependencies['bugyo'], /^\^\d/);
   assert.match(pkg.devDependencies['@bugyo/lint'], /^\^\d/);
   const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
-  for (const banned of ['react', 'react-dom', 'vite', 'vitest', '@vitejs/plugin-react', '@playwright/test']) {
+  for (const banned of ['react', 'react-dom', 'vite', 'vitest', '@vitejs/plugin-react', '@playwright/test', '@bugyo/lint-react']) {
     assert.ok(!deps.includes(banned), `${banned} が依存に入っています`);
   }
   const config = loadConfig(dir);

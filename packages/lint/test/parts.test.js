@@ -4,7 +4,7 @@ import { join, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
 import { config } from '../depcruise.cjs';
-import { bugyo, common, react, structure } from '../eslint.js';
+import { bugyo, common, structure } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture-node');
 const parts = bugyo({ root, parts: [common, structure], explicitExtensions: true });
@@ -56,7 +56,7 @@ test('構成: explicitExtensions がなければ index.ts への拡張子つき 
   assert.deepEqual(result?.messages.filter((m) => m.ruleId === 'no-restricted-imports').map((m) => m.line), [1, 2]);
 });
 
-test('共通と構成だけなら、React 用のルールは1つも登録されていない', async () => {
+test('既定（共通と構成）には、React 用のルールが1つも登録されていない', async () => {
   const text = serialize(parts.map((block) => block.rules ?? {}));
   for (const block of parts) assert.ok(!Object.keys(block.plugins ?? {}).includes('react-hooks'));
   assert.ok(!/react-hooks\//.test(text), 'react-hooks のルール');
@@ -73,17 +73,17 @@ test('共通と構成だけなら、React 用のルールは1つも登録され�
 });
 
 test('common を外した組み合わせは断る', () => {
-  assert.throws(() => bugyo({ root, parts: [structure, react] }), /common/);
+  assert.throws(() => bugyo({ root, parts: [structure] }), /common/);
 });
 
-test('部品の順番を変えても同じ設定になる', () => {
-  assert.equal(serialize(bugyo({ root, parts: [react, structure, common] })), serialize(bugyo({ root })));
+test('既定は共通と構成で、部品の順番を変えても同じ設定になる', () => {
+  assert.equal(serialize(bugyo({ root, parts: [structure, common] })), serialize(bugyo({ root })));
 });
 
-test('depcruise: react: false なら model-is-pure は React とその周辺を見ない', () => {
+test('depcruise: 既定では model-is-pure は React とその周辺を見ず、react: true で見る', () => {
   const pure = (options) => config(options).forbidden.find((rule) => rule.name === 'model-is-pure').to.path;
-  assert.match(pure(), /node_modules\/\(react\|react-dom\|@tanstack\)/);
-  assert.doesNotMatch(pure({ react: false }), /node_modules/);
+  assert.doesNotMatch(pure(), /node_modules/);
+  assert.match(pure({ react: true }), /node_modules\/\(react\|react-dom\|@tanstack\)/);
 });
 
 test('depcruise: React のないフィクスチャでも構成の境界を止める', () => {

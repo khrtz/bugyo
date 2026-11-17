@@ -60,7 +60,7 @@ The two lines say: the steps to check are in `docs/features/todos.md`, and the e
 ## What it does
 
 - **Structure** — `src/app`, `src/features/<id>/{ui,api,model,index.ts}`, `src/shared/{ui,lib,api}`. Other code may import a feature only through its `index.ts`. The `node-lib` template uses `src/features/<id>/{model,index.ts}` only.
-- **Lint** — three parts you combine. `common`: no `any`, no type assertions, no comments, no unexplained `eslint-disable`. `structure`: feature boundaries, `fetch` only in `shared/api`, `model/` stays pure. `react`: `useEffect` only in `shared/lib`, no timers in feature UI, no React in `model/`. Projects without React use `common` and `structure` only.
+- **Lint** — parts you combine. `@bugyo/lint` has `common` (no `any`, no type assertions, no comments, no unexplained `eslint-disable`) and `structure` (feature boundaries, `fetch` only in `shared/api`, `model/` stays pure). The `react` part (`useEffect` only in `shared/lib`, no timers in feature UI, no React in `model/`) lives in a separate package, `@bugyo/lint-react`. Projects without React install `@bugyo/lint` only.
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
 - **Verification** — `bugyo verify <id>` runs the feature's check and reports pass/fail plus where the evidence is. By default it runs the Playwright spec and keeps video, screenshots, and a trace; with `"runner": "command"` in `.bugyo/config.json` it runs any command per feature and keeps its output.
@@ -73,7 +73,8 @@ Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs
 
 | Path | Contents |
 | --- | --- |
-| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config built from three parts (common, structure, React), dependency-cruiser rules, a strict tsconfig, a no-comments rule |
+| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config (the common and structure parts), dependency-cruiser rules, a strict tsconfig, a no-comments rule. No React dependency |
+| [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | The React part added on top of `@bugyo/lint` (where `useEffect` may live, react-hooks, no timers in UI) |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify` / `task` / `mistake` / `gate`), feature map loader and consistency tests, Playwright config |
 | [plugin](plugin) | Claude Code plugin (five skills and a review subagent) |
 | [examples/todo-app](examples/todo-app) | A React (Vite) sample; the source of `bugyo init --template react-vite` (the default) |
@@ -88,21 +89,21 @@ pnpm install
 ```
 
 ```bash
-pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack
+pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack && pnpm --filter @bugyo/lint-react pack
 ```
 
 Pick a template when you create the project. The default is `react-vite`.
 
 | Template | What you get | How verify works |
 | --- | --- | --- |
-| `react-vite` | A React + Vite app. Lint uses all three parts | Drives the UI with Playwright and keeps video, screenshots, and a trace |
-| `node-lib` | A TypeScript library / CLI with no UI, run directly by Node's type stripping. Lint uses `common` and `structure` | Runs each feature's check script with `node` and keeps its output |
+| `react-vite` | A React + Vite app. Lint uses common, structure, and React (`@bugyo/lint-react`) | Drives the UI with Playwright and keeps video, screenshots, and a trace |
+| `node-lib` | A TypeScript library / CLI with no UI, run directly by Node's type stripping. Lint uses `common` and `structure` only; `@bugyo/lint-react` is not installed | Runs each feature's check script with `node` and keeps its output |
 
 ```bash
 node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib
 ```
 
-In the generated `my-app/package.json`, point `bugyo` and `@bugyo/lint` at the tarballs you just built using `file:` paths. Then run the following (for `react-vite`, also run `pnpm exec playwright install chromium`):
+In the generated `my-app/package.json`, point `bugyo` and `@bugyo/lint` (and `@bugyo/lint-react` for `react-vite`) at the tarballs you just built using `file:` paths. Then run the following (for `react-vite`, also run `pnpm exec playwright install chromium`):
 
 ```bash
 cd ../my-app && pnpm install
@@ -132,7 +133,7 @@ pnpm check && pnpm test && pnpm verify
 pnpm validate-plugin
 ```
 
-- The `packages/lint` tests run every rule against deliberately broken files in `test/fixture` (and the `.ts`-only `test/fixture-node`) and check that each one reports an error
+- The `packages/lint` and `packages/lint-react` tests run every rule against deliberately broken files (the `.ts`-only `packages/lint/test/fixture-node` and the React `packages/lint-react/test/fixture`) and check that each one reports an error
 - The `packages/bugyo` tests check what `new feature` and `init` generate for both templates, and how `verify` and the task ledger behave (including that what should be refused is refused) on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
 - TypeScript is pinned to 6.0
 

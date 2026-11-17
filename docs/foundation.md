@@ -4,7 +4,7 @@
 
 土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
 
-feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提で、React 用の禁止は部品の1つとして分かれています（下の「部品」）。
+feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提です。React 用の禁止は別のパッケージ `@bugyo/lint-react` に分かれていて、React を使うプロジェクトだけが入れます（下の「部品」）。
 
 雛形（`bugyo init --template <名前>`）は2つです。
 
@@ -40,10 +40,11 @@ e2e/<id>.spec.ts            その機能を実際に操作するテスト
 ### ESLint
 
 ```js
-// eslint.config.js
-import { bugyo } from '@bugyo/lint';
+// eslint.config.js（React を使うプロジェクト）
+import { bugyo, common, structure } from '@bugyo/lint';
+import { react } from '@bugyo/lint-react';
 
-export default bugyo({ root: import.meta.dirname });
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, react] });
 ```
 
 | 項目 | 既定 | 意味 |
@@ -54,18 +55,18 @@ export default bugyo({ root: import.meta.dirname });
 | `apiClientDir` | `<src>/shared/api` | `fetch` を呼んでよい場所 |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `extra` | `{}` | 独自の禁止を足す（下の「独自の禁止を足す」） |
-| `parts` | `[common, structure, react]` | 使う部品（下の「部品」）。`common` は必須 |
+| `parts` | `[common, structure]` | 使う部品（下の「部品」）。`common` は必須 |
 | `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
 
 #### 部品
 
-設定は3つの部品の組み合わせです。React を使わないプロジェクトは `common` と `structure` だけを渡します。同じ範囲の禁止（`no-restricted-imports` など）は、部品をまたいで1つのルールに合成されます。部品の順番は結果に影響しません。
+設定は部品の組み合わせです。`common` と `structure` は `@bugyo/lint` に、`react` は `@bugyo/lint-react` にあります。React を使わないプロジェクトは `@bugyo/lint-react` を入れず、`common` と `structure` だけを使います（`parts` を省いたときと同じ）。同じ範囲の禁止（`no-restricted-imports` など）は、部品をまたいで1つのルールに合成されます。部品の順番は結果に影響しません。
 
 ```js
 // eslint.config.js（React を使わないプロジェクト）
-import { bugyo, common, structure } from '@bugyo/lint';
+import { bugyo } from '@bugyo/lint';
 
-export default bugyo({ root: import.meta.dirname, parts: [common, structure], explicitExtensions: true });
+export default bugyo({ root: import.meta.dirname, explicitExtensions: true });
 ```
 
 | 部品 | 範囲 | 止めるもの |
@@ -74,7 +75,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure], ex
 | `common` | `src` の下 | コメント。`extra` で足した禁止 |
 | `structure` | `src` の下 | 他の feature の内部ファイルの import、`shared` から `features` / `app` への依存、`features` から `app` への依存、`fetch` |
 | `structure` | `src/features/*/model` | 同じ feature の `ui` と `api`、`shared/ui`、`shared/api` |
-| `react` | `src` の下 | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形。加えて react-hooks の推奨ルール |
+| `react`（`@bugyo/lint-react`） | `src` の下 | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形。加えて react-hooks の推奨ルール |
 | `react` | `src/features/*/ui` | `setTimeout`、`setInterval`、`requestAnimationFrame` |
 | `react` | `src/features/*/model` | `react`、`react-dom`、`@tanstack/*` |
 
@@ -119,11 +120,11 @@ export default bugyo({
 ### dependency-cruiser
 
 ```js
-// .dependency-cruiser.cjs
-module.exports = require('@bugyo/lint/depcruise').config();
+// .dependency-cruiser.cjs（React を使わないなら config()）
+module.exports = require('@bugyo/lint/depcruise').config({ react: true });
 ```
 
-`config({ src, tsConfig, forbidden, react })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: false` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存を見なくなります（既定は `true`）。
+`config({ src, tsConfig, forbidden, react })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: true` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存も止めます（既定は `false`）。
 
 | ルール | 止めるもの |
 | --- | --- |
@@ -297,7 +298,7 @@ export default defineBugyoConfig({ port: 5173 });
 | `pnpm test` | `vitest run`（ユニットテストと feature map の整合） | `node --test "src/**/*.test.ts" "test/**/*.test.ts"`（ユニットテストと feature map の整合） | 変更のたび |
 | `pnpm verify <id>` | `bugyo verify <id>`（Playwright） | `bugyo verify <id>`（`node checks/<id>.ts`） | 完了を名乗る前 |
 
-`node-lib` の `.bugyo/config.json` は、`verify` を `command` 方式（`node {spec}`）にし、spec のフォルダを `checks`、`evidence.tree` を `src`・`checks`・`test` にしています。lint は `parts: [common, structure]` と `explicitExtensions: true`、dependency-cruiser は `config({ react: false })` です。
+`node-lib` の `.bugyo/config.json` は、`verify` を `command` 方式（`node {spec}`）にし、spec のフォルダを `checks`、`evidence.tree` を `src`・`checks`・`test` にしています。lint は `parts` を省いた既定（`common` と `structure`）と `explicitExtensions: true`、dependency-cruiser は `config()` です。`@bugyo/lint-react` は依存に入れません。`react-vite` は `parts: [common, structure, react]` と `config({ react: true })` です。
 
 `pnpm check` が通るだけでは完了ではありません。変更の種類ごとに必要な証拠は、見本の [docs/土台設計.md](../examples/todo-app/docs/土台設計.md) にあります。
 

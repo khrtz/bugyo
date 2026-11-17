@@ -2,13 +2,13 @@
  * bugyo の dependency-cruiser 設定を作る。
  * 利用側の .dependency-cruiser.cjs で `module.exports = require('@bugyo/lint/depcruise').config()` とする。
  *
- * `react: false` にすると、`model-is-pure` は React とその周辺（react・react-dom・@tanstack）への依存を見なくなる。
+ * React を使うなら `react: true` にする。`model-is-pure` が React とその周辺（react・react-dom・@tanstack）への依存も止める。既定は false。
  *
  * @param {{ src?: string, tsConfig?: string, forbidden?: object[], react?: boolean }} [options]
  */
 function config(options = {}) {
   const src = options.src ?? 'src';
-  const react = options.react ?? true;
+  const react = options.react ?? false;
   const s = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return {
     forbidden: [
@@ -57,7 +57,7 @@ function config(options = {}) {
         from: { path: `^${s}/features/([^/]+)/model/` },
         to: {
           path: react
-            ? `^(${s}/(features|shared/(ui|api)|app)/|node_modules/(react|react-dom|@tanstack)/)`
+            ? `(^${s}/(features|shared/(ui|api)|app)/|(^|/)node_modules/(react|react-dom|@tanstack)/)`
             : `^${s}/(features|shared/(ui|api)|app)/`,
           pathNot: `^${s}/features/$1/model/`,
         },

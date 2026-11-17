@@ -2,7 +2,6 @@ import js from '@eslint/js';
 import comments from '@eslint-community/eslint-plugin-eslint-comments';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import importX from 'eslint-plugin-import-x';
-import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import { noComments } from './rules/no-comments.js';
@@ -87,51 +86,6 @@ export const common = {
       { files: ['**/*.cjs'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
     ],
   }),
-};
-
-/**
- * React: `useEffect` の禁止と例外の場所（effectHooksDir）、react-hooks、feature の UI でのタイマー禁止、`model` から React への依存の禁止。
- *
- * @type {Part}
- */
-export const react = {
-  name: 'react',
-  rank: 1,
-  build: (context) => {
-    const effectMessage = `製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは ${context.effectHooksDir} の専用フックを使ってください。該当するフックがなければ ${context.effectHooksDir} に追加してください。`;
-    return {
-      srcPlugins: { 'react-hooks': reactHooks },
-      srcRules: { ...reactHooks.configs.recommended.rules },
-      src: {
-        paths: [{ value: { name: 'react', importNames: ['useEffect', 'useLayoutEffect'], message: effectMessage }, exempt: ['effects'] }],
-        syntax: [
-          {
-            value: { selector: "MemberExpression[object.name='React'][property.name=/^use(Layout)?Effect$/]", message: effectMessage },
-            exempt: ['effects', 'tests'],
-          },
-        ],
-      },
-      ui: {
-        globals: ['setTimeout', 'setInterval', 'requestAnimationFrame'].map((name) => ({
-          value: {
-            name,
-            message: `UIで${name}によるタイミング合わせはできません。根本原因（状態の持ち方・データの流れ）を直してください。時間に依存する処理が本当に必要なら ${context.effectHooksDir} に専用フックを作ってください。`,
-          },
-          exempt: ['tests'],
-        })),
-      },
-      model: {
-        patterns: [
-          {
-            value: {
-              group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@tanstack/*'],
-              message: 'model/ は純粋関数だけです。Reactや通信に依存する処理は ui/ か api/ に置いてください。',
-            },
-          },
-        ],
-      },
-    };
-  },
 };
 
 /**
@@ -240,13 +194,13 @@ const merged = (list, key) => Object.assign({}, ...list.map((contribution) => co
  * bugyo の ESLint flat config を作る。
  * no-restricted-imports / no-restricted-globals などはスコープごとに1つの設定へ合成して返すので、
  * 利用側で同じルールを上書きせず、追加の禁止は `extra` で渡すこと。
- * `parts` で部品を選べる（既定は common・structure・react のすべて。common は必須）。
+ * `parts` で部品を選べる（既定は common と structure。common は必須）。React を使うなら @bugyo/lint-react の react を足す。
  *
  * @param {BugyoOptions} options
  * @returns {import('eslint').Linter.Config[]}
  */
 export function bugyo(options) {
-  const { root, src = 'src', ignores = [], extra = {}, parts = [common, structure, react], explicitExtensions = false } = options;
+  const { root, src = 'src', ignores = [], extra = {}, parts = [common, structure], explicitExtensions = false } = options;
   const { effectHooksDir = `${src}/shared/lib`, apiClientDir = `${src}/shared/api` } = options;
   if (typeof root !== 'string') throw new Error('bugyo({ root }) に import.meta.dirname を渡してください');
   if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');

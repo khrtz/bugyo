@@ -1,1 +1,1 @@
-module.exports = require('../../depcruise.cjs').config({ react: false });
+module.exports = require('../../depcruise.cjs').config();

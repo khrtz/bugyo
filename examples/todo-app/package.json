@@ -31,6 +31,7 @@
     "vite": "^8.3.8",
     "vitest": "^5.1.0",
     "@bugyo/lint": "workspace:*",
+    "@bugyo/lint-react": "workspace:*",
     "bugyo": "workspace:*"
   }
 }
