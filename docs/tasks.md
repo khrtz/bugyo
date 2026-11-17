@@ -67,7 +67,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `bugyo task show <id>` | エージェント | 本文、読むべき feature map、完了に必要なものを出す |
 | `bugyo task repro <id> -- <テストコマンド>` | エージェント | `bugfix` 用。直す前にそのコマンドが失敗することを確かめて記録する。今通るコマンドは断る |
 | `bugyo task done <id>` | エージェント | 証拠を取り、通れば閉じる。通らなければ理由を出して作業中のままにする |
-| `bugyo task rework <id> -r "<理由>" --kind <ミスの種類>` | 人 | 完了したタスクを作業中に戻し、手直しとミスの種類を記録する |
+| `bugyo task rework <id> -r "<理由>" --kind <ミスの種類> [--as <名前>]` | 人 | 完了したタスクを作業中に戻し、手直しとミスの種類を記録する。担当は元の担当のままで、その人が別のタスクを作業中なら断るので、`--as` で別の担当を指定する |
 | `bugyo task drop <id> -r "<理由>"` | 人 | やめる。完了したタスクはやめられない |
 | `bugyo task ls [--all]` | 人 | 一覧。`--all` で完了とやめたものも出す |
 | `bugyo task lint` | `pnpm check` | 台帳の整合を検査する |
@@ -108,7 +108,7 @@ t-014 [active/bugfix] 絞り込みを切り替えると残り件数がずれる 
 - テストファイルは、`evidence.tree` のパスの下で名前が `.test.` か `.spec.` を含む JS / TS のファイルです
 - `ui-look` で基準画像を更新したことをタスクに記録する仕組みは、まだありません
 
-証拠ファイルには、実際に実行したコマンドの文字列、終了コード、かかった時間、通った条件、verify の結果（`artifacts/verify.json` の中身。機能ごとの合否と証拠の場所）、ハッシュを取ったパスとハッシュが入ります。
+証拠ファイルには、実際に実行したコマンドの文字列、終了コード、かかった時間、通った条件、verify の結果（`artifacts/verify.json` の中身。機能ごとの合否、verify が中で実行したコマンド、証拠の場所）、ハッシュを取ったパスとハッシュが入ります。
 
 ```json
 {
@@ -122,7 +122,7 @@ t-014 [active/bugfix] 絞り込みを切り替えると残り件数がずれる 
   "steps": [
     { "name": "check", "command": "pnpm check", "status": 0, "ms": 11557 },
     { "name": "test", "command": "pnpm test", "status": 0, "ms": 1952 },
-    { "name": "verify", "command": "bugyo verify todos", "status": 0, "ms": 6269, "results": { "file": "artifacts/verify.json", "runner": "playwright", "passed": true, "features": [{ "id": "todos", "ok": true }], "evidence": ["…"] } }
+    { "name": "verify", "command": "bugyo verify todos", "status": 0, "ms": 6269, "results": { "file": "artifacts/verify.json", "runner": "playwright", "passed": true, "features": [{ "id": "todos", "ok": true, "command": "pnpm exec playwright test e2e/todos.spec.ts --reporter=line,json,html" }], "evidence": ["…"] } }
   ],
   "tree": { "paths": ["src", "e2e"], "hash": "sha256:…" }
 }
@@ -153,7 +153,7 @@ t-014 [active/bugfix] 絞り込みを切り替えると残り件数がずれる 
 | `gate.minFirstPass` | `16` | そのうち1回の `done` で閉じたタスクの下限 |
 
 - 既定値を使うのは、`commands` のキーそのものがないときだけです。`commands` があれば書かれたものだけを使い、そのタスクの種類に必要なコマンドが未定義か空なら `done` は断ります
-- **`.bugyo/config.json` を変えるのは人だけです。** コマンドを変えれば `done` の判定も変わるからです。エージェントはこのファイルを書き換えません。変えた跡が残るように、証拠ファイルには実行したコマンドの文字列とハッシュを取ったパスをそのまま記録します
+- **`.bugyo/config.json` を変えるのは人だけです。** コマンドを変えれば `done` の判定も変わるからです。エージェントはこのファイルを書き換えません。変えた跡が残るように、証拠ファイルには実行したコマンドの文字列（verify が中で実行したコマンドも）とハッシュを取ったパスをそのまま記録します
 
 ## 機械的に守らせる場所
 

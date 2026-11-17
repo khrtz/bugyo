@@ -27,7 +27,7 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo task show <id>                   本文、読むもの、完了に必要なもの
   bugyo task repro <id> -- <コマンド>    bugfix: 直す前に失敗することを記録する
   bugyo task done <id>                   証拠を取り、通れば閉じる
-  bugyo task rework <id> -r "<理由>" --kind <ミスの種類>
+  bugyo task rework <id> -r "<理由>" --kind <ミスの種類> [--as <名前>]
   bugyo task drop <id> -r "<理由>"
   bugyo task ls [--all]                  一覧（--all で完了・中止も）
   bugyo task lint                        台帳の整合を検査する
@@ -263,13 +263,20 @@ function rework(args, cwd) {
   const kind = required(values.kind, `--kind <ミスの種類> を渡してください。${hint}`);
   const reason = required(values.reason, '-r "<理由>" で、何を手直ししたかを書いてください');
   if (!isMistakeKind(kind)) throw new UsageError(`ミスの種類 "${kind}" は小文字・数字・ハイフンにしてください。${hint}`);
-  const task = findTask(loadTasks(cwd), id);
+  const tasks = loadTasks(cwd);
+  const task = findTask(tasks, id);
   if (task.status !== 'done') throw new Error(`${id} は ${task.status} です。rework できるのは done のタスクだけです`);
+  const assignee = values.as?.trim() || task.assignee;
+  const busy = tasks.find((other) => other.status === 'active' && other.assignee === assignee);
+  if (busy !== undefined) {
+    throw new Error(`${assignee} はいま ${busy.id} を作業中です。1人1件なので、--as <名前> で手直しする担当を指定してください`);
+  }
   const day = today();
   const count = task.rework + 1;
   const body = `${task.body.trimEnd()}\n${task.body.includes('\n## 手直し\n') ? '' : '\n## 手直し\n\n'}- ${count}回目（${kind}、${day}）: ${reason}\n`;
   const reopened = saveTask(cwd, {
     ...task,
+    assignee,
     status: 'active',
     rework: count,
     body,

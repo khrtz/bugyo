@@ -10,12 +10,15 @@ const reportFile = `${artifactsDir}/results.json`;
 /** verify が最後に書く、機能ごとの合否と証拠の場所の要約。task done が証拠に写す */
 export const summaryFile = `${artifactsDir}/verify.json`;
 
+/** @param {string[]} specs */
+const playwrightArgs = (specs) => ['exec', 'playwright', 'test', ...specs, '--reporter=line,json,html'];
+
 /**
  * @param {string} cwd
  * @param {string[]} specs
  */
 function runPlaywright(cwd, specs) {
-  return spawnSync('pnpm', ['exec', 'playwright', 'test', ...specs, '--reporter=line,json,html'], {
+  return spawnSync('pnpm', playwrightArgs(specs), {
     cwd,
     encoding: 'utf8',
     shell: process.platform === 'win32',
@@ -51,7 +54,7 @@ function resultsBySpec(cwd) {
 }
 
 /**
- * @typedef {{ id: string, ok: boolean | undefined }} FeatureResult
+ * @typedef {{ id: string, ok: boolean | undefined, command: string }} FeatureResult
  * @typedef {{ status: 0 | 1 | 2, lines: string[], results: FeatureResult[], evidence: string[] }} VerifyOutcome
  * @typedef {{ passed: boolean, output: string, results: FeatureResult[], evidence: string[] }} RunnerOutcome
  */
@@ -71,7 +74,11 @@ function viaPlaywright(cwd, targets) {
   return {
     passed,
     output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
-    results: targets.map((feature) => ({ id: feature.id, ok: bySpec.get(feature.spec) })),
+    results: targets.map((feature) => ({
+      id: feature.id,
+      ok: bySpec.get(feature.spec),
+      command: ['pnpm', ...playwrightArgs(targets.map((target) => target.spec))].join(' '),
+    })),
     evidence: [`${artifactsDir}/test-results（動画・スクリーンショット・トレース）`, `${artifactsDir}/report/index.html`],
   };
 }
@@ -92,7 +99,7 @@ function viaCommand(cwd, command, targets) {
     const run = runCommand(line, cwd);
     const log = `${artifactsDir}/verify/${feature.id}.log`;
     writeFileSync(join(cwd, log), `$ ${line}\n${run.output}`);
-    results.push({ id: feature.id, ok: run.status === 0 });
+    results.push({ id: feature.id, ok: run.status === 0, command: line });
     evidence.push(log);
     if (run.status !== 0) failedOutput.push(`$ ${line}\n${run.output}`);
   }

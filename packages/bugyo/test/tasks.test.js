@@ -182,7 +182,7 @@ test('done: verify が落ちる状態だと断られて作業中のまま、直�
       ['verify', `node "${bin}" verify greet`, 0],
     ],
   );
-  assert.deepEqual(evidence.steps[2].results.features, [{ id: 'greet', ok: true }]);
+  assert.deepEqual(evidence.steps[2].results.features, [{ id: 'greet', ok: true, command: 'node checks/greet.js' }]);
   assert.deepEqual(evidence.tree.paths, ['lib', 'checks']);
   assert.equal(evidence.tree.hash, field(cwd, 't-001', 'evidence-tree'));
   ok(cwd, 'task', 'lint');
@@ -360,4 +360,54 @@ test('gate: 同じ種類の手直しを2回記録すると不合格になり、�
 
   ok(cwd, 'task', 'rework', 't-003', '-r', 'また深い import', '--kind', 'deep-import');
   assert.match(ok(cwd, 'mistake', 'ls').stdout, /^deep-import 3回 {2}ルール: scripts\/check\.js {2}← ルールが漏れている/m);
+});
+
+test('rework は戻す担当が別のタスクを作業中なら断り、--as で別の担当に渡せる', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'a', '--type', 'chore');
+  ok(cwd, 'task', 'add', 'b', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  ok(cwd, 'task', 'start', 't-002', '--as', 'w1');
+  const busy = bugyo(cwd, 'task', 'rework', 't-001', '-r', '名前が違う', '--kind', 'wrong-name');
+  assert.equal(busy.status, 1);
+  assert.match(busy.stderr, /w1 はいま t-002 を作業中です/);
+  assert.equal(field(cwd, 't-001', 'status'), 'done');
+  ok(cwd, 'task', 'rework', 't-001', '-r', '名前が違う', '--kind', 'wrong-name', '--as', 'w2');
+  assert.equal(field(cwd, 't-001', 'assignee'), 'w2');
+  ok(cwd, 'task', 'lint');
+});
+
+test('drop は理由がないと断り、完了したタスクも断り、やめたタスクを archive に移す', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'a', '--type', 'chore');
+  ok(cwd, 'task', 'add', 'b', '--type', 'chore');
+  assert.equal(bugyo(cwd, 'task', 'drop', 't-001').status, 2);
+  ok(cwd, 'task', 'drop', 't-001', '-r', '要らなくなった');
+  assert.ok(existsSync(join(cwd, '.bugyo/tasks/archive/t-001.md')));
+  assert.ok(!existsSync(join(cwd, '.bugyo/tasks/t-001.md')));
+  assert.equal(field(cwd, 't-001', 'drop-reason'), '要らなくなった');
+  ok(cwd, 'task', 'start', 't-002', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-002');
+  const refused = bugyo(cwd, 'task', 'drop', 't-002', '-r', 'やめる');
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /完了しています。直すなら bugyo task rework/);
+  assert.deepEqual(JSON.parse(ok(cwd, 'task', 'ls', '--json').stdout), []);
+  assert.deepEqual(JSON.parse(ok(cwd, 'task', 'ls', '--all', '--json').stdout).map((task) => task.status), ['dropped', 'done']);
+});
+
+test('task lint: feature map にない機能、証拠と食い違う evidence-tree、同じ id の重複を見つける', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'a', '--type', 'ui-flow', '--feature', 'greet');
+  ok(cwd, 'task', 'add', 'b', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-002', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-002');
+  setField(cwd, 't-001', 'feature', 'gone');
+  setField(cwd, 't-002', 'evidence-tree', 'sha256:0000');
+  cpSync(join(cwd, '.bugyo/tasks/t-001.md'), join(cwd, '.bugyo/tasks/archive/t-001.md'));
+  const run = bugyo(cwd, 'task', 'lint');
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /t-001\.md: feature の gone が docs\/features にありません/);
+  assert.match(run.stderr, /t-002\.md: evidence-tree が \.bugyo\/evidence\/t-002\.json と合いません/);
+  assert.match(run.stderr, /同じ id のタスクが \.bugyo\/tasks\/t-001\.md にもあります/);
 });
