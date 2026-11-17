@@ -15,13 +15,12 @@
   <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-f0314f?style=flat-square">
   <img alt="node 24 or later" src="https://img.shields.io/badge/node-%E2%89%A5%2024-35e0c2?style=flat-square">
   <img alt="TypeScript (templates: React / Vite and Node)" src="https://img.shields.io/badge/TypeScript-React%20%2F%20Vite%20%7C%20Node-ffd23f?style=flat-square">
-  <img alt="status: early" src="https://img.shields.io/badge/status-early-8b7cf6?style=flat-square">
 </p>
 
 ---
 
 **bugyo** is a toolkit for handing development work to AI agents.
-Instead of piling up written instructions, it shapes the codebase so that **the wrong way does not pass, and "done" without evidence is not accepted**.
+Instead of piling up written instructions, it shapes the codebase so that **the wrong way is stopped by lint, and every check leaves evidence behind**.
 
 The core (feature map, verification, task ledger, gate) does not depend on any stack. The lint and dependency rules assume TypeScript. There are two templates: a React (Vite) app, and a Node library or CLI with no UI.
 
@@ -32,8 +31,8 @@ Three things happen when you delegate to agents. bugyo stops each of them with t
 | What happens | How bugyo stops it |
 | --- | --- |
 | Code lands in random places and styles, and the next agent copies it | Folder structure and lint rules that only let the right way through |
-| "I verified it" cannot be trusted | Completion is decided by evidence a command collects itself, not by the agent's report |
-| The same kind of mistake keeps coming back | Mistakes are recorded by kind, and the second occurrence blocks progress until it becomes a rule |
+| "I verified it" cannot be trusted | A verify command actually runs the feature and keeps pass/fail plus evidence. A task can only be closed by `bugyo task done`, which runs check, test, and verify itself |
+| The same kind of mistake keeps coming back | Instead of another note, add a lint rule that bans it and says what to use instead. Rework is recorded by kind, and the second occurrence fails `bugyo gate` until it becomes a rule |
 
 ## See it
 
@@ -58,25 +57,17 @@ PASS todos  確認手順: docs/features/todos.md
 
 The two lines say: the steps to check are in `docs/features/todos.md`, and the evidence (video, screenshots, trace, HTML report) is under `artifacts/`.
 
-## Three layers, and what exists today
-
-Built bottom-up. **Layers 1 and 2 work today.** Layer 3 is designed, and its commands do not exist yet.
-
-| Layer | What it does | Status | Docs (Japanese) |
-| --- | --- | --- | --- |
-| **1. Foundation** | Enforces how code is written and checked: structure, lint, dependency rules, verification | Implemented | [docs/foundation.md](docs/foundation.md) |
-| **2. Task ledger and gate** | One file per task; a task cannot be closed unless its evidence passes | Implemented (CI and hooks not yet) | [docs/tasks.md](docs/tasks.md) |
-| **3. Resident agents** | Agents with a role patrol, delegate work, and bring results back to a human | Design only | [docs/agents.md](docs/agents.md) |
-
-"An agent cannot claim done without evidence" is handled by `bugyo task done` in layer 2. It is the only way to close a task: it runs check, test, and verify itself, and writes an evidence file only when they pass. A task flipped to done by hand fails `bugyo task lint` inside `pnpm check`. The build order and the exit criteria for each stage are in [docs/roadmap.md](docs/roadmap.md).
-
-### Layer 1 in short
+## What it does
 
 - **Structure** — `src/app`, `src/features/<id>/{ui,api,model,index.ts}`, `src/shared/{ui,lib,api}`. Other code may import a feature only through its `index.ts`. The `node-lib` template uses `src/features/<id>/{model,index.ts}` only.
 - **Lint** — three parts you combine. `common`: no `any`, no type assertions, no comments, no unexplained `eslint-disable`. `structure`: feature boundaries, `fetch` only in `shared/api`, `model/` stays pure. `react`: `useEffect` only in `shared/lib`, no timers in feature UI, no React in `model/`. Projects without React use `common` and `structure` only.
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
 - **Verification** — `bugyo verify <id>` runs the feature's check and reports pass/fail plus where the evidence is. By default it runs the Playwright spec and keeps video, screenshots, and a trace; with `"runner": "command"` in `.bugyo/config.json` it runs any command per feature and keeps its output.
+- **Task ledger and gate** — one file per task in `.bugyo/tasks/`. `bugyo task done` collects the evidence the task type needs and closes the task only when it passes. A task flipped to done by hand fails `bugyo task lint` inside `pnpm check`. `bugyo gate` decides whether to widen what agents may do, from rework, first-pass closes, and repeated mistakes.
+- **Scaffold** — `bugyo init --template <name>` and `bugyo new feature` create projects and features that already follow these rules.
+
+Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs/tasks.md) (Japanese).
 
 ## What is in the box
 
@@ -90,7 +81,7 @@ Built bottom-up. **Layers 1 and 2 work today.** Layer 3 is designed, and its com
 
 ## Getting started
 
-bugyo is not on npm yet, so build it from this repository. You need Node 24 or later and pnpm 11.
+bugyo is not on npm, so build it from this repository. You need Node 24 or later and pnpm 11.
 
 ```bash
 pnpm install
@@ -141,7 +132,7 @@ pnpm check && pnpm test && pnpm verify
 pnpm validate-plugin
 ```
 
-- The `packages/lint` tests run every rule against deliberately broken files in `test/fixture` and check that each one reports an error
+- The `packages/lint` tests run every rule against deliberately broken files in `test/fixture` (and the `.ts`-only `test/fixture-node`) and check that each one reports an error
 - The `packages/bugyo` tests check what `new feature` and `init` generate for both templates, and how `verify` and the task ledger behave (including that what should be refused is refused) on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
 - TypeScript is pinned to 6.0
 
