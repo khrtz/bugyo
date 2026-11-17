@@ -15,13 +15,12 @@
   <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-f0314f?style=flat-square">
   <img alt="node 24 or later" src="https://img.shields.io/badge/node-%E2%89%A5%2024-35e0c2?style=flat-square">
   <img alt="TypeScript + React" src="https://img.shields.io/badge/TypeScript%20%2B%20React-Vite-ffd23f?style=flat-square">
-  <img alt="status: early" src="https://img.shields.io/badge/status-early-8b7cf6?style=flat-square">
 </p>
 
 ---
 
 **bugyo** is a toolkit for handing development work to AI agents.
-Instead of piling up written instructions, it shapes the codebase so that **the wrong way does not pass, and "done" without evidence is not accepted**. It targets TypeScript + React (Vite) projects.
+Instead of piling up written instructions, it shapes the codebase so that **the wrong way is stopped by lint, and every check leaves evidence behind**. It targets TypeScript + React (Vite) projects.
 
 ## Why
 
@@ -30,8 +29,8 @@ Three things happen when you delegate to agents. bugyo stops each of them with t
 | What happens | How bugyo stops it |
 | --- | --- |
 | Code lands in random places and styles, and the next agent copies it | Folder structure and lint rules that only let the right way through |
-| "I verified it" cannot be trusted | Completion is decided by evidence a command collects itself, not by the agent's report |
-| The same kind of mistake keeps coming back | Mistakes are recorded by kind, and the second occurrence blocks progress until it becomes a rule |
+| "I verified it" cannot be trusted | A verify command actually runs the feature and keeps pass/fail plus evidence (video, screenshots, trace) |
+| The same kind of mistake keeps coming back | Instead of another note, add a lint rule that bans it and says what to use instead |
 
 ## See it
 
@@ -56,25 +55,16 @@ PASS todos  確認手順: docs/features/todos.md
 
 The two lines say: the steps to check are in `docs/features/todos.md`, and the evidence (video, screenshots, trace, HTML report) is under `artifacts/`.
 
-## Three layers, and what exists today
-
-Built bottom-up. **Only layer 1 works today.** Layers 2 and 3 are designed, and their commands do not exist yet.
-
-| Layer | What it does | Status | Docs (Japanese) |
-| --- | --- | --- | --- |
-| **1. Foundation** | Enforces how code is written and checked: structure, lint, dependency rules, verification | Implemented | [docs/foundation.md](docs/foundation.md) |
-| **2. Task ledger and gate** | One file per task; a task cannot be closed unless its evidence passes | Design only | [docs/tasks.md](docs/tasks.md) |
-| **3. Resident agents** | Agents with a role patrol, delegate work, and bring results back to a human | Design only | [docs/agents.md](docs/agents.md) |
-
-With layer 1 alone, bugyo is a strict preset plus a scaffold. "An agent cannot claim done without evidence" only becomes true once layer 2 lands. The build order and the exit criteria for each stage are in [docs/roadmap.md](docs/roadmap.md).
-
-### Layer 1 in short
+## What it does
 
 - **Structure** — `src/app`, `src/features/<id>/{ui,api,model,index.ts}`, `src/shared/{ui,lib,api}`. Other code may import a feature only through its `index.ts`.
 - **Lint** — `useEffect` only in `shared/lib`, `fetch` only in `shared/api`, no timers in feature UI, no `any`, no type assertions, no comments, no unexplained `eslint-disable`. `model/` stays pure.
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
 - **Verification** — `bugyo verify <id>` runs the feature's Playwright spec and keeps video, screenshots, and a trace for every run.
+- **Scaffold** — `bugyo init` and `bugyo new feature` create projects and features that already follow these rules.
+
+Details are in [docs/foundation.md](docs/foundation.md) (Japanese).
 
 ## What is in the box
 
@@ -87,7 +77,7 @@ With layer 1 alone, bugyo is a strict preset plus a scaffold. "An agent cannot c
 
 ## Getting started
 
-bugyo is not on npm yet, so build it from this repository. You need Node 24 or later and pnpm 11.
+bugyo is not on npm, so build it from this repository. You need Node 24 or later and pnpm 11.
 
 ```bash
 pnpm install
