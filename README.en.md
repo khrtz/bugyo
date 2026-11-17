@@ -14,14 +14,16 @@
 <p align="center">
   <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-f0314f?style=flat-square">
   <img alt="node 24 or later" src="https://img.shields.io/badge/node-%E2%89%A5%2024-35e0c2?style=flat-square">
-  <img alt="TypeScript + React" src="https://img.shields.io/badge/TypeScript%20%2B%20React-Vite-ffd23f?style=flat-square">
+  <img alt="TypeScript (templates: React / Vite and Node)" src="https://img.shields.io/badge/TypeScript-React%20%2F%20Vite%20%7C%20Node-ffd23f?style=flat-square">
   <img alt="status: early" src="https://img.shields.io/badge/status-early-8b7cf6?style=flat-square">
 </p>
 
 ---
 
 **bugyo** is a toolkit for handing development work to AI agents.
-Instead of piling up written instructions, it shapes the codebase so that **the wrong way does not pass, and "done" without evidence is not accepted**. It targets TypeScript + React (Vite) projects.
+Instead of piling up written instructions, it shapes the codebase so that **the wrong way does not pass, and "done" without evidence is not accepted**.
+
+The core (feature map, verification, task ledger, gate) does not depend on any stack. The lint and dependency rules assume TypeScript. There are two templates: a React (Vite) app, and a Node library or CLI with no UI.
 
 ## Why
 
@@ -70,7 +72,7 @@ Built bottom-up. **Layers 1 and 2 work today.** Layer 3 is designed, and its com
 
 ### Layer 1 in short
 
-- **Structure** — `src/app`, `src/features/<id>/{ui,api,model,index.ts}`, `src/shared/{ui,lib,api}`. Other code may import a feature only through its `index.ts`.
+- **Structure** — `src/app`, `src/features/<id>/{ui,api,model,index.ts}`, `src/shared/{ui,lib,api}`. Other code may import a feature only through its `index.ts`. The `node-lib` template uses `src/features/<id>/{model,index.ts}` only.
 - **Lint** — three parts you combine. `common`: no `any`, no type assertions, no comments, no unexplained `eslint-disable`. `structure`: feature boundaries, `fetch` only in `shared/api`, `model/` stays pure. `react`: `useEffect` only in `shared/lib`, no timers in feature UI, no React in `model/`. Projects without React use `common` and `structure` only.
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
@@ -83,7 +85,8 @@ Built bottom-up. **Layers 1 and 2 work today.** Layer 3 is designed, and its com
 | [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config built from three parts (common, structure, React), dependency-cruiser rules, a strict tsconfig, a no-comments rule |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify` / `task` / `mistake` / `gate`), feature map loader and consistency tests, Playwright config |
 | [plugin](plugin) | Claude Code plugin (five skills and a review subagent) |
-| [examples/todo-app](examples/todo-app) | A sample app using both packages; also the source of the `bugyo init` template |
+| [examples/todo-app](examples/todo-app) | A React (Vite) sample; the source of `bugyo init --template react-vite` (the default) |
+| [examples/node-lib](examples/node-lib) | A TypeScript library / CLI sample with no UI and no React, Vite, or Playwright; the source of `bugyo init --template node-lib` |
 
 ## Getting started
 
@@ -97,21 +100,28 @@ pnpm install
 pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack
 ```
 
+Pick a template when you create the project. The default is `react-vite`.
+
+| Template | What you get | How verify works |
+| --- | --- | --- |
+| `react-vite` | A React + Vite app. Lint uses all three parts | Drives the UI with Playwright and keeps video, screenshots, and a trace |
+| `node-lib` | A TypeScript library / CLI with no UI, run directly by Node's type stripping. Lint uses `common` and `structure` | Runs each feature's check script with `node` and keeps its output |
+
 ```bash
-node packages/bugyo/bin/bugyo.js init ../my-app
+node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib
 ```
 
-In the generated `my-app/package.json`, point `bugyo` and `@bugyo/lint` at the tarballs you just built using `file:` paths. Then run:
+In the generated `my-app/package.json`, point `bugyo` and `@bugyo/lint` at the tarballs you just built using `file:` paths. Then run the following (for `react-vite`, also run `pnpm exec playwright install chromium`):
 
 ```bash
-cd ../my-app && pnpm install && pnpm exec playwright install chromium
+cd ../my-app && pnpm install
 ```
 
 ```bash
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-To add a feature, run `pnpm exec bugyo new feature <id>`. Adding bugyo to an existing project and every option are covered in [docs/foundation.md](docs/foundation.md).
+To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project and every option are covered in [docs/foundation.md](docs/foundation.md).
 
 ## Language
 
@@ -132,7 +142,7 @@ pnpm validate-plugin
 ```
 
 - The `packages/lint` tests run every rule against deliberately broken files in `test/fixture` and check that each one reports an error
-- The `packages/bugyo` tests check what `new feature` and `init` generate, and how `verify` and the task ledger behave (including that what should be refused is refused) on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
+- The `packages/bugyo` tests check what `new feature` and `init` generate for both templates, and how `verify` and the task ledger behave (including that what should be refused is refused) on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
 - TypeScript is pinned to 6.0
 
 ## License

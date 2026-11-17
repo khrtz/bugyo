@@ -1,0 +1,9 @@
+{
+  "extends": "@bugyo/lint/tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src", "checks", "test", "*.js", ".dependency-cruiser.cjs"]
+}

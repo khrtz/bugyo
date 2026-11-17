@@ -17,6 +17,8 @@ export function loadFeatures(cwd?: string): Feature[];
 export function loadSweepOrder(cwd?: string): string[];
 
 export interface BugyoConfig {
+  /** bugyo init で使ったテンプレートの名前。bugyo new feature が生成物を選ぶ */
+  template?: string | undefined;
   verify: {
     /** `playwright`（既定）は JSON レポートから spec ごとの合否を読む。`command` は機能ごとに command を1回ずつ実行する */
     runner: 'playwright' | 'command';
@@ -30,6 +32,20 @@ export interface BugyoConfig {
     specSuffix: string;
     /** 機能のフォルダを並べる場所。既定は `src/features`。null で検査を飛ばす */
     featuresDir: string | null;
+  };
+  /** bugyo task done が実行するコマンド。このキーがないときだけ既定値（pnpm check / pnpm test / bugyo verify {feature}）を使う */
+  commands?: { check?: string | undefined; test?: string | undefined; verify?: string | undefined } | undefined;
+  evidence: {
+    /** evidence-tree のハッシュを取るパス。既定は `["src", "e2e"]` */
+    tree: string[];
+  };
+  gate: {
+    /** 門番が見る直近の完了タスクの件数。既定は 20 */
+    window: number;
+    /** そのうち手直しが要ったタスクの上限。既定は 2 */
+    maxRework: number;
+    /** そのうち1回の done で閉じたタスクの下限。既定は 16 */
+    minFirstPass: number;
   };
 }
 

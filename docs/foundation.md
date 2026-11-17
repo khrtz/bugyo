@@ -4,7 +4,14 @@
 
 土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
 
-feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提で、React 用の禁止は部品の1つとして分かれています（下の「部品」）。Playwright の設定と React の見本は、pnpm、Vite、React、`@/` を `src/` に向けたパスの別名を前提にしています。
+feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提で、React 用の禁止は部品の1つとして分かれています（下の「部品」）。
+
+雛形（`bugyo init --template <名前>`）は2つです。
+
+| テンプレート | 見本 | 前提 |
+| --- | --- | --- |
+| `react-vite`（既定） | [examples/todo-app](../examples/todo-app) | pnpm、Vite、React、Playwright、Vitest、`@/` を `src/` に向けたパスの別名 |
+| `node-lib` | [examples/node-lib](../examples/node-lib) | pnpm、Node 24 の型除去（`.ts` をそのまま実行する）、`node:test`。import に拡張子 `.ts` を書く。React・Vite・Playwright は使わない |
 
 ## フォルダ構成
 
@@ -25,6 +32,8 @@ e2e/<id>.spec.ts            その機能を実際に操作するテスト
 ```
 
 依存の向きは `app → features → shared`、feature の中では `ui → api → model` です。
+
+`node-lib` では画面がないので、feature は `model/` と `index.ts` だけです。`src/app` はコマンドの入口、`src/index.ts` はライブラリとして公開するもの、`checks/<id>.ts` はその機能を実際に動かして確かめるスクリプト（feature map の `spec`）です。
 
 ## `@bugyo/lint`
 
@@ -169,8 +178,15 @@ spec: e2e/todos.spec.ts
 対応漏れはテストで落とします。
 
 ```ts
-// e2e/feature-map.test.ts
+// e2e/feature-map.test.ts（Vitest）
 import { registerFeatureMapTests } from 'bugyo/vitest';
+
+registerFeatureMapTests();
+```
+
+```ts
+// test/feature-map.test.ts（node:test）
+import { registerFeatureMapTests } from 'bugyo/node-test';
 
 registerFeatureMapTests();
 ```
@@ -214,22 +230,25 @@ export default defineBugyoConfig({ port: 5173 });
 
 | コマンド | すること |
 | --- | --- |
-| `bugyo init <dir>` | 土台入りの新しいプロジェクトを作る。`<dir>` が空でなければ断る |
-| `bugyo new feature <id>` | feature を一式作る。同じ名前のファイルがあれば上書きせずに断る |
+| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。既定のテンプレートは `react-vite`。使ったテンプレートの名前を `.bugyo/config.json` の `template` に残す。`<dir>` が空でなければ断り、存在しないテンプレート名は使える名前の一覧を出して断る |
+| `bugyo new feature <id>` | feature を一式作る。何を作るかは `.bugyo/config.json` の `template` で決まる（ないときは `react-vite`）。同じ名前のファイルがあれば上書きせずに断る。雛形のないテンプレートでは理由を出して断り、何も作らない |
 | `bugyo verify <id>` | その機能の spec を実行し、合否と証拠の場所だけを出す |
 | `bugyo verify --all` | feature map にあるすべての機能を確かめる |
 
 タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) にあります。
 
-`new feature <id>` が作るものは次のとおりです。作ったあと、画面への組み込みと feature map の記入が残ります（組み込むまで knip が「未使用」として止めます）。
+`new feature <id>` が作るものは次のとおりです。どちらも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
 
-- `src/features/<id>/model/<id>.ts` と、そのテスト
-- `src/features/<id>/api/use<Id>Query.ts`
-- `src/features/<id>/ui/<Id>View.tsx`
-- `src/features/<id>/index.ts`
-- `public/api/<id>.json`（サンプルデータ）
-- `e2e/<id>.spec.ts`
-- `docs/features/<id>.md`（README の順番にも1行足す）
+| `react-vite` | `node-lib` |
+| --- | --- |
+| `src/features/<id>/model/<id>.ts` と、そのテスト（Vitest と fast-check） | `src/features/<id>/model/<id>.ts` と、そのテスト（`node:test`） |
+| `src/features/<id>/api/use<Id>Query.ts` | — |
+| `src/features/<id>/ui/<Id>View.tsx` | — |
+| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` |
+| `public/api/<id>.json`（サンプルデータ） | — |
+| `e2e/<id>.spec.ts` | `checks/<id>.ts`（`featureMap.specDir` と `specSuffix` に従う） |
+
+`react-vite` では、作ったあとに画面への組み込みが残ります（組み込むまで knip が「未使用」として止めます）。`node-lib` では、作った直後から check・test・verify が通り、振る舞いの書き換えと feature map の記入が残ります。
 
 `verify` は次のように動きます。どちらの実行方法でも同じです。
 
@@ -270,13 +289,15 @@ export default defineBugyoConfig({ port: 5173 });
 
 ## プロジェクトに置くスクリプト
 
-見本（[examples/todo-app](../examples/todo-app)）は次の3つを使います。
+見本はどちらも次の3つを使います。
 
-| スクリプト | 中身 | いつ通すか |
-| --- | --- | --- |
-| `pnpm check` | `tsc --noEmit && eslint . && depcruise src && knip && bugyo task lint` | 変更のたび |
-| `pnpm test` | `vitest run`（ユニットテストと feature map の整合） | 変更のたび |
-| `pnpm verify <id>` | `bugyo verify <id>` | 完了を名乗る前 |
+| スクリプト | `react-vite`（[examples/todo-app](../examples/todo-app)） | `node-lib`（[examples/node-lib](../examples/node-lib)） | いつ通すか |
+| --- | --- | --- | --- |
+| `pnpm check` | `tsc --noEmit && eslint . && depcruise src && knip && bugyo task lint` | 同じ | 変更のたび |
+| `pnpm test` | `vitest run`（ユニットテストと feature map の整合） | `node --test "src/**/*.test.ts" "test/**/*.test.ts"`（ユニットテストと feature map の整合） | 変更のたび |
+| `pnpm verify <id>` | `bugyo verify <id>`（Playwright） | `bugyo verify <id>`（`node checks/<id>.ts`） | 完了を名乗る前 |
+
+`node-lib` の `.bugyo/config.json` は、`verify` を `command` 方式（`node {spec}`）にし、spec のフォルダを `checks`、`evidence.tree` を `src`・`checks`・`test` にしています。lint は `parts: [common, structure]` と `explicitExtensions: true`、dependency-cruiser は `config({ react: false })` です。
 
 `pnpm check` が通るだけでは完了ではありません。変更の種類ごとに必要な証拠は、見本の [docs/土台設計.md](../examples/todo-app/docs/土台設計.md) にあります。
 

@@ -50,6 +50,7 @@ export const defaultCommands = Object.freeze({
 
 const Config = z
   .object({
+    template: z.string().min(1).optional(),
     verify: Verify.prefault({}),
     featureMap: FeatureMap.prefault({}),
     commands: Commands.optional(),

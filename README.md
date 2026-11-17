@@ -14,14 +14,16 @@
 <p align="center">
   <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-f0314f?style=flat-square">
   <img alt="node 24 以上" src="https://img.shields.io/badge/node-%E2%89%A5%2024-35e0c2?style=flat-square">
-  <img alt="TypeScript + React" src="https://img.shields.io/badge/TypeScript%20%2B%20React-Vite-ffd23f?style=flat-square">
+  <img alt="TypeScript（雛形: React / Vite と Node）" src="https://img.shields.io/badge/TypeScript-React%20%2F%20Vite%20%7C%20Node-ffd23f?style=flat-square">
   <img alt="状態: 開発初期" src="https://img.shields.io/badge/status-early-8b7cf6?style=flat-square">
 </p>
 
 ---
 
 **bugyo（奉行）** は、AI エージェントに開発を任せるためのツール群です。
-注意書きを増やす代わりに、**間違った書き方は通らず、証拠のない完了は認められない**ようにコードベースの側を作ります。TypeScript + React（Vite）のプロジェクトが対象です。
+注意書きを増やす代わりに、**間違った書き方は通らず、証拠のない完了は認められない**ようにコードベースの側を作ります。
+
+本体（feature map・検証・タスク台帳・門番）は技術を問いません。lint と依存ルールは TypeScript が前提です。雛形は、React（Vite）の画面と、画面のない Node のライブラリ／CLI の2つがあります。
 
 ## なぜ要るのか
 
@@ -71,7 +73,8 @@ PASS todos  確認手順: docs/features/todos.md
 | [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config（共通・構成・React の3つの部品を組み合わせる）、dependency-cruiser のルール、厳しい tsconfig、コメント禁止ルール |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI（`init` / `new feature` / `verify` / `task` / `mistake` / `gate`）、feature map の読み込みと整合テスト、Playwright 設定 |
 | [plugin](plugin) | Claude Code プラグイン（スキル5つとレビュー用サブエージェント） |
-| [examples/todo-app](examples/todo-app) | 両パッケージを使う見本。`bugyo init` のテンプレートの元 |
+| [examples/todo-app](examples/todo-app) | React（Vite）の見本。`bugyo init --template react-vite`（既定）のテンプレートの元 |
+| [examples/node-lib](examples/node-lib) | 画面のない TypeScript のライブラリ／CLI の見本。React・Vite・Playwright を使わない。`bugyo init --template node-lib` のテンプレートの元 |
 
 ## 始め方
 
@@ -85,21 +88,28 @@ pnpm install
 pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack
 ```
 
+テンプレートを選んでプロジェクトを作ります。省略すると `react-vite` です。
+
+| テンプレート | 中身 | verify |
+| --- | --- | --- |
+| `react-vite` | React + Vite の画面。lint は3つの部品すべて | Playwright で画面を操作し、動画・スクリーンショット・トレースを残す |
+| `node-lib` | 画面のない TypeScript のライブラリ／CLI。Node の型除去で `.ts` をそのまま動かす。lint は共通と構成の部品 | 機能ごとの確かめるスクリプトを `node` で実行し、出力を残す |
+
 ```bash
-node packages/bugyo/bin/bugyo.js init ../my-app
+node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib
 ```
 
-できた `my-app/package.json` の `bugyo` と `@bugyo/lint` を、上で作った tarball への `file:` パスに書き換えてから、次を実行します。
+できた `my-app/package.json` の `bugyo` と `@bugyo/lint` を、上で作った tarball への `file:` パスに書き換えてから、次を実行します（`react-vite` のときは、続けて `pnpm exec playwright install chromium` も実行します）。
 
 ```bash
-cd ../my-app && pnpm install && pnpm exec playwright install chromium
+cd ../my-app && pnpm install
 ```
 
 ```bash
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-機能を足すときは `pnpm exec bugyo new feature <id>` を使います。既存のプロジェクトに入れる方法と、すべての設定項目は [docs/foundation.md](docs/foundation.md) にあります。
+機能を足すときは `pnpm exec bugyo new feature <id>` を使います。作るものはテンプレートに合わせて変わります。既存のプロジェクトに入れる方法と、すべての設定項目は [docs/foundation.md](docs/foundation.md) にあります。
 
 ## 文書
 
@@ -125,7 +135,7 @@ pnpm validate-plugin
 ```
 
 - `packages/lint` のテストは、わざと違反したファイル（`test/fixture`）に対して各ルールがエラーを出すことを確かめます
-- `packages/bugyo` のテストは `new feature` と `init` の生成物と、React も Playwright も使わないフィクスチャ（`test/fixtures/plain`）での `verify` とタスク台帳の動き（断られるべきものが断られること）を確かめます
+- `packages/bugyo` のテストは、両方のテンプレートでの `new feature` と `init` の生成物と、React も Playwright も使わないフィクスチャ（`test/fixtures/plain`）での `verify` とタスク台帳の動き（断られるべきものが断られること）を確かめます
 - TypeScript は 6.0 系に固定しています
 
 ## ライセンス
