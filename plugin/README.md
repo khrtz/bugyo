@@ -24,4 +24,4 @@ bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature ma
 
 ## 前提
 
-プロジェクト側に `@bugyo/lint` と `bugyo` が入っていること。新規なら `bugyo init <dir>` で作れます（React + Vite の画面なら既定の `react-vite`、画面のない TypeScript のライブラリ／CLI なら `--template node-lib`）。
+プロジェクト側に `@bugyo/lint` と `bugyo`（React を使うなら `@bugyo/lint-react` も）が入っていること。新規なら `bugyo init <dir>` で作れます（React + Vite の画面なら既定の `react-vite`、画面のない TypeScript のライブラリ／CLI なら `--template node-lib`）。

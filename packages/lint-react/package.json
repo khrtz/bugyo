@@ -1,0 +1,36 @@
+{
+  "name": "@bugyo/lint-react",
+  "version": "0.1.0",
+  "description": "@bugyo/lint に足す React 用の部品（useEffect の置き場所、react-hooks、UI でのタイマー禁止）",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./eslint.js"
+    }
+  },
+  "files": [
+    "eslint.js",
+    "index.d.ts"
+  ],
+  "scripts": {
+    "check": "node --check eslint.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "eslint-plugin-react-hooks": "^7.1.1"
+  },
+  "peerDependencies": {
+    "@bugyo/lint": "workspace:^",
+    "eslint": ">=10"
+  },
+  "devDependencies": {
+    "@bugyo/lint": "workspace:*",
+    "@types/react": "^19.3.0",
+    "dependency-cruiser": "^18.7.2",
+    "eslint": "^10.15.0",
+    "react": "^19.3.1",
+    "typescript": "~6.0.3"
+  }
+}

@@ -267,7 +267,7 @@ export function templates() {
  * bugyo の土台が入った新しいプロジェクトを作る。使ったテンプレートの名前は .bugyo/config.json に残す。
  *
  * @param {string} target
- * @param {{ template?: string, lintVersion?: string, bugyoVersion?: string }} [options]
+ * @param {{ template?: string, lintVersion?: string, lintReactVersion?: string, bugyoVersion?: string }} [options]
  */
 export function init(target, options = {}) {
   const template = options.template ?? defaultTemplate;
@@ -282,8 +282,11 @@ export function init(target, options = {}) {
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   pkg.name = basename(dir).toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const self = JSON.parse(readFileSync(resolve(import.meta.dirname, '..', 'package.json'), 'utf8'));
-  pkg.devDependencies['bugyo'] = options.bugyoVersion ?? `^${self.version}`;
-  pkg.devDependencies['@bugyo/lint'] = options.lintVersion ?? `^${self.version}`;
+  /** @type {Record<string, string | undefined>} */
+  const pinned = { bugyo: options.bugyoVersion, '@bugyo/lint': options.lintVersion, '@bugyo/lint-react': options.lintReactVersion };
+  for (const [name, version] of Object.entries(pkg.devDependencies)) {
+    if (String(version).startsWith('workspace:')) pkg.devDependencies[name] = pinned[name] ?? `^${self.version}`;
+  }
   writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
   const gitignore = join(dir, '_gitignore');

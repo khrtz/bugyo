@@ -26,6 +26,10 @@ test('shared → features を止める', () => {
   assert.ok(has('shared-is-leaf', 'src/shared/lib/leak.ts', 'src/features/a/index.ts'), violations.join('\n'));
 });
 
+test('react: true なら model → React を止める（pnpm の node_modules/.pnpm 経由でも）', () => {
+  assert.ok(has('model-is-pure', 'src/features/b/model/impure.ts', '/node_modules/react/'), violations.join('\n'));
+});
+
 test('model → shared/ui を止める', () => {
   assert.ok(has('model-is-pure', 'src/features/b/model/impure.ts', 'src/shared/ui/index.ts'), violations.join('\n'));
 });

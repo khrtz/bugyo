@@ -56,7 +56,7 @@ PASS todos  確認手順: docs/features/todos.md
 ## できること
 
 - **構成** — `src/app`、`src/features/<id>/{ui,api,model,index.ts}`、`src/shared/{ui,lib,api}`。feature は `index.ts` からだけ使える。画面のない `node-lib` では、feature は `model/` と `index.ts` だけ
-- **lint** — 3つの部品を組み合わせる。共通（`any`、型アサーション、コメント、理由のない `eslint-disable` を止める）、構成（feature の境界、`fetch` は `shared/api` だけ、`model/` は純粋関数だけ）、React（`useEffect` は `shared/lib` だけ、UI でのタイマーを止める）。React を使わないプロジェクトは共通と構成だけを使う
+- **lint** — 部品を組み合わせる。共通（`any`、型アサーション、コメント、理由のない `eslint-disable` を止める）と構成（feature の境界、`fetch` は `shared/api` だけ、`model/` は純粋関数だけ）は `@bugyo/lint` に、React（`useEffect` は `shared/lib` だけ、UI でのタイマーを止める）は別のパッケージ `@bugyo/lint-react` にある。React を使わないプロジェクトは `@bugyo/lint` だけを入れる
 - **依存ルール** — 循環依存、他の feature の内部への依存、`shared` から上の層への依存を止める
 - **feature map** — 機能ごとに `docs/features/<id>.md` を1つ置き、「何があるか・どう辿り着くか・どう操作して確かめるか・よく嘘をつくところ」を書く。機能・spec・地図の対応漏れはテストが落とす
 - **検証** — `bugyo verify <id>` がその機能を実際に動かし、合否と証拠を毎回残す。既定は Playwright（動画・スクリーンショット・トレース）。`.bugyo/config.json` で、機能ごとに任意のコマンドを実行する方式にもできる
@@ -69,7 +69,8 @@ PASS todos  確認手順: docs/features/todos.md
 
 | 場所 | 中身 |
 | --- | --- |
-| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config（共通・構成・React の3つの部品を組み合わせる）、dependency-cruiser のルール、厳しい tsconfig、コメント禁止ルール |
+| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config（共通と構成の部品）、dependency-cruiser のルール、厳しい tsconfig、コメント禁止ルール。React に依存しない |
+| [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | `@bugyo/lint` に足す React 用の部品（`useEffect` の置き場所、react-hooks、UI でのタイマー禁止） |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI（`init` / `new feature` / `verify` / `task` / `mistake` / `gate`）、feature map の読み込みと整合テスト、Playwright 設定 |
 | [plugin](plugin) | Claude Code プラグイン（スキル5つとレビュー用サブエージェント） |
 | [examples/todo-app](examples/todo-app) | React（Vite）の見本。`bugyo init --template react-vite`（既定）のテンプレートの元 |
@@ -84,21 +85,21 @@ pnpm install
 ```
 
 ```bash
-pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack
+pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack && pnpm --filter @bugyo/lint-react pack
 ```
 
 テンプレートを選んでプロジェクトを作ります。省略すると `react-vite` です。
 
 | テンプレート | 中身 | verify |
 | --- | --- | --- |
-| `react-vite` | React + Vite の画面。lint は3つの部品すべて | Playwright で画面を操作し、動画・スクリーンショット・トレースを残す |
-| `node-lib` | 画面のない TypeScript のライブラリ／CLI。Node の型除去で `.ts` をそのまま動かす。lint は共通と構成の部品 | 機能ごとの確かめるスクリプトを `node` で実行し、出力を残す |
+| `react-vite` | React + Vite の画面。lint は共通・構成・React（`@bugyo/lint-react`） | Playwright で画面を操作し、動画・スクリーンショット・トレースを残す |
+| `node-lib` | 画面のない TypeScript のライブラリ／CLI。Node の型除去で `.ts` をそのまま動かす。lint は共通と構成だけで、`@bugyo/lint-react` は入らない | 機能ごとの確かめるスクリプトを `node` で実行し、出力を残す |
 
 ```bash
 node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib
 ```
 
-できた `my-app/package.json` の `bugyo` と `@bugyo/lint` を、上で作った tarball への `file:` パスに書き換えてから、次を実行します（`react-vite` のときは、続けて `pnpm exec playwright install chromium` も実行します）。
+できた `my-app/package.json` の `bugyo`・`@bugyo/lint`（`react-vite` なら `@bugyo/lint-react` も）を、上で作った tarball への `file:` パスに書き換えてから、次を実行します（`react-vite` のときは、続けて `pnpm exec playwright install chromium` も実行します）。
 
 ```bash
 cd ../my-app && pnpm install
@@ -124,7 +125,7 @@ pnpm check && pnpm test && pnpm verify
 pnpm validate-plugin
 ```
 
-- `packages/lint` のテストは、わざと違反したファイル（`test/fixture`、`.ts` だけの `test/fixture-node`）に対して各ルールがエラーを出すことを確かめます
+- `packages/lint` と `packages/lint-react` のテストは、わざと違反したファイル（`.ts` だけの `packages/lint/test/fixture-node`、React の `packages/lint-react/test/fixture`）に対して各ルールがエラーを出すことを確かめます
 - `packages/bugyo` のテストは、両方のテンプレートでの `new feature` と `init` の生成物と、React も Playwright も使わないフィクスチャ（`test/fixtures/plain`）での `verify` とタスク台帳の動き（断られるべきものが断られること）を確かめます
 - TypeScript は 6.0 系に固定しています
 

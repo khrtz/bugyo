@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { join, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
-import { bugyo } from '../eslint.js';
+import { bugyo, common, structure } from '@bugyo/lint';
+import { react } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture');
-const eslint = new ESLint({ cwd: root, overrideConfigFile: true, baseConfig: bugyo({ root }) });
+const eslint = new ESLint({ cwd: root, overrideConfigFile: true, baseConfig: bugyo({ root, parts: [common, structure, react] }) });
 const results = await eslint.lintFiles(['src/**/*.{ts,tsx}']);
 
 const rulesFor = (file) => {

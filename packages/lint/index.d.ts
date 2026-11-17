@@ -29,7 +29,7 @@ export interface RestrictedSyntax {
 }
 
 /**
- * 組み合わせられる設定の部品。同じスコープの禁止（no-restricted-imports など）は bugyo() が1つのルールに合成する。
+ * 組み合わせられる設定の部品（React 用の部品は @bugyo/lint-react にある）。同じスコープの禁止（no-restricted-imports など）は bugyo() が1つのルールに合成する。
  */
 export interface BugyoPart {
   readonly name: string;
@@ -40,13 +40,11 @@ export interface BugyoPart {
 export const common: BugyoPart;
 /** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止、fetch は apiClientDir だけ */
 export const structure: BugyoPart;
-/** React: useEffect の禁止と例外の場所、react-hooks、feature の UI でのタイマー禁止、model から React への依存の禁止 */
-export const react: BugyoPart;
 
 export interface BugyoOptions {
   /** eslint.config.js で `import.meta.dirname` を渡す */
   root: string;
-  /** 使う部品。既定は `[common, structure, react]`。common は必須。順番は結果に影響しない */
+  /** 使う部品。既定は `[common, structure]`。common は必須。React を使うなら @bugyo/lint-react の `react` を足す。順番は結果に影響しない */
   parts?: readonly BugyoPart[];
   /**
    * import に拡張子を書くプロジェクト（Node の型除去で .ts を直接動かすなど）で true にする。
