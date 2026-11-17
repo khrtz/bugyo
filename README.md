@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h3 align="center">エージェントの「終わりました」を、証拠で裁く。</h3>
+<h3 align="center">AI エージェントのための lint と検証ツール。</h3>
 
 <p align="center">
   日本語 ・ <a href="README.en.md">English</a>

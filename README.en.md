@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h3 align="center">Your agent says "done". bugyo asks for proof.</h3>
+<h3 align="center">Lint and verification for agent-written code.</h3>
 
 <p align="center">
   <a href="README.md">日本語</a> ・ English
