@@ -1,0 +1,47 @@
+{
+  "name": "@bugyo/lint",
+  "version": "0.1.0",
+  "description": "エージェントが正しいやり方しか選べないようにする ESLint / dependency-cruiser / tsconfig のプリセット",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./eslint.js"
+    },
+    "./depcruise": "./depcruise.cjs",
+    "./tsconfig.json": "./tsconfig.base.json"
+  },
+  "files": [
+    "eslint.js",
+    "index.d.ts",
+    "depcruise.cjs",
+    "tsconfig.base.json",
+    "rules"
+  ],
+  "scripts": {
+    "check": "node --check eslint.js && node --check depcruise.cjs && node --check rules/no-comments.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
+    "@eslint/js": "^10.0.1",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.18.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "typescript-eslint": "^8.72.2"
+  },
+  "peerDependencies": {
+    "dependency-cruiser": ">=18",
+    "eslint": ">=10",
+    "typescript": ">=5.8 <6.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "dependency-cruiser": "^18.7.2",
+    "eslint": "^10.15.0",
+    "react": "^19.3.1",
+    "typescript": "~6.0.3"
+  }
+}

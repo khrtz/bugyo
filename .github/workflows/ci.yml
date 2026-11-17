@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Linux用のスクリーンショット基準画像を作り直す'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: pnpm check / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+
+  e2e:
+    name: e2e（証拠つき）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: examples/todo-app
+
+      - name: Linuxの基準画像があるか確かめる
+        id: baseline
+        working-directory: examples/todo-app
+        env:
+          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots }}
+        run: |
+          if [ "$UPDATE_SNAPSHOTS" = "true" ] || [ -d e2e/__screenshots__/linux ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Linux用の基準画像がまだないので e2e を飛ばしました。Actions から update_snapshots を有効にして実行し、できた linux-screenshots を examples/todo-app/e2e/__screenshots__/linux に置いてコミットしてください。"
+          fi
+
+      - name: Playwright
+        id: e2e
+        if: ${{ steps.baseline.outputs.ready == 'true' }}
+        working-directory: examples/todo-app
+        env:
+          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots }}
+        run: |
+          if [ "$UPDATE_SNAPSHOTS" = "true" ]; then
+            pnpm e2e --update-snapshots
+          else
+            pnpm e2e
+          fi
+
+      - name: 証拠をアップロード
+        id: evidence
+        if: ${{ !cancelled() && steps.baseline.outputs.ready == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence
+          path: examples/todo-app/artifacts/
+          retention-days: 14
+
+      - name: Linuxの基準画像をアップロード
+        if: ${{ inputs.update_snapshots }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-screenshots
+          path: examples/todo-app/e2e/__screenshots__/linux/
+
+      - name: PRに証拠のリンクを載せる
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.baseline.outputs.ready == 'true' }}
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          OUTCOME: ${{ steps.e2e.outcome }}
+          ARTIFACT_URL: ${{ steps.evidence.outputs.artifact-url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const marker = '<!-- e2e-evidence -->';
+            const passed = process.env.OUTCOME === 'success';
+            const body = [
+              marker,
+              `### e2e: ${passed ? '✅ PASS' : '❌ FAIL'}`,
+              '',
+              `- 証拠（動画・スクリーンショット・トレース・HTMLレポート）: ${process.env.ARTIFACT_URL || process.env.RUN_URL}`,
+              `- 実行ログ: ${process.env.RUN_URL}`,
+              '',
+              'レビューではコードの行より先にこの証拠を見てください。トレースは `pnpm exec playwright show-trace trace.zip` で開けます。',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find((c) => c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
