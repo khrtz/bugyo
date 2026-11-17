@@ -71,7 +71,7 @@ Built bottom-up. **Layers 1 and 2 work today.** Layer 3 is designed, and its com
 ### Layer 1 in short
 
 - **Structure** — `src/app`, `src/features/<id>/{ui,api,model,index.ts}`, `src/shared/{ui,lib,api}`. Other code may import a feature only through its `index.ts`.
-- **Lint** — `useEffect` only in `shared/lib`, `fetch` only in `shared/api`, no timers in feature UI, no `any`, no type assertions, no comments, no unexplained `eslint-disable`. `model/` stays pure.
+- **Lint** — three parts you combine. `common`: no `any`, no type assertions, no comments, no unexplained `eslint-disable`. `structure`: feature boundaries, `fetch` only in `shared/api`, `model/` stays pure. `react`: `useEffect` only in `shared/lib`, no timers in feature UI, no React in `model/`. Projects without React use `common` and `structure` only.
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
 - **Verification** — `bugyo verify <id>` runs the feature's check and reports pass/fail plus where the evidence is. By default it runs the Playwright spec and keeps video, screenshots, and a trace; with `"runner": "command"` in `.bugyo/config.json` it runs any command per feature and keeps its output.
@@ -80,7 +80,7 @@ Built bottom-up. **Layers 1 and 2 work today.** Layer 3 is designed, and its com
 
 | Path | Contents |
 | --- | --- |
-| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config, dependency-cruiser rules, a strict tsconfig, a no-comments rule |
+| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config built from three parts (common, structure, React), dependency-cruiser rules, a strict tsconfig, a no-comments rule |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify` / `task` / `mistake` / `gate`), feature map loader and consistency tests, Playwright config |
 | [plugin](plugin) | Claude Code plugin (five skills and a review subagent) |
 | [examples/todo-app](examples/todo-app) | A sample app using both packages; also the source of the `bugyo init` template |

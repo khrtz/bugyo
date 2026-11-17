@@ -8,120 +8,148 @@ import tseslint from 'typescript-eslint';
 import { noComments } from './rules/no-comments.js';
 
 /**
- * bugyo の ESLint flat config を作る。
- * no-restricted-imports / no-restricted-globals はスコープごとに1つの設定へ合成して返すので、
- * 利用側で同じルールを上書きせず、追加の禁止は `extra` で渡すこと。
- *
- * @param {import('./index.js').BugyoOptions} options
- * @returns {import('eslint').Linter.Config[]}
+ * @typedef {import('./index.js').BugyoOptions} BugyoOptions
+ * @typedef {Required<Omit<BugyoOptions, 'parts' | 'extra'>> & { extra: NonNullable<BugyoOptions['extra']> }} Context
+ * @typedef {'effects' | 'api' | 'tests'} Exception
+ * @typedef {{ value: object, exempt?: Exception[] }} Entry
+ * @typedef {{ paths?: Entry[], patterns?: Entry[], globals?: Entry[], syntax?: Entry[], properties?: Entry[] }} Bans
+ * @typedef {{
+ *   prelude?: import('eslint').Linter.Config[],
+ *   trailing?: import('eslint').Linter.Config[],
+ *   languageOptions?: object,
+ *   plugins?: Record<string, object>,
+ *   settings?: Record<string, unknown>,
+ *   rules?: Record<string, unknown>,
+ *   srcPlugins?: Record<string, object>,
+ *   srcRules?: Record<string, unknown>,
+ *   src?: Bans,
+ *   ui?: Bans,
+ *   model?: Bans,
+ *   exceptions?: Exception[],
+ * }} Contribution
+ * @typedef {{ name: string, rank: number, build: (context: Context) => Contribution }} Part
  */
-export function bugyo(options) {
-  const {
-    root,
-    src = 'src',
-    effectHooksDir = `${src}/shared/lib`,
-    apiClientDir = `${src}/shared/api`,
-    ignores = [],
-    extra = {},
-  } = options;
-  if (typeof root !== 'string') throw new Error('bugyo({ root }) に import.meta.dirname を渡してください');
 
-  const extraPaths = extra.restrictedImports?.paths ?? [];
-  const extraPatterns = extra.restrictedImports?.patterns ?? [];
-  const extraGlobals = extra.restrictedGlobals ?? [];
-  const extraProperties = extra.restrictedProperties ?? [];
-  const extraSyntax = extra.restrictedSyntax ?? [];
+/** @type {Record<Exception, readonly (keyof Bans | 'imports')[]>} */
+const exceptionRules = {
+  effects: ['imports', 'syntax', 'properties'],
+  api: ['globals'],
+  tests: ['globals', 'properties', 'syntax'],
+};
 
-  const effectBan = {
-    name: 'react',
-    importNames: ['useEffect', 'useLayoutEffect'],
-    message: `製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは ${effectHooksDir} の専用フックを使ってください。該当するフックがなければ ${effectHooksDir} に追加してください。`,
-  };
+/** @param {Context} context */
+const exceptionFiles = (context) => ({
+  effects: [`${context.effectHooksDir}/**/*.{ts,tsx}`],
+  api: [`${context.apiClientDir}/**/*.ts`],
+  tests: [`${context.src}/**/*.test.{ts,tsx}`],
+});
 
-  const featureInternals = {
-    group: ['@/features/*/*', '**/features/*/*'],
-    message: 'featureの内部ファイルは直接importできません。features/<名前>/index.ts から公開されたものを使ってください。',
-  };
-
-  const modelBans = [
-    {
-      group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@tanstack/*'],
-      message: 'model/ は純粋関数だけです。Reactや通信に依存する処理は ui/ か api/ に置いてください。',
+/**
+ * 共通: TypeScript の厳しい検査、`any`・型アサーション・非 null アサーション・待っていない Promise・`switch` の漏れ、
+ * 理由のない `eslint-disable`、コメント、`extra` の合成。どの構成のプロジェクトにも当てる。
+ *
+ * @type {Part}
+ */
+export const common = {
+  name: 'common',
+  rank: 0,
+  build: (context) => ({
+    prelude: [
+      { files: ['**/*.cjs'], languageOptions: { sourceType: 'commonjs' } },
+      { ignores: ['dist', 'artifacts', 'playwright-report', 'test-results', 'node_modules', ...context.ignores] },
+      js.configs.recommended,
+      ...tseslint.configs.strictTypeChecked,
+    ],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: context.root },
+      globals: { ...globals.browser, ...globals.node },
     },
-    {
-      group: ['../ui', '../ui/*', '../api', '../api/*'],
-      message: 'model/ から ui/ や api/ はimportできません。依存の向きは ui → api → model です。',
+    plugins: {
+      '@eslint-community/eslint-comments': comments,
+      bugyo: { rules: { 'no-comments': noComments } },
     },
-    {
-      group: ['@/shared/ui', '@/shared/ui/*', '@/shared/api', '@/shared/api/*'],
-      message: 'model/ が使えるのは自分のmodelと shared/lib だけです。',
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: false, requireDefaultForNonUnion: true },
+      ],
+      '@eslint-community/eslint-comments/require-description': ['error', { ignore: [] }],
+      '@eslint-community/eslint-comments/no-unlimited-disable': 'error',
     },
-  ];
+    srcRules: { 'bugyo/no-comments': 'error' },
+    exceptions: ['effects', 'tests'],
+    trailing: [
+      { files: ['**/*.{js,cjs,mjs}'], ...tseslint.configs.disableTypeChecked },
+      { files: ['**/*.cjs'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
+    ],
+  }),
+};
 
-  const fetchBan = {
-    name: 'fetch',
-    message: `fetchを直接呼ばないでください。${apiClientDir} のクライアントを使い、スキーマで応答を検証してください。`,
-  };
-
-  const timingBans = ['setTimeout', 'setInterval', 'requestAnimationFrame'].map((name) => ({
-    name,
-    message: `UIで${name}によるタイミング合わせはできません。根本原因（状態の持ち方・データの流れ）を直してください。時間に依存する処理が本当に必要なら ${effectHooksDir} に専用フックを作ってください。`,
-  }));
-
-  const effectSyntaxBan = {
-    selector: "MemberExpression[object.name='React'][property.name=/^use(Layout)?Effect$/]",
-    message: effectBan.message,
-  };
-
-  const imports = (/** @type {object[]} */ paths, /** @type {object[]} */ patterns) => [
-    'error',
-    { paths: [...paths, ...extraPaths], patterns: [...patterns, ...extraPatterns] },
-  ];
-  const globalsBan = (/** @type {object[]} */ names) => ['error', ...names, ...extraGlobals];
-
-  return tseslint.config(
-    { files: ['**/*.cjs'], languageOptions: { sourceType: 'commonjs' } },
-    { ignores: ['dist', 'artifacts', 'playwright-report', 'test-results', 'node_modules', ...ignores] },
-
-    js.configs.recommended,
-    ...tseslint.configs.strictTypeChecked,
-    {
-      languageOptions: {
-        parserOptions: { projectService: true, tsconfigRootDir: root },
-        globals: { ...globals.browser, ...globals.node },
-      },
-      plugins: {
-        'import-x': importX,
-        '@eslint-community/eslint-comments': comments,
-        bugyo: { rules: { 'no-comments': noComments } },
-      },
-      settings: {
-        'import-x/resolver-next': [createTypeScriptImportResolver({ project: `${root}/tsconfig.json` })],
-      },
-      rules: {
-        '@typescript-eslint/no-explicit-any': 'error',
-        '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
-        '@typescript-eslint/no-non-null-assertion': 'error',
-        '@typescript-eslint/no-floating-promises': 'error',
-        '@typescript-eslint/switch-exhaustiveness-check': [
-          'error',
-          { considerDefaultExhaustiveForUnions: false, requireDefaultForNonUnion: true },
+/**
+ * React: `useEffect` の禁止と例外の場所（effectHooksDir）、react-hooks、feature の UI でのタイマー禁止、`model` から React への依存の禁止。
+ *
+ * @type {Part}
+ */
+export const react = {
+  name: 'react',
+  rank: 1,
+  build: (context) => {
+    const effectMessage = `製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは ${context.effectHooksDir} の専用フックを使ってください。該当するフックがなければ ${context.effectHooksDir} に追加してください。`;
+    return {
+      srcPlugins: { 'react-hooks': reactHooks },
+      srcRules: { ...reactHooks.configs.recommended.rules },
+      src: {
+        paths: [{ value: { name: 'react', importNames: ['useEffect', 'useLayoutEffect'], message: effectMessage }, exempt: ['effects'] }],
+        syntax: [
+          {
+            value: { selector: "MemberExpression[object.name='React'][property.name=/^use(Layout)?Effect$/]", message: effectMessage },
+            exempt: ['effects', 'tests'],
+          },
         ],
-        '@eslint-community/eslint-comments/require-description': ['error', { ignore: [] }],
-        '@eslint-community/eslint-comments/no-unlimited-disable': 'error',
       },
-    },
+      ui: {
+        globals: ['setTimeout', 'setInterval', 'requestAnimationFrame'].map((name) => ({
+          value: {
+            name,
+            message: `UIで${name}によるタイミング合わせはできません。根本原因（状態の持ち方・データの流れ）を直してください。時間に依存する処理が本当に必要なら ${context.effectHooksDir} に専用フックを作ってください。`,
+          },
+          exempt: ['tests'],
+        })),
+      },
+      model: {
+        patterns: [
+          {
+            value: {
+              group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@tanstack/*'],
+              message: 'model/ は純粋関数だけです。Reactや通信に依存する処理は ui/ か api/ に置いてください。',
+            },
+          },
+        ],
+      },
+    };
+  },
+};
 
-    {
-      files: [`${src}/**/*.{ts,tsx}`],
-      plugins: { 'react-hooks': reactHooks },
-      rules: {
-        ...reactHooks.configs.recommended.rules,
-        'bugyo/no-comments': 'error',
-        'no-restricted-imports': imports([effectBan], [featureInternals]),
-        'no-restricted-syntax': ['error', effectSyntaxBan, ...extraSyntax],
-        'no-restricted-properties': extraProperties.length > 0 ? ['error', ...extraProperties] : 'off',
-        'no-restricted-globals': globalsBan([fetchBan]),
+/**
+ * 構成: `app` / `features/<id>` / `shared` の境界、feature の外からは `index.ts` だけを通す決まり、
+ * `model` から `ui` / `api` / `shared/ui` / `shared/api` への依存の禁止、`fetch` は apiClientDir だけ。React に依存しない。
+ *
+ * @type {Part}
+ */
+export const structure = {
+  name: 'structure',
+  rank: 2,
+  build: (context) => {
+    const { root, src } = context;
+    const internals = ['@/features/*/*', '**/features/*/*'];
+    return {
+      plugins: { 'import-x': importX },
+      settings: { 'import-x/resolver-next': [createTypeScriptImportResolver({ project: `${root}/tsconfig.json` })] },
+      srcRules: {
         'import-x/no-restricted-paths': [
           'error',
           {
@@ -137,42 +165,176 @@ export function bugyo(options) {
           },
         ],
       },
+      src: {
+        patterns: [
+          {
+            value: {
+              group: context.explicitExtensions ? [...internals, '!@/features/*/index.ts', '!**/features/*/index.ts'] : internals,
+              message: 'featureの内部ファイルは直接importできません。features/<名前>/index.ts から公開されたものを使ってください。',
+            },
+          },
+        ],
+        globals: [
+          {
+            value: {
+              name: 'fetch',
+              message: `fetchを直接呼ばないでください。${context.apiClientDir} のクライアントを使い、スキーマで応答を検証してください。`,
+            },
+            exempt: ['api', 'tests'],
+          },
+        ],
+      },
+      model: {
+        patterns: [
+          {
+            value: {
+              group: ['../ui', '../ui/*', '../api', '../api/*'],
+              message: 'model/ から ui/ や api/ はimportできません。依存の向きは ui → api → model です。',
+            },
+          },
+          {
+            value: {
+              group: ['@/shared/ui', '@/shared/ui/*', '@/shared/api', '@/shared/api/*'],
+              message: 'model/ が使えるのは自分のmodelと shared/lib だけです。',
+            },
+          },
+        ],
+      },
+      exceptions: ['api'],
+    };
+  },
+};
+
+/** @param {Context} context @returns {Contribution} */
+const extraContribution = (context) => {
+  const { extra } = context;
+  const plain = (/** @type {object[]} */ values) => values.map((value) => ({ value }));
+  const exempt = (/** @type {object[]} */ values) => values.map((value) => ({ value, exempt: /** @type {Exception[]} */ (['effects', 'tests']) }));
+  return {
+    src: {
+      paths: plain(extra.restrictedImports?.paths ?? []),
+      patterns: plain(extra.restrictedImports?.patterns ?? []),
+      globals: plain(extra.restrictedGlobals ?? []),
+      properties: exempt(extra.restrictedProperties ?? []),
+      syntax: exempt(extra.restrictedSyntax ?? []),
+    },
+  };
+};
+
+/**
+ * @param {Contribution[]} contributions
+ * @param {'src' | 'ui' | 'model'} scope
+ * @param {keyof Bans} kind
+ * @returns {Entry[]}
+ */
+const collect = (contributions, scope, kind) => contributions.flatMap((contribution) => contribution[scope]?.[kind] ?? []);
+
+/** @param {Entry[]} entries @param {Exception | undefined} exception */
+const values = (entries, exception) =>
+  entries.filter((entry) => exception === undefined || !(entry.exempt ?? []).includes(exception)).map((entry) => entry.value);
+
+/** @param {Contribution[]} list @param {'plugins' | 'settings' | 'rules' | 'srcPlugins' | 'srcRules'} key */
+const merged = (list, key) => Object.assign({}, ...list.map((contribution) => contribution[key] ?? {}));
+
+/**
+ * bugyo の ESLint flat config を作る。
+ * no-restricted-imports / no-restricted-globals などはスコープごとに1つの設定へ合成して返すので、
+ * 利用側で同じルールを上書きせず、追加の禁止は `extra` で渡すこと。
+ * `parts` で部品を選べる（既定は common・structure・react のすべて。common は必須）。
+ *
+ * @param {BugyoOptions} options
+ * @returns {import('eslint').Linter.Config[]}
+ */
+export function bugyo(options) {
+  const { root, src = 'src', ignores = [], extra = {}, parts = [common, structure, react], explicitExtensions = false } = options;
+  const { effectHooksDir = `${src}/shared/lib`, apiClientDir = `${src}/shared/api` } = options;
+  if (typeof root !== 'string') throw new Error('bugyo({ root }) に import.meta.dirname を渡してください');
+  if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
+
+  /** @type {Context} */
+  const context = { root, src, effectHooksDir, apiClientDir, ignores, extra, explicitExtensions };
+  const built = [...new Set(parts)].sort((a, b) => a.rank - b.rank).map((part) => part.build(context));
+  const extras = extraContribution(context);
+
+  const importsRule = (/** @type {Entry[]} */ paths, /** @type {Entry[]} */ patterns, /** @type {Exception | undefined} */ exception) => [
+    'error',
+    { paths: values(paths, exception), patterns: values(patterns, exception) },
+  ];
+  const listRule = (/** @type {Entry[]} */ entries, /** @type {Exception | undefined} */ exception, offWhenEmpty = false) => {
+    const list = values(entries, exception);
+    return offWhenEmpty && list.length === 0 ? 'off' : ['error', ...list];
+  };
+
+  /** @param {keyof Bans} kind @param {'ui' | 'model'} [scope] */
+  const entries = (kind, scope) => {
+    const base = collect(built, 'src', kind);
+    const scoped = scope === undefined ? [] : collect(built, scope, kind);
+    return [...base, ...scoped, ...collect([extras], 'src', kind)];
+  };
+
+  const srcPlugins = merged(built, 'srcPlugins');
+  /** @type {import('eslint').Linter.Config[]} */
+  const scopeBlocks = [];
+  /** @type {Record<'ui' | 'model', string>} */
+  const scopeFiles = { ui: `${src}/features/*/ui/**/*.{ts,tsx}`, model: `${src}/features/*/model/**/*.ts` };
+  for (const scope of /** @type {const} */ (['ui', 'model'])) {
+    /** @type {Record<string, unknown>} */
+    const rules = {};
+    if (collect(built, scope, 'paths').length + collect(built, scope, 'patterns').length > 0) {
+      rules['no-restricted-imports'] = importsRule(entries('paths', scope), entries('patterns', scope), undefined);
+    }
+    if (collect(built, scope, 'globals').length > 0) rules['no-restricted-globals'] = listRule(entries('globals', scope), undefined);
+    if (collect(built, scope, 'syntax').length > 0) rules['no-restricted-syntax'] = listRule(entries('syntax', scope), undefined);
+    if (Object.keys(rules).length > 0) scopeBlocks.push({ files: [scopeFiles[scope]], rules });
+  }
+
+  const owned = new Set(built.flatMap((contribution) => contribution.exceptions ?? []));
+  const files = exceptionFiles(context);
+  /** @type {import('eslint').Linter.Config[]} */
+  const exceptionBlocks = /** @type {Exception[]} */ (['effects', 'api', 'tests'])
+    .filter((exception) => owned.has(exception))
+    .map((exception) => ({
+      files: files[exception],
+      rules: Object.fromEntries(
+        exceptionRules[exception].map((kind) => {
+          switch (kind) {
+            case 'imports':
+              return ['no-restricted-imports', importsRule(entries('paths'), entries('patterns'), exception)];
+            case 'globals':
+              return ['no-restricted-globals', listRule(entries('globals'), exception, true)];
+            case 'syntax':
+              return ['no-restricted-syntax', listRule(entries('syntax'), exception, true)];
+            case 'properties':
+              return ['no-restricted-properties', listRule(entries('properties'), exception, true)];
+            default:
+              throw new Error(`知らない種類です: ${kind}`);
+          }
+        }),
+      ),
+    }));
+
+  const settings = merged(built, 'settings');
+  return tseslint.config(
+    ...built.flatMap((contribution) => contribution.prelude ?? []),
+    {
+      languageOptions: Object.assign({}, ...built.map((contribution) => contribution.languageOptions ?? {})),
+      plugins: merged(built, 'plugins'),
+      ...(Object.keys(settings).length === 0 ? {} : { settings }),
+      rules: merged(built, 'rules'),
     },
     {
-      files: [`${src}/features/*/ui/**/*.{ts,tsx}`],
-      rules: { 'no-restricted-globals': globalsBan([fetchBan, ...timingBans]) },
-    },
-    {
-      files: [`${src}/features/*/model/**/*.ts`],
-      rules: { 'no-restricted-imports': imports([effectBan], [featureInternals, ...modelBans]) },
-    },
-    {
-      files: [`${effectHooksDir}/**/*.{ts,tsx}`],
+      files: [`${src}/**/*.{ts,tsx}`],
+      ...(Object.keys(srcPlugins).length === 0 ? {} : { plugins: srcPlugins }),
       rules: {
-        'no-restricted-imports': imports([], [featureInternals]),
-        'no-restricted-syntax': 'off',
-        'no-restricted-properties': 'off',
+        ...merged(built, 'srcRules'),
+        'no-restricted-imports': importsRule(entries('paths'), entries('patterns'), undefined),
+        'no-restricted-syntax': listRule(entries('syntax'), undefined),
+        'no-restricted-properties': listRule(entries('properties'), undefined, true),
+        'no-restricted-globals': listRule(entries('globals'), undefined),
       },
     },
-    {
-      files: [`${apiClientDir}/**/*.ts`],
-      rules: { 'no-restricted-globals': extraGlobals.length > 0 ? globalsBan([]) : 'off' },
-    },
-    {
-      files: [`${src}/**/*.test.{ts,tsx}`],
-      rules: {
-        'no-restricted-globals': extraGlobals.length > 0 ? globalsBan([]) : 'off',
-        'no-restricted-properties': 'off',
-        'no-restricted-syntax': 'off',
-      },
-    },
-    {
-      files: ['**/*.{js,cjs,mjs}'],
-      ...tseslint.configs.disableTypeChecked,
-    },
-    {
-      files: ['**/*.cjs'],
-      rules: { '@typescript-eslint/no-require-imports': 'off' },
-    },
+    ...scopeBlocks,
+    ...exceptionBlocks,
+    ...built.flatMap((contribution) => contribution.trailing ?? []),
   );
 }

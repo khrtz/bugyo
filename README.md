@@ -68,7 +68,7 @@ PASS todos  確認手順: docs/features/todos.md
 
 | 場所 | 中身 |
 | --- | --- |
-| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config、dependency-cruiser のルール、厳しい tsconfig、コメント禁止ルール |
+| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config（共通・構成・React の3つの部品を組み合わせる）、dependency-cruiser のルール、厳しい tsconfig、コメント禁止ルール |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI（`init` / `new feature` / `verify` / `task` / `mistake` / `gate`）、feature map の読み込みと整合テスト、Playwright 設定 |
 | [plugin](plugin) | Claude Code プラグイン（スキル5つとレビュー用サブエージェント） |
 | [examples/todo-app](examples/todo-app) | 両パッケージを使う見本。`bugyo init` のテンプレートの元 |

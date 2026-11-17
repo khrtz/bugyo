@@ -4,7 +4,7 @@
 
 土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
 
-feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint・フォルダ構成・Playwright の設定・見本は、pnpm、Vite、React、TypeScript、`@/` を `src/` に向けたパスの別名を前提にしています。
+feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提で、React 用の禁止は部品の1つとして分かれています（下の「部品」）。Playwright の設定と React の見本は、pnpm、Vite、React、`@/` を `src/` に向けたパスの別名を前提にしています。
 
 ## フォルダ構成
 
@@ -45,23 +45,39 @@ export default bugyo({ root: import.meta.dirname });
 | `apiClientDir` | `<src>/shared/api` | `fetch` を呼んでよい場所 |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `extra` | `{}` | 独自の禁止を足す（下の「独自の禁止を足す」） |
+| `parts` | `[common, structure, react]` | 使う部品（下の「部品」）。`common` は必須 |
+| `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
 
-どこで何が止まるかは次のとおりです。エラー文には、代わりに何を使うかが入っています。
+#### 部品
 
-| 範囲 | 止めるもの |
-| --- | --- |
-| すべてのファイル | `any`、型アサーション（`as`）、非 null アサーション（`!`）、待っていない Promise、`switch` の分岐漏れ、理由のない `eslint-disable`、対象を絞らない `eslint-disable`。加えて typescript-eslint の `strictTypeChecked` |
-| `src` の下 | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形、`fetch`、他の feature の内部ファイルの import、コメント、`shared` から `features` / `app` への依存、`features` から `app` への依存。加えて react-hooks の推奨ルール |
-| `src/features/*/ui` | 上に加えて `setTimeout`、`setInterval`、`requestAnimationFrame` |
-| `src/features/*/model` | 上に加えて `react`、`react-dom`、`@tanstack/*`、同じ feature の `ui` と `api`、`shared/ui`、`shared/api` |
+設定は3つの部品の組み合わせです。React を使わないプロジェクトは `common` と `structure` だけを渡します。同じ範囲の禁止（`no-restricted-imports` など）は、部品をまたいで1つのルールに合成されます。部品の順番は結果に影響しません。
+
+```js
+// eslint.config.js（React を使わないプロジェクト）
+import { bugyo, common, structure } from '@bugyo/lint';
+
+export default bugyo({ root: import.meta.dirname, parts: [common, structure], explicitExtensions: true });
+```
+
+| 部品 | 範囲 | 止めるもの |
+| --- | --- | --- |
+| `common` | すべてのファイル | `any`、型アサーション（`as`）、非 null アサーション（`!`）、待っていない Promise、`switch` の分岐漏れ、理由のない `eslint-disable`、対象を絞らない `eslint-disable`。加えて typescript-eslint の `strictTypeChecked` |
+| `common` | `src` の下 | コメント。`extra` で足した禁止 |
+| `structure` | `src` の下 | 他の feature の内部ファイルの import、`shared` から `features` / `app` への依存、`features` から `app` への依存、`fetch` |
+| `structure` | `src/features/*/model` | 同じ feature の `ui` と `api`、`shared/ui`、`shared/api` |
+| `react` | `src` の下 | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形。加えて react-hooks の推奨ルール |
+| `react` | `src/features/*/ui` | `setTimeout`、`setInterval`、`requestAnimationFrame` |
+| `react` | `src/features/*/model` | `react`、`react-dom`、`@tanstack/*` |
+
+エラー文には、代わりに何を使うかが入っています。他の feature の内部ファイルの import は、パスに `features/` を含む書き方（`@/features/<id>/...` や `../features/<id>/...`）を ESLint が止め、相対パスで feature の間をまたぐ書き方も含めて dependency-cruiser が止めます。
 
 場所による例外は次の3つだけです。
 
-| 場所 | 許されること |
-| --- | --- |
-| `effectHooksDir` | `useEffect` / `useLayoutEffect` |
-| `apiClientDir` | `fetch` |
-| `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形 |
+| 場所 | 許されること | 例外を持つ部品 |
+| --- | --- | --- |
+| `effectHooksDir` | `useEffect` / `useLayoutEffect`、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`react` |
+| `apiClientDir` | `fetch` | `structure` |
+| `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`structure`・`react` |
 
 コメントは、公開 API の JSDoc（`/** */`）と、理由つきの `eslint-disable`（`-- 理由`）だけ書けます。`.js` / `.cjs` / `.mjs` には型を使うルールを当てません。
 
@@ -98,7 +114,7 @@ export default bugyo({
 module.exports = require('@bugyo/lint/depcruise').config();
 ```
 
-`config({ src, tsConfig, forbidden })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。
+`config({ src, tsConfig, forbidden, react })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: false` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存を見なくなります（既定は `true`）。
 
 | ルール | 止めるもの |
 | --- | --- |
@@ -107,7 +123,7 @@ module.exports = require('@bugyo/lint/depcruise').config();
 | `app-only-via-feature-index` | `app` から feature の `index.ts` 以外への依存 |
 | `shared-is-leaf` | `shared` から `features` / `app` への依存 |
 | `features-not-to-app` | `features` から `app` への依存 |
-| `model-is-pure` | `model` から、自分の `model` と `shared/lib` 以外のソース、`react`、`react-dom`、`@tanstack/*` への依存 |
+| `model-is-pure` | `model` から、自分の `model` と `shared/lib` 以外のソースへの依存。`react: true` なら `react`、`react-dom`、`@tanstack/*` への依存も |
 | `not-to-unresolvable` | 解決できない import |
 
 境界は ESLint と dependency-cruiser の両方で見ます。循環依存を見るのは dependency-cruiser だけです。
