@@ -113,7 +113,7 @@ cd ../my-app && pnpm install
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project and every option are covered in [docs/foundation.md](docs/foundation.md).
+To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project is covered in [docs/adopt.md](docs/adopt.md), and every option in [docs/foundation.md](docs/foundation.md) (both in Japanese).
 
 ## Language
 

@@ -109,7 +109,7 @@ cd ../my-app && pnpm install
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-機能を足すときは `pnpm exec bugyo new feature <id>` を使います。作るものはテンプレートに合わせて変わります。既存のプロジェクトに入れる方法と、すべての設定項目は [docs/foundation.md](docs/foundation.md) にあります。
+機能を足すときは `pnpm exec bugyo new feature <id>` を使います。作るものはテンプレートに合わせて変わります。既存のプロジェクトに入れる方法は [docs/adopt.md](docs/adopt.md)、すべての設定項目は [docs/foundation.md](docs/foundation.md) にあります。
 
 ## このリポジトリでの開発
 
