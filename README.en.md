@@ -66,7 +66,7 @@ Three things happen when you delegate to agents. bugyo stops each of them with t
 10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] Do not call fetch directly. Use the client in src/shared/api and validate the response with a schema.  no-restricted-globals
 ```
 
-(Two entries taken from the output for the deliberately broken test file `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx`, with `"locale": "en"` in `.bugyo/config.json`. Rule messages are in Japanese by default. The rest of the CLI output is in Japanese for now.)
+(Two entries taken from the output for the deliberately broken test file `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx`, Rule messages are in English by default; set `"locale": "ja"` in `.bugyo/config.json` for Japanese. The rest of the CLI output is in Japanese for now.)
 
 **Verification returns pass/fail and where the evidence is, nothing more.** No long logs eating the agent's context.
 
@@ -139,7 +139,7 @@ To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depe
 
 ## Language
 
-The detailed docs, the CLI output, the rule messages, and the plugin skills are written in Japanese. This page is the English entry point.
+The detailed docs, the CLI output, and the plugin skills are written in Japanese. Rule messages are in English by default. This page is the English entry point.
 
 ## Developing this repository
 

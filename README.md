@@ -62,11 +62,11 @@
 **止めるときは、代わりに何を使うかまで言います。** `useEffect` と `fetch` の禁止を入れたプロジェクト（`react-vite` のテンプレートは入れています）でエージェントがそれを書くと、こう返ります。
 
 ```
- 1:17  error  'useEffect' import from 'react' is restricted. [bugyo:use-effect] 製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは src/shared/lib の専用フックを使ってください。該当するフックがなければ src/shared/lib に追加してください。  no-restricted-imports
-10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。src/shared/api のクライアントを使い、スキーマで応答を検証してください。  no-restricted-globals
+ 1:17  error  'useEffect' import from 'react' is restricted. [bugyo:use-effect] useEffect is not allowed in product code. Fetch data with useXxxQuery in features/*/api, and use a dedicated hook in src/shared/lib for subscriptions and timers. If no such hook exists, add one to src/shared/lib.  no-restricted-imports
+10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] Do not call fetch directly. Use the client in src/shared/api and validate the response with a schema.  no-restricted-globals
 ```
 
-（テスト用の違反ファイル `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx` に対する出力から2件を抜き出したものです）
+（テスト用の違反ファイル `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx` に対する出力から2件を抜き出したものです。禁止のメッセージは既定で英語です。`.bugyo/config.json` に `"locale": "ja"` を書くと日本語になります）
 
 **確かめた結果は、合否と証拠の場所だけを返します。** 長いログでエージェントの文脈を埋めません。
 

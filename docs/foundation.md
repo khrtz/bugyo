@@ -61,7 +61,7 @@ export default bugyo({
 | `apiClientDir` | `layers.shared.api`（いくつもあればそのすべて） | 禁止の `allow` に書く `api` の場所（`fetchOnlyInApi` を入れたときに `fetch` を呼んでよい場所） |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `severity` | `{}` | 禁止を warn に下げる（下の「禁止を warn に下げる」） |
-| `locale` | `ja` | 禁止のメッセージの言語。`ja` か `en`（下の「メッセージの言語」） |
+| `locale` | `en` | 禁止のメッセージの言語。`en` か `ja`（下の「メッセージの言語」） |
 | `parts` | `[common, structure]` | 使う部品と禁止（下の「部品と禁止」）。`common` は必須 |
 | `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
 
@@ -117,21 +117,22 @@ export default bugyo({
 
 #### メッセージの言語
 
-bugyo の禁止のメッセージは、日本語（`ja`、既定）と英語（`en`）があります。次の順に見て、最初に見つかったものを使います。
+bugyo の禁止のメッセージは、英語（`en`、既定）と日本語（`ja`）があります。次の順に見て、最初に見つかったものを使います。
 
-1. `bugyo({ locale: 'en' })`
+1. `bugyo({ locale: 'ja' })`
 2. 環境変数 `BUGYO_LOCALE`
 3. `.bugyo/config.json` の `locale`
 
 ```
-'useEffect' import from 'react' is restricted. [bugyo:use-effect] useEffect is not allowed in product code. Fetch data with useXxxQuery in features/*/api, ...
+'useEffect' import from 'react' is restricted. [bugyo:use-effect] 製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、...
 ```
 
 - メッセージの頭の禁止の名前（`[bugyo:use-effect]`）は、言語によらず同じです。`bugyo baseline` はこの名前までで数えるので、言語を変えても件数は変わりません
 - 言語が変わるのは、`@bugyo/lint` と `@bugyo/lint-react` の禁止のメッセージ（コメントの禁止を含む）だけです。設定の書き方の誤りを知らせるエラー、dependency-cruiser のルールの説明、`bugyo` の CLI の出力は日本語のままです
 - `defineBan` で作った禁止のメッセージは書いたとおりに出ます。言語ごとに変えたいときは、`build(context)` で `context.locale` を見ます
 - `.bugyo/baseline.json` が名前で数える前の形式（`version` のないもの）なら、言語を変える前に `bugyo baseline save` で作り直します。古い形式はメッセージの文で数えるので、言語を変えると件数が合わなくなります
-- `ja` と `en` のほかを渡すと断ります
+- どれもなければ英語です
+- `en` と `ja` のほかを渡すと断ります
 
 #### 層のフォルダ名を変える
 
@@ -611,7 +612,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | --- | --- | --- |
 | `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
 | `sarif` | なし | `bugyo doctor` と `bugyo baseline` で一緒に数える、外の lint の結果。`[{ command?, file }]`（[外の lint の結果も数える](adopt.md#外の-lint-の結果も数える)） |
-| `locale` | `ja` | `@bugyo/lint` の禁止のメッセージの言語。`ja` か `en`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
+| `locale` | `en` | `@bugyo/lint` の禁止のメッセージの言語。`en` か `ja`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
 | `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
 | `verify.command` | なし | `command` で動かすときは必須 |
 | `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |

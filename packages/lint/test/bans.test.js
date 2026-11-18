@@ -66,9 +66,9 @@ test('defineBan: テストで許す import の禁止を足しても、model/ の
   const product = importMessages((await rulesFor(config, 'src/features/calc/model/add.ts'))['no-restricted-imports']);
   const tests = importMessages((await rulesFor(config, 'src/features/calc/model/add.test.ts'))['no-restricted-imports']);
   assert.ok(product.includes('lodash は使いません。'), product.join('\n'));
-  assert.ok(product.some((message) => message.startsWith('model/ から ui/')), product.join('\n'));
+  assert.ok(product.some((message) => message.startsWith('model/ cannot import ui/')), product.join('\n'));
   assert.ok(!tests.includes('lodash は使いません。'), `テストでは lodash を許す\n${tests.join('\n')}`);
-  assert.ok(tests.some((message) => message.startsWith('model/ から ui/')), `model/ の禁止は残る\n${tests.join('\n')}`);
+  assert.ok(tests.some((message) => message.startsWith('model/ cannot import ui/')), `model/ の禁止は残る\n${tests.join('\n')}`);
 });
 
 test('defineBan: 名前で warn に下げられ、rules の禁止も下がる', async () => {

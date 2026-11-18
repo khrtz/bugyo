@@ -183,7 +183,7 @@ export interface BugyoOptions extends BugyoSource {
    */
   severity?: Record<string, 'warn'>;
   /**
-   * bugyo の禁止のメッセージの言語。省くと、環境変数 `BUGYO_LOCALE`、`<root>/.bugyo/config.json` の `locale` の順に見て、どれもなければ `ja`。
+   * bugyo の禁止のメッセージの言語。省くと、環境変数 `BUGYO_LOCALE`、`<root>/.bugyo/config.json` の `locale` の順に見て、どれもなければ `en`。
    * メッセージの頭の禁止の名前（`[bugyo:<名前>]`）は言語によらず同じなので、言語を変えても bugyo baseline の件数は変わらない
    */
   locale?: BugyoLocale;

@@ -2,16 +2,16 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * bugyo の禁止のメッセージの言語。`ja`（既定）と `en`。
+ * bugyo の禁止のメッセージの言語。`en`（既定）と `ja`。
  *
  * @typedef {'ja' | 'en'} Locale
  */
 
 /** @type {readonly Locale[]} */
-export const locales = ['ja', 'en'];
+export const locales = ['en', 'ja'];
 
 /**
- * メッセージの言語を決める。`bugyo({ locale })`、環境変数 `BUGYO_LOCALE`、`<root>/.bugyo/config.json` の `locale` の順に見て、どれもなければ `ja`。
+ * メッセージの言語を決める。`bugyo({ locale })`、環境変数 `BUGYO_LOCALE`、`<root>/.bugyo/config.json` の `locale` の順に見て、どれもなければ `en`。
  *
  * @param {string} root
  * @param {unknown} [option]
@@ -19,7 +19,7 @@ export const locales = ['ja', 'en'];
  */
 export function resolveLocale(root, option) {
   const chosen = option ?? (process.env.BUGYO_LOCALE || undefined) ?? configLocale(root);
-  if (chosen === undefined) return 'ja';
+  if (chosen === undefined) return 'en';
   if (typeof chosen !== 'string' || !locales.some((locale) => locale === chosen)) {
     throw new Error(`locale は ${locales.join(' / ')} のどれかです / locale must be one of ${locales.join(', ')}: ${String(chosen)}`);
   }
