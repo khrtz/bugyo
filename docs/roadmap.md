@@ -25,7 +25,6 @@
 
 ## 確かめていないこと
 
-- CI（[.github/workflows/ci.yml](../.github/workflows/ci.yml)）は、まだ一度も最後まで動かしていません
 - Linux 用のスクリーンショットの基準画像がありません。できるまで CI の e2e は警告を出して飛ばします
 - プラグインのうち、`bugyo-mode`、`bugyo-critique`、`slop-reviewer` は実際の作業で試していません
 - `node-lib` のテンプレートは、テストとリポジトリの外での通し確認（`pack` → `init` → `install` → check・test・verify、`new feature` のあとも同じ）だけで、実際の開発に使ったことはありません
