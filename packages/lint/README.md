@@ -2,6 +2,8 @@
 
 エージェントが正しい書き方しか選べないようにする、ESLint・dependency-cruiser・tsconfig のプリセットです。React に依存しません。React 用の禁止は [@bugyo/lint-react](../lint-react) にあります。
 
+ESLint 9.24 以上（10 を含む）と TypeScript 5.8〜6.0 で動きます。`eslint` と `@eslint/js`（同じ大きな版）、`typescript`、`dependency-cruiser` はプロジェクトの側に入れます。
+
 ```js
 // eslint.config.js
 import { bugyo } from '@bugyo/lint';

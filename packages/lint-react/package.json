@@ -23,7 +23,7 @@
   },
   "peerDependencies": {
     "@bugyo/lint": "workspace:^",
-    "eslint": ">=10"
+    "eslint": "^9.24.0 || ^10.0.0"
   },
   "devDependencies": {
     "@bugyo/lint": "workspace:*",

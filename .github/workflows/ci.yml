@@ -34,6 +34,26 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
+  oldest:
+    name: ESLint 9.24 と TypeScript 5.8 で lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 対応する一番古い版にそろえる
+        run: |
+          printf "\noverrides:\n  eslint: 9.24.0\n  '@eslint/js': 9.24.0\n  typescript: 5.8.3\n" >> pnpm-workspace.yaml
+          pnpm install --no-frozen-lockfile
+          test "$(pnpm --filter @bugyo/lint exec eslint --version)" = "v9.24.0"
+      - run: pnpm --filter @bugyo/lint --filter @bugyo/lint-react test
+      - run: pnpm --filter todo-app --filter node-lib exec tsc --noEmit
+      - run: pnpm --filter todo-app --filter node-lib exec eslint .
+
   npm:
     name: npm で入れたプロジェクト（pnpm なし）
     runs-on: ubuntu-latest

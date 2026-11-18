@@ -39,6 +39,8 @@ e2e/<id>.spec.ts            その機能を実際に操作するテスト
 
 ### ESLint
 
+ESLint は 9.24 以上（10 を含む）、TypeScript は 5.8 以上 6.0 まで、flat config が前提です。`@eslint/js` は peer 依存なので、使う ESLint と同じ大きな版（9 なら 9、10 なら 10）をプロジェクトに入れます。CI は ESLint 9.24・TypeScript 5.8 の組み合わせでも lint のテストを回しています。
+
 ```js
 // eslint.config.js（React を使うプロジェクト）
 import { bugyo, common, structure } from '@bugyo/lint';
