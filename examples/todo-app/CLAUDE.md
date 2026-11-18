@@ -1,16 +1,16 @@
-# 開発ルール
+# Development rules
 
-## コマンド
-- pnpm check — 型・lint・依存関係・不要コード。変更のたびに必ず通す
-- pnpm test — ユニットテストとfeature mapの整合チェック
-- pnpm verify <feature> — 実際に動かして証拠を artifacts/ に残す
+## Commands
+- pnpm check — types, lint, dependencies, unused code. Run it after every change
+- pnpm test — unit tests and the feature map consistency check
+- pnpm verify <feature> — actually run the feature and keep evidence in artifacts/
 
-## 完了の定義
-- pnpm check が通るだけでは完了ではない
-- 変更の種類に応じた証拠（docs/土台設計.md の表）を出すまで終わらない
-- バグ修正は、先に失敗するテストで再現する
+## Definition of done
+- Passing pnpm check alone is not done
+- You are not done until you produce the evidence for your kind of change (the table in docs/architecture.md)
+- For a bug fix, reproduce it with a failing test first
 
-## 迷ったら
-- どの機能をどう確かめるか: docs/features/README.md から該当する機能のファイルを1つだけ開く
-- UIを変えたら、同じ変更で docs/features/<id>.md も直す
-- lintに止められたら、エラー文の指示に従う。無効化しない
+## When unsure
+- How to check a feature: open only that feature's file from docs/features/README.md
+- When you change the UI, fix docs/features/<id>.md in the same change
+- When lint stops you, follow the message. Do not disable the rule

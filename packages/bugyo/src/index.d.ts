@@ -32,7 +32,7 @@ export interface BugyoConfig {
    * ツールとルールごとに数える（`sarif: <ツール>/<ルール>`）
    */
   sarif?: { command?: string | undefined; file: string }[] | undefined;
-  /** @bugyo/lint の禁止のメッセージの言語。書かなければ `ja`（環境変数 `BUGYO_LOCALE` のほうが先） */
+  /** @bugyo/lint の禁止のメッセージの言語。書かなければ `en`（環境変数 `BUGYO_LOCALE` のほうが先） */
   locale?: 'ja' | 'en';
   verify: {
     /**

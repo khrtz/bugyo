@@ -4,7 +4,7 @@ import { App } from './App';
 import { Providers } from './Providers';
 
 const root = document.getElementById('root');
-if (root === null) throw new Error('#root が見つかりません');
+if (root === null) throw new Error('#root not found');
 
 createRoot(root).render(
   <StrictMode>

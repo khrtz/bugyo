@@ -36,10 +36,10 @@ test('locale を en にすると、禁止のメッセージが英語になり、
   assert.ok(en.some((m) => m.ruleId === 'bugyo/no-comments' && m.message.startsWith('Comments are not allowed.')), '名前のないコメントの禁止も英語になる');
   assert.ok(tagged(en).some((m) => m.message.includes('[bugyo:use-effect] useEffect is not allowed in product code.')));
   assert.ok(tagged(en).some((m) => m.message.includes('[bugyo:fetch] Do not call fetch directly.')));
-  assert.ok(tagged(ja).some((m) => m.message.includes('[bugyo:use-effect] 製品コードでuseEffectは使えません。')), '既定と同じ日本語');
+  assert.ok(tagged(ja).some((m) => m.message.includes('[bugyo:use-effect] 製品コードでuseEffectは使えません。')));
 });
 
-test('locale は、オプション、BUGYO_LOCALE、.bugyo/config.json の順に見て、なければ日本語', () => {
+test('locale は、オプション、BUGYO_LOCALE、.bugyo/config.json の順に見て、なければ英語', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bugyo-locale-'));
   mkdirSync(join(dir, '.bugyo'));
   const fetchMessage = (/** @type {import('eslint').Linter.Config[]} */ config) =>
@@ -54,12 +54,12 @@ test('locale は、オプション、BUGYO_LOCALE、.bugyo/config.json の順に
   const saved = process.env.BUGYO_LOCALE;
   try {
     delete process.env.BUGYO_LOCALE;
+    assert.match(fetchMessage(build(undefined)), /Do not call fetch/, '何もなければ英語');
+    writeFileSync(join(dir, '.bugyo/config.json'), JSON.stringify({ locale: 'ja' }));
     assert.match(fetchMessage(build(undefined)), /fetchを直接/);
-    writeFileSync(join(dir, '.bugyo/config.json'), JSON.stringify({ locale: 'en' }));
-    assert.match(fetchMessage(build(undefined)), /Do not call fetch/);
-    process.env.BUGYO_LOCALE = 'ja';
-    assert.match(fetchMessage(build(undefined)), /fetchを直接/, 'BUGYO_LOCALE が config より先');
-    assert.match(fetchMessage(build('en')), /Do not call fetch/, 'オプションがいちばん先');
+    process.env.BUGYO_LOCALE = 'en';
+    assert.match(fetchMessage(build(undefined)), /Do not call fetch/, 'BUGYO_LOCALE が config より先');
+    assert.match(fetchMessage(build('ja')), /fetchを直接/, 'オプションがいちばん先');
     process.env.BUGYO_LOCALE = 'fr';
     assert.throws(() => build(undefined), /locale/);
   } finally {

@@ -41,6 +41,9 @@ test('タスク台帳は、状態の項目の書き換えだけを断り、本�
   assert.match(run('Edit', { file_path: file, old_string: 'status: active', new_string: 'status: done' }, cwd) ?? '', /bugyo task のコマンドだけ/);
   assert.match(run('MultiEdit', { file_path: file, edits: [{ old_string: 'x', new_string: 'evidence-file: fake.json' }] }, cwd) ?? '', /bugyo task/);
   assert.match(run('Write', { file_path: file, content: taskText('done') }, cwd) ?? '', /bugyo task/);
+  for (const line of ['model: other-model', 'harness: other-harness']) {
+    assert.match(run('Edit', { file_path: file, old_string: 'assignee: agent-1', new_string: `assignee: agent-1\n${line}` }, cwd) ?? '', /bugyo task/, line);
+  }
   assert.equal(run('Edit', { file_path: file, old_string: '# slug を直す', new_string: '# slug の区切りを直す' }, cwd), undefined);
   assert.equal(run('Write', { file_path: file, content: taskText('active').replace('feature: slug', 'feature: slug-v2') }, cwd), undefined);
   assert.match(run('Write', { file_path: join(cwd, '.bugyo/tasks/t-002.md'), content: taskText('open') }, cwd) ?? '', /bugyo task add/);

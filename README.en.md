@@ -18,19 +18,19 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/terminal.svg" alt="pnpm check stops useEffect and fetch, pnpm verify todos prints PASS and where the evidence is, and bugyo task done closes the task with evidence" width="860">
+  <img src="docs/media/terminal.en.svg" alt="pnpm check stops useEffect and fetch, pnpm verify todos prints PASS and where the evidence is, and bugyo task done closes the task with evidence" width="860">
 </p>
 
 <table>
   <tr>
-    <td colspan="2" align="center"><a href="docs/media/trace.png"><img src="docs/media/trace.png" alt="Playwright trace: time per action and the page at that moment"></a></td>
+    <td colspan="2" align="center"><a href="docs/media/trace.en.png"><img src="docs/media/trace.en.png" alt="Playwright trace: time per action and the page at that moment"></a></td>
   </tr>
   <tr>
     <td colspan="2" align="center"><b>Trace</b> <sub>— step through each action later, with the page, network and logs at that moment</sub></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><img src="docs/media/verify.gif" alt="Video that verify recorded while operating the Todo app"></td>
-    <td width="50%" align="center"><a href="docs/media/report.png"><img src="docs/media/report.png" alt="HTML report: pass or fail and time for each test step"></a></td>
+    <td width="50%" align="center"><img src="docs/media/verify.en.gif" alt="Video that verify recorded while operating the Todo app"></td>
+    <td width="50%" align="center"><a href="docs/media/report.en.png"><img src="docs/media/report.en.png" alt="HTML report: pass or fail and time for each test step"></a></td>
   </tr>
   <tr>
     <td align="center"><b>Video</b> <sub>— the run, recorded as is</sub></td>
@@ -38,7 +38,7 @@
   </tr>
 </table>
 
-<p align="center"><sub>All of this is evidence that <code>pnpm verify todos</code> leaves on every run of the <a href="examples/todo-app">todo-app</a> example. CI keeps the same evidence and posts the result and a link to it on the PR. The messages are in Japanese for now.</sub></p>
+<p align="center"><sub>All of this is evidence that <code>pnpm verify todos</code> leaves on every run of the <a href="examples/todo-app">todo-app</a> example. CI keeps the same evidence and posts the result and a link to it on the PR.</sub></p>
 
 ---
 
@@ -66,14 +66,14 @@ Three things happen when you delegate to agents. bugyo stops each of them with t
 10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] Do not call fetch directly. Use the client in src/shared/api and validate the response with a schema.  no-restricted-globals
 ```
 
-(Two entries taken from the output for the deliberately broken test file `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx`, with `"locale": "en"` in `.bugyo/config.json`. Rule messages are in Japanese by default. The rest of the CLI output is in Japanese for now.)
+(Two entries taken from the output for the deliberately broken test file `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx`, Rule messages are in English by default; set `"locale": "ja"` in `.bugyo/config.json` for Japanese. The verify output and the result of `bugyo task done` follow the same setting; the rest of the CLI output is in Japanese for now.)
 
 **Verification returns pass/fail and where the evidence is, nothing more.** No long logs eating the agent's context.
 
 ```
 $ pnpm verify todos
-PASS todos  確認手順: docs/features/todos.md
-証拠: artifacts/test-results（動画・スクリーンショット・トレース）, artifacts/report/index.html
+PASS todos  steps: docs/features/todos.md
+evidence: artifacts/test-results (video, screenshots, traces), artifacts/report/index.html
 ```
 
 The two lines say: the steps to check are in `docs/features/todos.md`, and the evidence (video, screenshots, trace, HTML report) is under `artifacts/`.
@@ -85,7 +85,7 @@ The two lines say: the steps to check are in `docs/features/todos.md`, and the e
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
 - **Verification** — `bugyo verify <id>` runs the feature's check and reports pass/fail plus where the evidence is. By default it runs the Playwright spec and keeps video, screenshots, and a trace; with `"runner": "command"` in `.bugyo/config.json` it runs any command per feature and keeps its output.
-- **Task ledger and gate** — one file per task in `.bugyo/tasks/`. `bugyo task done` collects the evidence the task type needs and closes the task only when it passes. A task flipped to done by hand fails `bugyo task lint` inside `pnpm check`. `bugyo gate` decides whether to widen what agents may do, from rework, first-pass closes, and repeated mistakes.
+- **Task ledger and gate** — one file per task in `.bugyo/tasks/`. `bugyo task done` collects the evidence the task type needs and closes the task only when it passes. A task flipped to done by hand fails `bugyo task lint` inside `pnpm check`. `bugyo gate` decides whether to widen what agents may do, from rework, first-pass closes, and repeated mistakes. `bugyo stats` shows the record per task type, model, and harness.
 - **Scaffold** — `bugyo init --template <name>` and `bugyo new feature` create projects and features that already follow these rules.
 - **Gradual adoption** — `bugyo doctor` counts violations per ban before you adopt the rules, and `bugyo baseline save` records the current violations as a baseline. `bugyo baseline check` fails whenever a ban's count goes up or down, so the baseline can only shrink.
 
@@ -139,7 +139,7 @@ To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depe
 
 ## Language
 
-The detailed docs, the CLI output, the rule messages, and the plugin skills are written in Japanese. This page is the English entry point.
+The detailed docs, the CLI output, and the plugin skills are written in Japanese. Rule messages are in English by default. This page is the English entry point.
 
 ## Developing this repository
 

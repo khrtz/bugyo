@@ -1,18 +1,18 @@
 # Feature map
 
-利用者から見た機能の地図です。変更を確かめるときは、該当する機能のファイルを**1つだけ**開いてください。全部読む必要はありません。
+A map of the features as users see them. To check a change, open **only the one** file for that feature. You don't need to read them all.
 
-## 書き方
-- 1機能＝1ファイル（`docs/features/<id>.md`）。`<id>` は `src/features/<id>` と同じ名前にする
-- 先頭のfrontmatterに `id`・`route`・`spec` を書く。`pnpm test` がspecの存在と対応漏れを検査する
-- 本文は次の4つの見出しに答える。挙動のレベルで短く書き、ソースを読まなくても操作できるようにする
-  1. **何があるか**
-  2. **どう辿り着くか**
-  3. **どう操作して確かめるか**（`pnpm verify <id>` と、成功・キャンセル・エラー・空・永続化の各経路）
-  4. **よく嘘をつくところ**（見た目は通るのに壊れている、が起きやすい点）
-- UIを変えたら、同じPRでこのファイルも直す
+## How to write one
+- One feature, one file (`docs/features/<id>.md`). `<id>` matches `src/features/<id>`
+- Put `id`, `route`, and `spec` in the frontmatter. `pnpm test` checks that the spec exists and that nothing is missing
+- The body answers four headings. Keep it short and at the level of behavior, so someone can operate the feature without reading the source
+  1. **What is there**
+  2. **How to reach it**
+  3. **How to check it** (`pnpm verify <id>`, and each path: success, cancel, error, empty, persistence)
+  4. **Where it lies** (places where it looks fine but is broken)
+- When you change the UI, fix this file in the same PR
 
-## 回帰の順番
-アプリ全体を確かめるときは、上から順に回す。
+## Regression order
+To check the whole app, go from top to bottom.
 
 1. [todos](todos.md)

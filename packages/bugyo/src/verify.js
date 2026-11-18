@@ -3,6 +3,7 @@ import { existsSync, globSync, mkdirSync, readFileSync, rmSync, statSync, writeF
 import { join, relative, sep } from 'node:path';
 import { loadConfig } from './config.js';
 import { loadFeatures } from './feature-map.js';
+import { cliLocale, cliMessages } from './locale.js';
 import { runCommand, tail } from './run.js';
 import { runsOf } from './runners.js';
 
@@ -112,12 +113,13 @@ function sandboxCheck(plan, command, cwd) {
  */
 export function verify(target, cwd = process.cwd()) {
   const config = loadConfig(cwd);
+  const m = cliMessages(cliLocale(config));
   const features = loadFeatures(cwd);
   const targets = target === '--all' ? features : features.filter((feature) => feature.id === target);
   if (targets.length === 0) {
     return {
       status: 2,
-      lines: [`使い方: bugyo verify <feature>|--all  (候補: ${features.map((feature) => feature.id).join(', ')})`],
+      lines: [m.verifyUsage({ features: features.map((feature) => feature.id).join(', ') })],
       results: [],
       evidence: [],
     };
@@ -145,7 +147,8 @@ export function verify(target, cwd = process.cwd()) {
   const sandbox = sandboxCheck(plan, config.verify.sandbox, cwd);
   if (sandbox !== undefined && !sandbox.ok) {
     for (const item of plan.filter((candidate) => candidate.runner.sandbox)) outcomes.set(item, { ok: false, command: sandbox.command, passed: false });
-    failedOutput.push(`隔離環境ではないので、隔離環境が要る確かめ方（${[...new Set(plan.filter((item) => item.runner.sandbox).map((item) => item.runner.name))].join(', ')}）を動かしませんでした: ${sandbox.command} が終了コード ${sandbox.status}\n${sandbox.output}`);
+    const runners = [...new Set(plan.filter((item) => item.runner.sandbox).map((item) => item.runner.name))].join(', ');
+    failedOutput.push(`${m.notInSandbox({ runners, command: sandbox.command, status: sandbox.status })}\n${sandbox.output}`);
   }
   const runnable = plan.filter((item) => !outcomes.has(item));
 
@@ -162,7 +165,7 @@ export function verify(target, cwd = process.cwd()) {
     });
     const bySpec = resultsBySpec(cwd, paths.report);
     for (const item of items) outcomes.set(item, { ok: bySpec.get(item.spec), command, passed: run.status === 0 });
-    evidence.push(`${paths.testResults}（動画・スクリーンショット・トレース）`, `${paths.html}/index.html`);
+    evidence.push(`${paths.testResults}${m.playwrightEvidence}`, `${paths.html}/index.html`);
     if (run.status !== 0) failedOutput.push(run.output);
   }
 
@@ -188,7 +191,7 @@ export function verify(target, cwd = process.cwd()) {
     outcomes.set(item, { ok, command: line, passed: ok, files });
     evidence.push(...files.map((found) => found.path));
     if (run.status !== 0) failedOutput.push(`$ ${line}\n${run.output}`);
-    else if (files.length === 0) failedOutput.push(`$ ${line}\n終了コードは 0 ですが、証拠のファイルがありません（${globs.join(', ')} に当たり、実行のあいだに書かれたもの）`);
+    else if (files.length === 0) failedOutput.push(`$ ${line}\n${m.noEvidenceFiles({ globs: globs.join(', ') })}`);
   }
 
   const multi = plan.length !== targets.length || plan.some((item) => item.runner.name !== config.verify.runner);
@@ -201,7 +204,7 @@ export function verify(target, cwd = process.cwd()) {
     const ok = oks.includes(false) ? false : oks.every((value) => value === true) ? true : undefined;
     const passed = runs.every(({ outcome }) => outcome?.passed === true);
     const label = ok === undefined ? (passed ? 'PASS' : 'FAIL?') : ok ? 'PASS' : 'FAIL';
-    lines.push(`${label} ${feature.id}  確認手順: ${feature.file}`);
+    lines.push(`${label} ${feature.id}  ${m.steps} ${feature.file}`);
     const commands = [...new Set(runs.map(({ outcome }) => outcome?.command ?? ''))];
     /** @type {FeatureResult} */
     const result = { id: feature.id, ok, command: commands.join('\n') };
@@ -219,7 +222,7 @@ export function verify(target, cwd = process.cwd()) {
     return result;
   });
   const passed = failedOutput.length === 0;
-  lines.push(`証拠: ${evidence.join(', ')}`);
+  lines.push(`${m.evidence} ${evidence.join(', ')}`);
   if (!passed) lines.push(tail(failedOutput.join('\n')));
   writeFileSync(join(cwd, summaryFile), `${JSON.stringify({ runner: config.verify.runner, passed, features: results, evidence }, null, 2)}\n`);
   return { status: passed ? 0 : 1, lines, results, evidence };

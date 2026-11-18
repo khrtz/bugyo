@@ -40,5 +40,5 @@ export function remaining(todos: readonly Todo[]): number {
 }
 
 export function todoTitle(todos: readonly Todo[] | undefined): string {
-  return todos === undefined ? 'Todo' : `残り ${String(remaining(todos))} 件`;
+  return todos === undefined ? 'Todo' : `${String(remaining(todos))} left`;
 }

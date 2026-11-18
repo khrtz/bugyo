@@ -14,7 +14,7 @@ import {
   type TodoId,
 } from '../model/todo';
 
-const filterLabels = { all: 'すべて', active: '未完了', done: '完了' } satisfies Record<Filter, string>;
+const filterLabels = { all: 'All', active: 'Active', done: 'Done' } satisfies Record<Filter, string>;
 
 export function TodoList() {
   const query = useTodosQuery();
@@ -25,15 +25,15 @@ export function TodoList() {
 
   switch (query.status) {
     case 'loading':
-      return <p role="status">読み込み中…</p>;
+      return <p role="status">Loading…</p>;
     case 'error':
-      return <p role="alert">読み込みに失敗しました: {query.error.message}</p>;
+      return <p role="alert">Failed to load: {query.error.message}</p>;
     case 'ready': {
       const todos = withToggles(query.data, toggled);
       return (
         <section aria-label="Todo">
-          <p>残り {remaining(todos)} 件</p>
-          <div role="group" aria-label="絞り込み">
+          <p>{remaining(todos)} left</p>
+          <div role="group" aria-label="Filter">
             {filters.map((f) => (
               <Button key={f} pressed={f === filter} onClick={() => {
                 setFilter(f);

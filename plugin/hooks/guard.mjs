@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
 /** CLI だけが書く、タスク台帳の frontmatter の項目 */
-const managedField = /^(status|assignee|rework|gate-attempts|tests-hash|repro(-[a-z]+)?|drop-reason|dropped-at|evidence-[a-z]+)\s*:/m;
+const managedField = /^(status|assignee|model|harness|rework|gate-attempts|tests-hash|repro(-[a-z]+)?|drop-reason|dropped-at|evidence-[a-z]+)\s*:/m;
 
 const rules = [
   {
