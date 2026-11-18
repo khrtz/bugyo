@@ -43,6 +43,8 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -56,6 +58,10 @@ jobs:
         id: e2e
         if: ${{ !inputs.update_snapshots }}
         run: pnpm verify
+
+      - name: この PR で閉じたタスクの証拠を取り直して照合する
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm recheck --base "origin/${{ github.base_ref }}"
 
       - name: Linuxの基準画像を作り直す
         if: ${{ inputs.update_snapshots }}

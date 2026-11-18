@@ -411,3 +411,71 @@ test('task lint: feature map にない機能、証拠と食い違う evidence-tr
   assert.match(run.stderr, /t-002\.md: evidence-tree が \.bugyo\/evidence\/t-002\.json と合いません/);
   assert.match(run.stderr, /同じ id のタスクが \.bugyo\/tasks\/t-001\.md にもあります/);
 });
+
+test('recheck: 本物の証拠は通り、閉じたあとにコードが変わるとハッシュの不一致で落ちる', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  assert.match(ok(cwd, 'task', 'recheck', 't-001').stdout, /^OK {3}t-001 {2}手順が通り、ハッシュが一致しました$/m);
+
+  writeFileSync(join(cwd, 'lib/greet/extra.js'), 'export const extra = 1;\n');
+  const changed = bugyo(cwd, 'task', 'recheck', 't-001');
+  assert.equal(changed.status, 1, changed.all);
+  assert.match(changed.stdout, /^FAIL t-001 {2}今のコードのハッシュ.*evidence-tree.*と違います/m);
+});
+
+test('recheck: ハッシュまで合わせた偽の証拠は task lint を通るが、取り直すと verify で落ちる', async () => {
+  const { treeHash } = await import('../src/evidence.js');
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  breakGreet(cwd);
+  const forged = treeHash(cwd, ['lib', 'checks']);
+  setField(cwd, 't-001', 'evidence-tree', forged);
+  const evidencePath = join(cwd, '.bugyo/evidence/t-001.json');
+  const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+  evidence.tree.hash = forged;
+  writeFileSync(evidencePath, JSON.stringify(evidence));
+
+  ok(cwd, 'task', 'lint');
+  const run = bugyo(cwd, 'task', 'recheck', 't-001');
+  assert.equal(run.status, 1, run.all);
+  assert.match(run.stdout, /^FAIL t-001 {2}取り直すと .*verify greet が通りません/m);
+});
+
+test('recheck: 証拠のコマンドが今の設定と違うと落ちる', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', '文書', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  editConfig(cwd, (config) => (config.commands.check = 'node -e "process.exit(0)"'));
+  const run = bugyo(cwd, 'task', 'recheck', 't-001');
+  assert.equal(run.status, 1, run.all);
+  assert.match(run.stdout, /証拠に記録されたコマンド（node scripts\/check\.js）が、今の設定で必要なコマンド/);
+});
+
+test('recheck --base: その範囲で閉じたタスクだけを照合し、引数がなければ断る', () => {
+  const cwd = project();
+  const git = (...args) => {
+    const run = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'core.autocrlf=false', ...args], { cwd, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+  };
+  git('init', '-q');
+  ok(cwd, 'task', 'add', '前からある', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  git('add', '-A');
+  git('commit', '-qm', 'base');
+  git('tag', 'base');
+  ok(cwd, 'task', 'add', 'この PR で閉じる', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-002', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-002');
+  git('add', '-A');
+  git('commit', '-qm', 'pr');
+
+  const run = ok(cwd, 'task', 'recheck', '--base', 'base', '--json');
+  assert.deepEqual(JSON.parse(run.stdout).results.map((result) => result.id), ['t-002']);
+  assert.equal(bugyo(cwd, 'task', 'recheck').status, 2);
+});

@@ -4,6 +4,7 @@ import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
 import { evaluateGate } from './gate.js';
 import { isMistakeKind, loadMistakes, mistakeLine, mistakeState, recordMistake, recordRule, sortMistakes } from './mistakes.js';
+import { changedArchiveIds, recheckTask } from './recheck.js';
 import { runCommand } from './run.js';
 import { lintTasks } from './task-lint.js';
 import {
@@ -31,6 +32,7 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo task drop <id> -r "<理由>"
   bugyo task ls [--all]                  一覧（--all で完了・中止も）
   bugyo task lint                        台帳の整合を検査する
+  bugyo task recheck [<id>...] [--base <ref>]  完了タスクの証拠を取り直して照合する（CI 用。--base なら <ref>...HEAD で閉じたタスク）
   bugyo mistake ls                       ミスの種類ごとの回数とルール
   bugyo mistake rule <種類> --at <パス>  ルールに変えたことを記録する
   bugyo gate                             任せる範囲を広げてよいかを計算する
@@ -53,6 +55,7 @@ function parse(args) {
         reason: { type: 'string', short: 'r' },
         kind: { type: 'string' },
         at: { type: 'string' },
+        base: { type: 'string' },
         json: { type: 'boolean' },
         all: { type: 'boolean' },
       },
@@ -343,6 +346,26 @@ function lint(args, cwd) {
  * @param {string[]} args
  * @param {string} cwd
  */
+function recheck(args, cwd) {
+  const { values, positionals } = parse(args);
+  if (positionals.length === 0 && values.base === undefined) throw new UsageError('使い方: bugyo task recheck <id>... か bugyo task recheck --base <ref>');
+  const ids = [...new Set([...positionals, ...(values.base === undefined ? [] : changedArchiveIds(cwd, values.base))])];
+  const config = loadConfig(cwd);
+  const tasks = loadTasks(cwd);
+  const results = ids.map((id) => recheckTask(findTask(tasks, id), config, cwd));
+  const failed = results.filter((result) => !result.ok);
+  const lines = [
+    ...results.flatMap((result) => [`${result.ok ? 'OK  ' : 'FAIL'} ${result.id}  ${result.reason}`, ...(result.output === '' ? [] : [result.output])]),
+    `task recheck: ${results.length}件を照合、不一致 ${failed.length}件`,
+  ];
+  print(values.json, lines, { ok: failed.length === 0, results: results.map(({ id, ok, reason }) => ({ id, ok, reason })) });
+  return failed.length === 0 ? 0 : 1;
+}
+
+/**
+ * @param {string[]} args
+ * @param {string} cwd
+ */
 export function taskCommand(args, cwd = process.cwd()) {
   const [sub, ...rest] = args;
   switch (sub) {
@@ -366,8 +389,10 @@ export function taskCommand(args, cwd = process.cwd()) {
       return ls(rest, cwd);
     case 'lint':
       return lint(rest, cwd);
+    case 'recheck':
+      return recheck(rest, cwd);
     default:
-      throw new UsageError(`bugyo task のサブコマンドは add / ready / start / show / repro / done / rework / drop / ls / lint です`);
+      throw new UsageError(`bugyo task のサブコマンドは add / ready / start / show / repro / done / rework / drop / ls / lint / recheck です`);
   }
 }
 

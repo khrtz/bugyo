@@ -1,0 +1,36 @@
+name: config guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  config-guard:
+    name: .bugyo/config.json の変更には人の承認が要る
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 変更と承認のラベルを確かめる
+        env:
+          BASE: origin/${{ github.base_ref }}
+          APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'bugyo-config-approved') }}
+        run: |
+          changed=$(git diff --name-only "$BASE...HEAD" | grep -E '(^|/)\.bugyo/config\.json$' || true)
+          if [ -z "$changed" ]; then
+            echo ".bugyo/config.json の変更はありません"
+            exit 0
+          fi
+          echo "変更された設定ファイル:"
+          echo "$changed"
+          if [ "$APPROVED" = "true" ]; then
+            echo "ラベル bugyo-config-approved があるので通します"
+            exit 0
+          fi
+          echo "::error::.bugyo/config.json は done の判定を決めるファイルなので、変えるのは人だけです。人が差分を確かめてから、PR にラベル bugyo-config-approved を付けてください。"
+          exit 1
