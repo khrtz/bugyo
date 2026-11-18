@@ -49,9 +49,18 @@ export interface BugyoConfig {
             command?: string | undefined;
             env?: Record<string, string> | undefined;
             match?: string | string[] | undefined;
+            /**
+             * command のとき、実行が書くはずの証拠のファイルの glob（`{id}` と `{spec}` が置き換わる）。
+             * 実行のあいだに書かれたファイルが1つもなければ、終了コードが 0 でも FAIL。見つかったファイルはハッシュと一緒に verify.json に残る
+             */
+            evidence?: string[] | undefined;
+            /** `sandbox` なら、`verify.sandbox` のコマンドが通るときだけ動かす（通らなければ FAIL） */
+            requires?: 'sandbox' | undefined;
           }
         >
       | undefined;
+    /** 隔離環境かどうかを確かめるコマンド。`requires: 'sandbox'` の確かめ方を動かす前に1回だけ実行する */
+    sandbox?: string | undefined;
   };
   featureMap: {
     /** spec を探すフォルダ。既定は `e2e`。null で検査を飛ばす */

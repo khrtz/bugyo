@@ -17,6 +17,8 @@ const NamedRunner = z
     command: z.string().optional(),
     env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/, '環境変数の名前にしてください'), z.string()).optional(),
     match: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
+    evidence: z.array(z.string().min(1)).min(1).optional(),
+    requires: z.literal('sandbox').optional(),
   })
   .strict();
 
@@ -24,6 +26,7 @@ const Verify = z
   .object({
     runner: RunnerName.default('playwright'),
     command: z.string().optional(),
+    sandbox: z.string().trim().min(1).optional(),
     runners: z
       .record(RunnerName, NamedRunner)
       .refine(
@@ -255,6 +258,12 @@ export function loadConfig(cwd = process.cwd()) {
   for (const [name, runner] of Object.entries(verify.runners ?? {})) {
     if (runner.runner === 'command' && !runner.command?.trim()) {
       throw new Error(`${configFile}: verify.runners.${name} は command なので、command にコマンドを書いてください（{id} と {spec} が置き換わります）`);
+    }
+    if (runner.requires === 'sandbox' && verify.sandbox === undefined) {
+      throw new Error(`${configFile}: verify.runners.${name} は requires が "sandbox" なので、隔離環境かどうかを確かめるコマンドを verify.sandbox に書いてください`);
+    }
+    if (runner.evidence !== undefined && runner.runner !== 'command') {
+      throw new Error(`${configFile}: verify.runners.${name} の evidence は、runner が "command" のときだけ書けます（playwright は証拠を決まった場所に残します）`);
     }
   }
   const { featureMap } = parsed.data;
