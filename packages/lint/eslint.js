@@ -16,7 +16,14 @@ import { noComments as noCommentsRule } from './rules/no-comments.js';
  *   shared: { ui: string[], api: string[], lib: string[], model: string[], other: string[] },
  *   featureParts: { ui: string[], api: string[], model: string[] },
  * }} Layers
- * @typedef {Required<Omit<BugyoOptions, 'parts' | 'layers' | 'severity'>> & {
+ * @typedef {{
+ *   root: string,
+ *   src: string,
+ *   tsconfig: string,
+ *   effectHooksDir: string,
+ *   apiClientDir: string,
+ *   ignores: string[],
+ *   explicitExtensions: boolean,
  *   layers: Layers,
  *   customLayers: boolean,
  *   featuresLabel: string,
@@ -238,7 +245,7 @@ export const structure = {
         ];
     return {
       plugins: { 'import-x': importX },
-      settings: { 'import-x/resolver-next': [createTypeScriptImportResolver({ project: `${root}/tsconfig.json` })] },
+      settings: { 'import-x/resolver-next': [createTypeScriptImportResolver({ project: `${root}/${context.tsconfig}` })] },
       srcRules: {
         'import-x/no-restricted-paths': ['error', { basePath: root, zones: zones.filter((zone) => [zone.target, zone.from].every((list) => list.length > 0)) }],
       },
@@ -372,6 +379,52 @@ const lower = (value) => {
   return value;
 };
 
+/** ソースごとに書く項目。sources を使うときは sources のそれぞれに書く */
+const sourceKeys = ['src', 'layers', 'parts', 'tsconfig', 'explicitExtensions', 'effectHooksDir', 'apiClientDir'];
+
+/**
+ * @typedef {{ context: Context, parts: Part[], built: Contribution[], bans: Ban[], effectsDirs: string[], apiDirs: string[] }} PreparedSource
+ */
+
+/**
+ * ソース1つの部品を組み立て、禁止を集める。同じソースの中に同じ名前の禁止があれば断る。
+ *
+ * @param {string} root
+ * @param {string[]} ignores
+ * @param {import('./index.js').BugyoSource} source
+ * @returns {PreparedSource}
+ */
+function prepareSource(root, ignores, source) {
+  const { src = 'src', parts = [common, structure], explicitExtensions = false, tsconfig = 'tsconfig.json' } = source;
+  if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
+  const layers = resolveLayers(src, source.layers);
+  const effectsDirs = source.effectHooksDir === undefined ? layers.shared.lib : [trimSlash(source.effectHooksDir)];
+  const apiDirs = source.apiClientDir === undefined ? layers.shared.api : [trimSlash(source.apiClientDir)];
+  const customLayers = source.layers !== undefined;
+  /** @type {Context} */
+  const context = {
+    root,
+    src,
+    tsconfig: trimSlash(tsconfig),
+    effectHooksDir: effectsDirs.join('・'),
+    apiClientDir: apiDirs.join('・'),
+    ignores,
+    explicitExtensions,
+    layers,
+    customLayers,
+    featuresLabel: customLayers ? layers.features : 'features',
+  };
+  const sorted = [...new Set(parts)].sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
+  const built = sorted.map((part) => part.build(context));
+  const bans = built.flatMap((contribution) => contribution.bans ?? []);
+  /** @type {Map<string, number>} */
+  const seen = new Map();
+  for (const ban of bans) seen.set(ban.name, (seen.get(ban.name) ?? 0) + 1);
+  const duplicated = [...seen].filter(([, count]) => count > 1).map(([name]) => name);
+  if (duplicated.length > 0) throw new Error(`同じ名前の禁止が2つ以上あります: ${duplicated.join(', ')}。名前を変えてください`);
+  return { context, parts: sorted, built, bans, effectsDirs, apiDirs };
+}
+
 /**
  * bugyo の ESLint flat config を作る。
  * no-restricted-imports / no-restricted-globals などはスコープごとに1つの設定へ合成して返すので、
@@ -382,49 +435,29 @@ const lower = (value) => {
  * @returns {import('eslint').Linter.Config[]}
  */
 export function bugyo(options) {
-  const { root, src = 'src', ignores = [], parts = [common, structure], explicitExtensions = false } = options;
+  const { root, ignores = [] } = options;
   if (typeof root !== 'string') throw new Error('bugyo({ root }) に import.meta.dirname を渡してください');
   if ('extra' in options) {
     throw new Error('bugyo({ extra }) はありません。独自の禁止は defineBan({ name, ... }) で作り、parts に足してください');
   }
-  if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
-  const layers = resolveLayers(src, options.layers);
-  const effectsDirs = options.effectHooksDir === undefined ? layers.shared.lib : [trimSlash(options.effectHooksDir)];
-  const apiDirs = options.apiClientDir === undefined ? layers.shared.api : [trimSlash(options.apiClientDir)];
-  const effectHooksDir = effectsDirs.join('・');
-  const apiClientDir = apiDirs.join('・');
-  const customLayers = options.layers !== undefined;
+  const multi = options.sources !== undefined;
+  if (multi) {
+    const mixed = sourceKeys.filter((key) => key in options);
+    if (mixed.length > 0) throw new Error(`bugyo({ sources }) を使うときは、${mixed.join(', ')} を sources のそれぞれに書いてください`);
+    if (!Array.isArray(options.sources) || options.sources.length === 0) throw new Error('bugyo({ sources }) には、ソースを1つ以上の配列で渡してください');
+  }
+  const prepared = (options.sources ?? [options]).map((source) => prepareSource(root, ignores, source));
+  const srcs = prepared.map(({ context }) => context.src);
+  const nested = srcs.filter((src, index) => srcs.some((other, at) => at !== index && (other === src || src.startsWith(`${other}/`))));
+  if (nested.length > 0) throw new Error(`bugyo({ sources }) の src が重なっています: ${nested.join(', ')}。ソースごとに別のフォルダにしてください`);
 
-  /** @type {Context} */
-  const context = {
-    root,
-    src,
-    effectHooksDir,
-    apiClientDir,
-    ignores,
-    explicitExtensions,
-    layers,
-    customLayers,
-    featuresLabel: customLayers ? layers.features : 'features',
-  };
-  const built = [...new Set(parts)].sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name)).map((part) => part.build(context));
-  const bans = built.flatMap((contribution) => contribution.bans ?? []);
-
-  /** @type {Map<string, number>} */
-  const seen = new Map();
-  for (const ban of bans) seen.set(ban.name, (seen.get(ban.name) ?? 0) + 1);
-  const duplicated = [...seen].filter(([, count]) => count > 1).map(([name]) => name);
-  if (duplicated.length > 0) throw new Error(`同じ名前の禁止が2つ以上あります: ${duplicated.join(', ')}。名前を変えてください`);
-  const banNames = new Set(seen.keys());
-
+  const banNames = new Set(prepared.flatMap(({ bans }) => bans.map((ban) => ban.name)));
   const severity = options.severity ?? {};
   for (const [name, level] of Object.entries(severity)) {
     if (level !== 'warn') throw new Error(`bugyo({ severity }) で下げられるのは 'warn' だけです（${name}: ${String(level)}）`);
   }
   const warned = new Set(Object.keys(severity).filter((name) => banNames.has(name)));
-
-  const entries = entriesOf(bans);
-  const alias = entries.some((entry) => warned.has(entry.name));
+  const alias = prepared.some(({ bans }) => entriesOf(bans).some((entry) => warned.has(entry.name)));
 
   /** @typedef {'error' | 'warn'} Level */
   /** @param {Entry[]} list @param {Level} level */
@@ -464,6 +497,19 @@ export function bugyo(options) {
   /** @param {(typeof combined)[number]} group @param {Entry[]} list */
   const inGroup = (group, list) => list.filter((entry) => /** @type {readonly Kind[]} */ (group.kinds).includes(entry.kind));
 
+  /** @param {Ban} ban */
+  const banRules = (ban) => Object.fromEntries(Object.entries(ban.rules).map(([id, value]) => [id, warned.has(ban.name) ? lower(value) : value]));
+
+  /**
+   * ソース1つ分のブロック（src の下に当てるもの、範囲ごと、許す場所ごと）。
+   *
+   * @param {PreparedSource} source
+   * @returns {import('eslint').Linter.Config[]}
+   */
+  const blocksOf = ({ context, built, bans, effectsDirs, apiDirs }) => {
+  const { src, layers } = context;
+  const entries = entriesOf(bans);
+
   /** @param {string} scope */
   const scopeGlobs = (scope) => {
     switch (scope) {
@@ -493,9 +539,6 @@ export function bugyo(options) {
         return pathGlobs(place);
     }
   };
-
-  /** @param {Ban} ban */
-  const banRules = (ban) => Object.fromEntries(Object.entries(ban.rules).map(([id, value]) => [id, warned.has(ban.name) ? lower(value) : value]));
 
   const srcEntries = entries.filter((entry) => entry.scope === 'src');
   const scopes = [...new Set(['ui', 'model', ...bans.map((ban) => ban.scope)])].filter((scope) => scope !== 'src');
@@ -558,25 +601,37 @@ export function bugyo(options) {
     }
   }
 
-  const settings = merged(built, 'settings');
-  const plugins = Object.assign({}, merged(built, 'plugins'), ...bans.map((ban) => ban.plugins));
   const srcPlugins = merged(built, 'srcPlugins');
-  const configs = tseslint.config(
-    ...built.flatMap((contribution) => contribution.prelude ?? []),
-    {
-      languageOptions: Object.assign({}, ...built.map((contribution) => contribution.languageOptions ?? {})),
-      plugins: alias ? { ...plugins, [warnPlugin]: { rules: Object.fromEntries(combined.map(({ ruleId }) => [ruleId, builtinRules.get(ruleId)])) } } : plugins,
-      ...(Object.keys(settings).length === 0 ? {} : { settings }),
-      rules: merged(built, 'rules'),
-    },
+  const sourceSettings = multi ? merged(built, 'settings') : {};
+  return [
     {
       files: scopeGlobs('src'),
       ...(Object.keys(srcPlugins).length === 0 ? {} : { plugins: srcPlugins }),
+      ...(Object.keys(sourceSettings).length === 0 ? {} : { settings: sourceSettings }),
       rules: srcRules,
     },
     ...scopeBlocks,
     ...placeBlocks,
-    ...built.flatMap((contribution) => contribution.trailing ?? []),
+  ];
+  };
+
+  /** 全体に1回だけ当てるもの（prelude・言語の設定・プラグイン・src の外にも当てるルール・trailing）。どれかのソースに入っている部品から1回ずつ */
+  /** @type {Map<Part, Contribution>} */
+  const byPart = new Map();
+  for (const { parts, built } of prepared) parts.forEach((part, index) => byPart.has(part) || byPart.set(part, /** @type {Contribution} */ (built[index])));
+  const globalBuilt = [...byPart].sort(([a], [b]) => a.rank - b.rank || a.name.localeCompare(b.name)).map(([, contribution]) => contribution);
+  const settings = multi ? {} : merged(globalBuilt, 'settings');
+  const plugins = Object.assign({}, merged(globalBuilt, 'plugins'), ...prepared.flatMap(({ bans }) => bans.map((ban) => ban.plugins)));
+  const configs = tseslint.config(
+    ...globalBuilt.flatMap((contribution) => contribution.prelude ?? []),
+    {
+      languageOptions: Object.assign({}, ...globalBuilt.map((contribution) => contribution.languageOptions ?? {})),
+      plugins: alias ? { ...plugins, [warnPlugin]: { rules: Object.fromEntries(combined.map(({ ruleId }) => [ruleId, builtinRules.get(ruleId)])) } } : plugins,
+      ...(Object.keys(settings).length === 0 ? {} : { settings }),
+      rules: merged(globalBuilt, 'rules'),
+    },
+    ...prepared.flatMap(blocksOf),
+    ...globalBuilt.flatMap((contribution) => contribution.trailing ?? []),
   );
   return lowerRules(configs, Object.keys(severity).filter((name) => !banNames.has(name)), banNames);
 }

@@ -49,6 +49,8 @@ export const fetchOnlyInApi: BugyoPart;
 export interface BugyoContext {
   root: string;
   src: string;
+  /** import の解決に使う tsconfig（root からの相対パス） */
+  tsconfig: string;
   /** エラー文に書く、`effects` の場所。いくつもあれば `・` でつなぐ */
   effectHooksDir: string;
   /** エラー文に書く、`api` の場所。いくつもあれば `・` でつなぐ */
@@ -126,9 +128,27 @@ export interface ResolvedLayers {
 
 export function resolveLayers(src: string, layers: BugyoLayers | undefined): ResolvedLayers;
 
-export interface BugyoOptions {
+/** ソース1つ分の設定。`bugyo({ sources })` のそれぞれに書く。項目の意味は BugyoOptions の同じ名前のもの */
+export interface BugyoSource {
+  src?: string;
+  layers?: BugyoLayers;
+  parts?: readonly BugyoPart[];
+  /** import の解決に使う tsconfig（root からの相対パス）。既定は `tsconfig.json` */
+  tsconfig?: string;
+  explicitExtensions?: boolean;
+  effectHooksDir?: string;
+  apiClientDir?: string;
+}
+
+export interface BugyoOptions extends BugyoSource {
   /** eslint.config.js で `import.meta.dirname` を渡す */
   root: string;
+  /**
+   * 1つのリポジトリに、層の決まりを当てるソースがいくつもあるとき（フロントとサーバーなど）に、ソースごとの設定を並べる。
+   * 書くときは src・layers・parts・tsconfig・explicitExtensions・effectHooksDir・apiClientDir を外に書かない。
+   * 部品の、src の外にも当てるルール（common の型の検査など）は、どれかのソースに入っていれば全体に1回だけ当てる
+   */
+  sources?: readonly BugyoSource[];
   /**
    * 使う部品と禁止。既定は `[common, structure]`。common は必須。React を使うなら @bugyo/lint-react の `react` を足す。
    * 禁止（`noComments`・`fetchOnlyInApi`、@bugyo/lint-react の `noUseEffect`・`noUiTimers`、defineBan で作ったもの）も並べて渡す。順番は結果に影響しない
