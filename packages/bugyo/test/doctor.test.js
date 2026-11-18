@@ -131,6 +131,17 @@ test('baseline check は、同じルールの中で禁止を入れ替えても�
   assert.equal(bugyo(cwd, 'baseline', 'check').status, 0);
 });
 
+test('warn に下げた禁止（bugyo-warn/…）は、下げる前と同じ禁止として数え、借りとして別にも出す', () => {
+  const cwd = project();
+  setResults(cwd, { 'a.ts': [useEffect] });
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  setResults(cwd, { 'a.ts': [{ ...useEffect, ruleId: 'bugyo-warn/no-restricted-imports', severity: 1 }] });
+  const report = JSON.parse(bugyo(cwd, 'doctor', '--json').all);
+  assert.deepEqual(report.counts, { [banOf(useEffect)]: 1 });
+  assert.deepEqual(report.warned, { [banOf(useEffect)]: 1 });
+  assert.equal(bugyo(cwd, 'baseline', 'check').status, 0, '下げただけでは件数は変わらない');
+});
+
 test('baseline check はベースラインがなければ何もしない', () => {
   const cwd = project();
   setResults(cwd, { 'a.ts': [useEffect] });

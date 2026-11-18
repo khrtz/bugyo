@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import { builtinRules } from 'eslint/use-at-your-own-risk';
 import comments from '@eslint-community/eslint-plugin-eslint-comments';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import importX from 'eslint-plugin-import-x';
@@ -16,7 +17,7 @@ import { noComments } from './rules/no-comments.js';
  *   featuresLabel: string,
  * }} Context
  * @typedef {'effects' | 'api' | 'tests'} Exception
- * @typedef {{ value: object, exempt?: Exception[] }} Entry
+ * @typedef {{ value: object, exempt?: Exception[], name?: string }} Entry 禁止1つ。name は bugyo({ severity }) で warn に下げるときの名前
  * @typedef {{ paths?: Entry[], patterns?: Entry[], globals?: Entry[], syntax?: Entry[], properties?: Entry[] }} Bans
  * @typedef {{
  *   prelude?: import('eslint').Linter.Config[],
@@ -139,6 +140,7 @@ export const structure = {
       src: {
         patterns: [
           {
+            name: 'feature-internals',
             value: {
               group: context.explicitExtensions ? [...internals, ...indexes] : internals,
               message: `featureの内部ファイルは直接importできません。${customLayers ? features : 'features'}/<名前>/index.ts から公開されたものを使ってください。`,
@@ -147,6 +149,7 @@ export const structure = {
         ],
         globals: [
           {
+            name: 'fetch',
             value: {
               name: 'fetch',
               message: `fetchを直接呼ばないでください。${context.apiClientDir} のクライアントを使い、スキーマで応答を検証してください。`,
@@ -158,6 +161,7 @@ export const structure = {
       model: {
         patterns: [
           {
+            name: 'model-layers',
             value: {
               group: ['../ui', '../ui/*', '../api', '../api/*'],
               message: 'model/ から ui/ や api/ はimportできません。依存の向きは ui → api → model です。',
@@ -167,6 +171,7 @@ export const structure = {
             ? []
             : [
                 {
+                  name: 'model-layers',
                   value: {
                     group: ['@/shared/ui', '@/shared/ui/*', '@/shared/api', '@/shared/api/*'],
                     message: 'model/ が使えるのは自分のmodelと shared/lib だけです。',
@@ -230,9 +235,17 @@ const extraContribution = (context) => {
  */
 const collect = (contributions, scope, kind) => contributions.flatMap((contribution) => contribution[scope]?.[kind] ?? []);
 
-/** @param {Entry[]} entries @param {Exception | undefined} exception */
-const values = (entries, exception) =>
-  entries.filter((entry) => exception === undefined || !(entry.exempt ?? []).includes(exception)).map((entry) => entry.value);
+/**
+ * @param {Entry[]} entries
+ * @param {Exception | undefined} exception
+ * @param {Set<string>} warned warn に下げた禁止の名前
+ * @param {'error' | 'warn'} level error なら下げていないもの、warn なら下げたものだけを返す
+ */
+const values = (entries, exception, warned, level) =>
+  entries
+    .filter((entry) => exception === undefined || !(entry.exempt ?? []).includes(exception))
+    .filter((entry) => (entry.name !== undefined && warned.has(entry.name)) === (level === 'warn'))
+    .map((entry) => entry.value);
 
 /** @param {Contribution[]} list @param {'plugins' | 'settings' | 'rules' | 'srcPlugins' | 'srcRules'} key */
 const merged = (list, key) => Object.assign({}, ...list.map((contribution) => contribution[key] ?? {}));
@@ -270,14 +283,49 @@ export function bugyo(options) {
   const built = [...new Set(parts)].sort((a, b) => a.rank - b.rank).map((part) => part.build(context));
   const extras = extraContribution(context);
 
-  const importsRule = (/** @type {Entry[]} */ paths, /** @type {Entry[]} */ patterns, /** @type {Exception | undefined} */ exception) => [
-    'error',
-    { paths: values(paths, exception), patterns: values(patterns, exception) },
-  ];
-  const listRule = (/** @type {Entry[]} */ entries, /** @type {Exception | undefined} */ exception, offWhenEmpty = false) => {
-    const list = values(entries, exception);
-    return offWhenEmpty && list.length === 0 ? 'off' : ['error', ...list];
+  const severity = options.severity ?? {};
+  for (const [name, level] of Object.entries(severity)) {
+    if (level !== 'warn') throw new Error(`bugyo({ severity }) で下げられるのは 'warn' だけです（${name}: ${String(level)}）`);
+  }
+  const banNames = new Set(
+    built.flatMap((contribution) =>
+      [contribution.src, contribution.ui, contribution.model].flatMap((bans) =>
+        Object.values(bans ?? {}).flatMap((/** @type {Entry[]} */ list) => list.map((entry) => entry.name ?? '')),
+      ),
+    ),
+  );
+  banNames.delete('');
+  const warned = new Set(Object.keys(severity).filter((name) => banNames.has(name)));
+  const alias = warned.size > 0;
+
+  /** @typedef {'error' | 'warn'} Level */
+  const importsRule = (
+    /** @type {Entry[]} */ paths,
+    /** @type {Entry[]} */ patterns,
+    /** @type {Exception | undefined} */ exception,
+    /** @type {Level} */ level = 'error',
+  ) => {
+    const pathList = values(paths, exception, warned, level);
+    const patternList = values(patterns, exception, warned, level);
+    if (level === 'warn' && pathList.length + patternList.length === 0) return 'off';
+    return [level, { paths: pathList, patterns: patternList }];
   };
+  const listRule = (
+    /** @type {Entry[]} */ entries,
+    /** @type {Exception | undefined} */ exception,
+    offWhenEmpty = false,
+    /** @type {Level} */ level = 'error',
+  ) => {
+    const list = values(entries, exception, warned, level);
+    return (offWhenEmpty || level === 'warn') && list.length === 0 ? 'off' : [level, ...list];
+  };
+  /**
+   * 合成した禁止のルールを、error のものと warn に下げたもの（`bugyo-warn/<ルール>`）の2つにする。warn に下げた禁止がなければ1つだけ。
+   *
+   * @param {string} ruleId
+   * @param {(level: Level) => unknown} make
+   */
+  const pair = (ruleId, make) => ({ [ruleId]: make('error'), ...(alias ? { [`${warnPlugin}/${ruleId}`]: make('warn') } : {}) });
 
   /** @param {keyof Bans} kind @param {'ui' | 'model'} [scope] */
   const entries = (kind, scope) => {
@@ -295,10 +343,14 @@ export function bugyo(options) {
     /** @type {Record<string, unknown>} */
     const rules = {};
     if (collect(built, scope, 'paths').length + collect(built, scope, 'patterns').length > 0) {
-      rules['no-restricted-imports'] = importsRule(entries('paths', scope), entries('patterns', scope), undefined);
+      Object.assign(rules, pair('no-restricted-imports', (level) => importsRule(entries('paths', scope), entries('patterns', scope), undefined, level)));
     }
-    if (collect(built, scope, 'globals').length > 0) rules['no-restricted-globals'] = listRule(entries('globals', scope), undefined);
-    if (collect(built, scope, 'syntax').length > 0) rules['no-restricted-syntax'] = listRule(entries('syntax', scope), undefined);
+    if (collect(built, scope, 'globals').length > 0) {
+      Object.assign(rules, pair('no-restricted-globals', (level) => listRule(entries('globals', scope), undefined, false, level)));
+    }
+    if (collect(built, scope, 'syntax').length > 0) {
+      Object.assign(rules, pair('no-restricted-syntax', (level) => listRule(entries('syntax', scope), undefined, false, level)));
+    }
     if (Object.keys(rules).length > 0) scopeBlocks.push({ files: [scopeFiles[scope]], rules });
   }
 
@@ -309,17 +361,18 @@ export function bugyo(options) {
     .filter((exception) => owned.has(exception))
     .map((exception) => ({
       files: files[exception],
-      rules: Object.fromEntries(
-        exceptionRules[exception].map((kind) => {
+      rules: Object.assign(
+        {},
+        ...exceptionRules[exception].map((kind) => {
           switch (kind) {
             case 'imports':
-              return ['no-restricted-imports', importsRule(entries('paths'), entries('patterns'), exception)];
+              return pair('no-restricted-imports', (level) => importsRule(entries('paths'), entries('patterns'), exception, level));
             case 'globals':
-              return ['no-restricted-globals', listRule(entries('globals'), exception, true)];
+              return pair('no-restricted-globals', (level) => listRule(entries('globals'), exception, true, level));
             case 'syntax':
-              return ['no-restricted-syntax', listRule(entries('syntax'), exception, true)];
+              return pair('no-restricted-syntax', (level) => listRule(entries('syntax'), exception, true, level));
             case 'properties':
-              return ['no-restricted-properties', listRule(entries('properties'), exception, true)];
+              return pair('no-restricted-properties', (level) => listRule(entries('properties'), exception, true, level));
             default:
               throw new Error(`知らない種類です: ${kind}`);
           }
@@ -328,11 +381,12 @@ export function bugyo(options) {
     }));
 
   const settings = merged(built, 'settings');
-  return tseslint.config(
+  const plugins = merged(built, 'plugins');
+  const configs = tseslint.config(
     ...built.flatMap((contribution) => contribution.prelude ?? []),
     {
       languageOptions: Object.assign({}, ...built.map((contribution) => contribution.languageOptions ?? {})),
-      plugins: merged(built, 'plugins'),
+      plugins: alias ? { ...plugins, [warnPlugin]: { rules: Object.fromEntries(combinedRules.map((id) => [id, builtinRules.get(id)])) } } : plugins,
       ...(Object.keys(settings).length === 0 ? {} : { settings }),
       rules: merged(built, 'rules'),
     },
@@ -341,14 +395,49 @@ export function bugyo(options) {
       ...(Object.keys(srcPlugins).length === 0 ? {} : { plugins: srcPlugins }),
       rules: {
         ...merged(built, 'srcRules'),
-        'no-restricted-imports': importsRule(entries('paths'), entries('patterns'), undefined),
-        'no-restricted-syntax': listRule(entries('syntax'), undefined),
-        'no-restricted-properties': listRule(entries('properties'), undefined, true),
-        'no-restricted-globals': listRule(entries('globals'), undefined),
+        ...pair('no-restricted-imports', (level) => importsRule(entries('paths'), entries('patterns'), undefined, level)),
+        ...pair('no-restricted-syntax', (level) => listRule(entries('syntax'), undefined, false, level)),
+        ...pair('no-restricted-properties', (level) => listRule(entries('properties'), undefined, true, level)),
+        ...pair('no-restricted-globals', (level) => listRule(entries('globals'), undefined, false, level)),
       },
     },
     ...scopeBlocks,
     ...exceptionBlocks,
     ...built.flatMap((contribution) => contribution.trailing ?? []),
+  );
+  return lowerRules(configs, Object.keys(severity).filter((name) => !banNames.has(name)), banNames);
+}
+
+/** 禁止を warn に下げたときの、合成した禁止のルールの置き場所（プラグインの名前） */
+export const warnPlugin = 'bugyo-warn';
+const combinedRules = ['no-restricted-imports', 'no-restricted-globals', 'no-restricted-syntax', 'no-restricted-properties'];
+
+/**
+ * ルール ID で指定したものを、どのブロックでも warn に下げる。知らない名前があれば断る。
+ *
+ * @param {import('eslint').Linter.Config[]} configs
+ * @param {string[]} ruleIds
+ * @param {Set<string>} banNames
+ */
+function lowerRules(configs, ruleIds, banNames) {
+  if (ruleIds.length === 0) return configs;
+  const known = new Set(configs.flatMap((block) => Object.keys(block.rules ?? {})));
+  const unknown = ruleIds.filter((id) => !known.has(id));
+  if (unknown.length > 0) {
+    throw new Error(
+      `bugyo({ severity }) の ${unknown.join(', ')} は、禁止の名前（${[...banNames].sort().join(', ')}）でも、設定にあるルール ID でもありません`,
+    );
+  }
+  const lowered = new Set(ruleIds);
+  /** @param {unknown} value */
+  const lower = (value) => {
+    if (value === 'error' || value === 2) return 'warn';
+    if (Array.isArray(value) && (value[0] === 'error' || value[0] === 2)) return ['warn', ...value.slice(1)];
+    return value;
+  };
+  return configs.map((block) =>
+    block.rules === undefined
+      ? block
+      : { ...block, rules: Object.fromEntries(Object.entries(block.rules).map(([id, value]) => [id, lowered.has(id) ? lower(value) : value])) },
   );
 }

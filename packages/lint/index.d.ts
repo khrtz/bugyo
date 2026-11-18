@@ -80,6 +80,13 @@ export interface BugyoOptions {
   /** 追加で lint 対象から外すパス */
   ignores?: string[];
   /**
+   * 禁止を warn に下げる（off にはできない）。キーは禁止の名前（`feature-internals`・`fetch`・`model-layers`、
+   * @bugyo/lint-react の `use-effect`・`ui-timers`・`model-react`）か、設定にあるルール ID。
+   * 禁止の名前で下げたものは、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になる。
+   * 知らない名前を渡すと断る。
+   */
+  severity?: Record<string, 'warn'>;
+  /**
    * 追加の禁止。bugyo の禁止と同じスコープに合成される（上書きしない）。
    * restrictedProperties と restrictedSyntax は、副作用を包む場所（effectHooksDir）とテストでは効かない。
    * 例: Date.now を禁止し、shared/lib の clock だけで使わせる。
@@ -93,3 +100,6 @@ export interface BugyoOptions {
 }
 
 export function bugyo(options: BugyoOptions): Linter.Config[];
+
+/** 禁止の名前で warn に下げたルールの置き場所（プラグインの名前）。`bugyo-warn` */
+export const warnPlugin: string;

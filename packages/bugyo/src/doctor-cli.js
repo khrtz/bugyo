@@ -61,16 +61,21 @@ const countLines = (counts) =>
 export function doctorCommand(args, cwd = process.cwd()) {
   const { values } = parse(args);
   const dirs = dirsOf(cwd, values.dirs);
-  const { counts, errors } = banCounts(cwd, dirs);
+  const { counts, warned, errors } = banCounts(cwd, dirs);
   const tsc = values.tsconfig === undefined ? undefined : tscErrors(cwd, values.tsconfig);
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const config = loadConfig(cwd);
   const outside = config.layers === undefined ? undefined : filesOutsideLayers(cwd, layerDirs(config), commonDir(layerDirs(config)));
   if (values.json) {
-    console.log(JSON.stringify({ total, counts, tsc, outsideLayers: outside, errors }));
+    console.log(JSON.stringify({ total, counts, warned, tsc, outsideLayers: outside, errors }));
   } else {
     console.log(`doctor: 違反 ${total}件（禁止ごと、多い順。ESLint の抑制ファイルで隠れているものも数える）`);
     for (const line of countLines(counts)) console.log(line);
+    const warnedTotal = Object.values(warned).reduce((sum, count) => sum + count, 0);
+    if (warnedTotal > 0) {
+      console.log(`うち warn に下げた禁止 ${warnedTotal}件（lint は通るが、直す借りとして残っている）`);
+      for (const line of countLines(warned)) console.log(line);
+    }
     if (depcruiseConfig(cwd) === undefined) console.log('  dependency-cruiser の設定がないので、依存の違反は数えていません');
     if (tsc !== undefined) console.log(`tsc（${values.tsconfig}）: エラー ${tsc}件`);
     if (outside !== undefined) {

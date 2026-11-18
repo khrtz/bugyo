@@ -169,6 +169,8 @@ ESLint の抑制はファイルとルールごとの件数なので、同じフ�
 - 減ったとき: 直した違反がベースラインに残っています。`bugyo baseline save` で縮めて、一緒にコミットします
 - `eslint-suppressions.json` か `.dependency-cruiser-known-violations.json` があるのに `.bugyo/baseline.json` がないとき: 入れ替えを見つけられないので落ちます
 
+ファイルの数が多すぎてベースラインにも入れたくない禁止は、`bugyo({ severity })` で warn に下げることもできます（[禁止を warn に下げる](foundation.md#禁止を-warn-に下げる)）。warn は lint を落としませんが、`bugyo doctor` が借りとして数え続けます。
+
 ### 4. CI でベースラインが増えていないか確かめる
 
 ```yaml

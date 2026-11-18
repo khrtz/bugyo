@@ -37,14 +37,18 @@ function runTool(cwd, command, args) {
  */
 export function banOf(message) {
   if (message.ruleId === null) return 'eslint: 構文エラー';
-  return combinedRules.has(message.ruleId) ? `${message.ruleId}: ${message.message}` : message.ruleId;
+  const ruleId = message.ruleId.replace(warnedPrefix, '');
+  return combinedRules.has(ruleId) ? `${ruleId}: ${message.message}` : ruleId;
 }
+
+/** @bugyo/lint で warn に下げた禁止のルール ID の頭。下げても同じ禁止として数える */
+const warnedPrefix = /^bugyo-warn\//;
 
 /**
  * ESLint の違反を、抑制ファイルで隠れているものも含めて、禁止ごとに数える。`eslint-disable`（理由つきのコメント）で止めたものは数えない。
  *
  * @param {string} cwd
- * @returns {{ counts: Map<string, number>, files: Map<string, Set<string>> } | { error: string }}
+ * @returns {{ counts: Map<string, number>, warned: Map<string, number>, files: Map<string, Set<string>> } | { error: string }}
  */
 export function eslintCounts(cwd) {
   const run = runTool(cwd, 'eslint', ['.', '--format', 'json']);
@@ -58,6 +62,8 @@ export function eslintCounts(cwd) {
   const counts = new Map();
   /** @type {Map<string, Set<string>>} */
   const files = new Map();
+  /** @type {Map<string, number>} warn に下げた禁止の件数（counts にも入っている） */
+  const warned = new Map();
   for (const result of results) {
     const all = [
       ...(result.messages ?? []),
@@ -66,10 +72,11 @@ export function eslintCounts(cwd) {
     for (const message of all) {
       const ban = banOf(message);
       counts.set(ban, (counts.get(ban) ?? 0) + 1);
+      if (message.severity === 1) warned.set(ban, (warned.get(ban) ?? 0) + 1);
       files.set(ban, (files.get(ban) ?? new Set()).add(result.filePath));
     }
   }
-  return { counts, files };
+  return { counts, warned, files };
 }
 
 /** @param {string} cwd */
@@ -118,22 +125,27 @@ export function tscErrors(cwd, tsconfig) {
  *
  * @param {string} cwd
  * @param {string[]} dirs dependency-cruiser に渡すフォルダ
- * @returns {{ counts: Record<string, number>, errors: string[] }}
+ * @returns {{ counts: Record<string, number>, warned: Record<string, number>, errors: string[] }}
  */
 export function banCounts(cwd, dirs) {
   /** @type {string[]} */
   const errors = [];
   /** @type {Map<string, number>} */
   const merged = new Map();
+  /** @type {Record<string, number>} */
+  let warned = {};
   const eslint = eslintCounts(cwd);
   if ('error' in eslint) errors.push(eslint.error);
-  else for (const [key, value] of eslint.counts) merged.set(key, value);
+  else {
+    for (const [key, value] of eslint.counts) merged.set(key, value);
+    warned = Object.fromEntries(eslint.warned);
+  }
   const depcruise = depcruiseCounts(cwd, dirs);
   if (depcruise !== undefined) {
     if (depcruise instanceof Map) for (const [key, value] of depcruise) merged.set(key, value);
     else errors.push(depcruise.error);
   }
-  return { counts: Object.fromEntries([...merged].sort(([a], [b]) => a.localeCompare(b))), errors };
+  return { counts: Object.fromEntries([...merged].sort(([a], [b]) => a.localeCompare(b))), warned, errors };
 }
 
 const codeFile = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;

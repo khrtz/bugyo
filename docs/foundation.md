@@ -57,6 +57,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, rea
 | `effectHooksDir` | `layers.shared.lib` | `useEffect` を書いてよい場所 |
 | `apiClientDir` | `layers.shared.api` | `fetch` を呼んでよい場所 |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
+| `severity` | `{}` | 禁止を warn に下げる（下の「禁止を warn に下げる」） |
 | `extra` | `{}` | 独自の禁止を足す（下の「独自の禁止を足す」） |
 | `parts` | `[common, structure]` | 使う部品（下の「部品」）。`common` は必須 |
 | `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
@@ -93,6 +94,29 @@ export default bugyo({ root: import.meta.dirname, explicitExtensions: true });
 | `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`structure`・`react` |
 
 コメントは、公開 API の JSDoc（`/** */`）と、理由つきの `eslint-disable`（`-- 理由`）だけ書けます。`.js` / `.cjs` / `.mjs` には型を使うルールを当てません。
+
+#### 禁止を warn に下げる
+
+入れたばかりで直しきれない禁止は、`severity` で warn に下げられます。`off` にはできません。
+
+```js
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, react], severity: { 'use-effect': 'warn' } });
+```
+
+| 名前 | 禁止 | 部品 |
+| --- | --- | --- |
+| `feature-internals` | 他の feature の内部ファイルの import | `structure` |
+| `fetch` | `fetch` | `structure` |
+| `model-layers` | `model/` から `ui/`・`api/`・`shared/ui`・`shared/api` への import | `structure` |
+| `use-effect` | `useEffect` / `useLayoutEffect` | `react` |
+| `ui-timers` | feature の UI での `setTimeout` などのタイマー | `react` |
+| `model-react` | `model/` から React とその周辺への import | `react` |
+
+- 名前のほかに、設定にあるルール ID（例: `@typescript-eslint/no-non-null-assertion`）も渡せます。そのルールがどのファイルでも warn になります
+- 名前で下げた禁止は、同じルールの他の禁止と分けるために、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になります。`eslint-disable` のコメントで止めるときも、この ID を書きます
+- 知らない名前と、組み合わせた部品にない禁止の名前は断ります
+- `bugyo doctor` は、warn に下げた禁止を「直す借り」として別に数えます。`bugyo baseline check` は warn に下げた禁止も数えるので、下げても件数は増やせません
+- ESLint の抑制ファイルに入っている禁止を下げると、抑制が使われなくなって `eslint .` が落ちます（抑制は error だけに効くため）。下げたら `bugyo baseline save` を実行し直します
 
 #### 層のフォルダ名を変える
 

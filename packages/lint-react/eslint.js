@@ -15,16 +15,18 @@ export const react = {
       srcPlugins: { 'react-hooks': reactHooks },
       srcRules: { ...reactHooks.configs.recommended.rules },
       src: {
-        paths: [{ value: { name: 'react', importNames: ['useEffect', 'useLayoutEffect'], message: effectMessage }, exempt: ['effects'] }],
+        paths: [{ name: 'use-effect', value: { name: 'react', importNames: ['useEffect', 'useLayoutEffect'], message: effectMessage }, exempt: ['effects'] }],
         syntax: [
           {
-            value: { selector: "MemberExpression[object.name='React'][property.name=/^use(Layout)?Effect$/]", message: effectMessage },
+            name: 'use-effect',
+            value:{ selector: "MemberExpression[object.name='React'][property.name=/^use(Layout)?Effect$/]", message: effectMessage },
             exempt: ['effects', 'tests'],
           },
         ],
       },
       ui: {
         globals: ['setTimeout', 'setInterval', 'requestAnimationFrame'].map((name) => ({
+          name: 'ui-timers',
           value: {
             name,
             message: `UIで${name}によるタイミング合わせはできません。根本原因（状態の持ち方・データの流れ）を直してください。時間に依存する処理が本当に必要なら ${context.effectHooksDir} に専用フックを作ってください。`,
@@ -35,6 +37,7 @@ export const react = {
       model: {
         patterns: [
           {
+            name: 'model-react',
             value: {
               group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@tanstack/*'],
               message: 'model/ は純粋関数だけです。Reactや通信に依存する処理は ui/ か api/ に置いてください。',
