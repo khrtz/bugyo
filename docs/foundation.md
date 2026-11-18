@@ -493,7 +493,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 `verify` は次のように動きます。どちらの実行方法でも同じです。
 
-- 実行のたびに `artifacts/` を消してから始める
+- 実行のたびに、`artifacts/` の中で verify が書くもの（`verify.json`・`results.json`・`report`・`test-results`・`verify`、確かめ方ごとのフォルダ）だけを消してから始める。ほかのファイルには触らない
 - 機能ごとに `PASS` / `FAIL` を1行で出し、次の行に証拠の場所を出す。失敗したときだけ、出力の末尾30行を付ける
 - 終了コードは、すべて通れば 0、1つでも落ちれば 1、機能名が feature map になければ 2
 - 最後に、機能ごとの合否・中で実行したコマンド・証拠の場所の要約を `artifacts/verify.json` に書く（`bugyo task done` が証拠に写す）
