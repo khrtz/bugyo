@@ -169,7 +169,7 @@ test('done: verify が落ちる状態だと断られて作業中のまま、直�
 
   fixGreet(cwd);
   const closed = ok(cwd, 'task', 'done', 't-001');
-  assert.match(closed.stdout, /^DONE t-001 \[done\/ui-flow\] あいさつ .*証拠: \.bugyo\/evidence\/t-001\.json$/m);
+  assert.match(closed.stdout, /^DONE t-001 \[done\/ui-flow\] あいさつ .*evidence: \.bugyo\/evidence\/t-001\.json$/m);
   assert.ok(existsSync(join(cwd, '.bugyo/tasks/archive/t-001.md')));
   assert.equal(field(cwd, 't-001', 'gate-attempts'), '2');
 

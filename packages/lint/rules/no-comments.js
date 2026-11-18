@@ -33,4 +33,4 @@ export function noCommentsFor(locale) {
   };
 }
 
-export const noComments = noCommentsFor('ja');
+export const noComments = noCommentsFor('en');

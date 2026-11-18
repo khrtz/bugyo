@@ -7,7 +7,7 @@ const todosArb = fc.uniqueArray(todoArb, { selector: (todo) => todo.id });
 const filterArb = fc.constantFrom(...filters);
 
 describe('todo model', () => {
-  it('同じIDを2回トグルすると元に戻る', () => {
+  it('toggling the same id twice restores the list', () => {
     fc.assert(
       fc.property(todosArb, fc.string({ minLength: 1 }), (todos, raw) => {
         const id = TodoId.parse(raw);
@@ -17,7 +17,7 @@ describe('todo model', () => {
     );
   });
 
-  it('active と done に分けると全件になり、重ならない', () => {
+  it('active and done together cover every todo without overlap', () => {
     fc.assert(
       fc.property(todosArb, (todos) => {
         const active = applyFilter(todos, 'active');
@@ -28,7 +28,7 @@ describe('todo model', () => {
     );
   });
 
-  it('remaining は active の件数と一致する', () => {
+  it('remaining equals the number of active todos', () => {
     fc.assert(
       fc.property(todosArb, filterArb, (todos, filter) => {
         expect(remaining(todos)).toBe(applyFilter(todos, 'active').length);
@@ -37,20 +37,20 @@ describe('todo model', () => {
     );
   });
 
-  it('空のIDは TodoId として受け付けない', () => {
+  it('rejects an empty id as a TodoId', () => {
     expect(TodoId.safeParse('').success).toBe(false);
   });
 });
 
 describe('todoTitle', () => {
-  it('データが無いうちは件数を出さない', () => {
+  it('shows no count before the data arrives', () => {
     expect(todoTitle(undefined)).toBe('Todo');
   });
 
-  it('データがあれば残り件数を出す', () => {
+  it('shows the remaining count once the data arrives', () => {
     fc.assert(
       fc.property(todosArb, (todos) => {
-        expect(todoTitle(todos)).toBe(`残り ${String(remaining(todos))} 件`);
+        expect(todoTitle(todos)).toBe(`${String(remaining(todos))} left`);
       }),
     );
   });

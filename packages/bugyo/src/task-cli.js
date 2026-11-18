@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { configFile, loadConfig } from './config.js';
+import { cliLocale, cliMessages } from './locale.js';
 import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
 import { evaluateGate } from './gate.js';
@@ -303,7 +304,7 @@ function done(args, cwd) {
   });
   print(
     values.json,
-    [`DONE ${taskLine(closed)}  証拠: ${outcome.file}`, ...outcome.warnings.map((warning) => `warn  ${warning}`)],
+    [`DONE ${taskLine(closed)}  ${cliMessages(cliLocale(config)).done} ${outcome.file}`, ...outcome.warnings.map((warning) => `warn  ${warning}`)],
     { ...taskJson(closed), ok: true, evidence: outcome.file, warnings: outcome.warnings },
   );
   return 0;

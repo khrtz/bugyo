@@ -43,7 +43,7 @@ test('既定（共通と構成）は、コメントと fetch の禁止を入れ�
   assert.equal(count(rulesFor('src/features/report/model/bad.ts'), 'bugyo/no-comments'), 0);
   const text = serialize(parts.map((block) => block.rules ?? {}));
   assert.ok(!/"bugyo\/no-comments"/.test(text), 'コメントの禁止');
-  assert.ok(!/fetchを直接呼ばないでください/.test(text), 'fetch の禁止');
+  assert.ok(!/\[bugyo:fetch\]/.test(text), 'fetch の禁止');
 
   const opted = new ESLint({ cwd: root, overrideConfigFile: true, baseConfig: bugyo({ root, explicitExtensions: true, parts: [common, structure, noComments, fetchOnlyInApi] }) });
   const [result] = await opted.lintFiles(['src/features/report/model/bad.ts']);

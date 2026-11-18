@@ -38,7 +38,7 @@
   </tr>
 </table>
 
-<p align="center"><sub>どれも <code>pnpm verify todos</code> が見本の <a href="examples/todo-app">todo-app</a> で毎回残す証拠です。CI でも同じ証拠を残し、PR に合否と証拠のリンクを書きます。</sub></p>
+<p align="center"><sub>どれも <code>pnpm verify todos</code> が見本の <a href="examples/todo-app">todo-app</a> で残す証拠です（画面の文字と出力を日本語にして撮ったもの）。CI でも同じ証拠を残し、PR に合否と証拠のリンクを書きます。</sub></p>
 
 ---
 
@@ -66,9 +66,9 @@
 10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。src/shared/api のクライアントを使い、スキーマで応答を検証してください。  no-restricted-globals
 ```
 
-（テスト用の違反ファイル `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx` に対する出力から2件を抜き出したものです）
+（テスト用の違反ファイル `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx` に対する出力から2件を抜き出したものです。`.bugyo/config.json` に `"locale": "ja"` を書いたときの出力です。既定は英語です）
 
-**確かめた結果は、合否と証拠の場所だけを返します。** 長いログでエージェントの文脈を埋めません。
+**確かめた結果は、合否と証拠の場所だけを返します。** 長いログでエージェントの文脈を埋めません（これも `"locale": "ja"` のときの出力です）。
 
 ```
 $ pnpm verify todos

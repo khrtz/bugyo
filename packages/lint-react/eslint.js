@@ -24,7 +24,7 @@ const messages = {
 };
 
 /** @param {{ locale?: string }} context */
-const messagesOf = (context) => (context.locale === 'en' ? messages.en : messages.ja);
+const messagesOf = (context) => (context.locale === 'ja' ? messages.ja : messages.en);
 
 /**
  * React: react-hooks の推奨ルールと、`model` から React への依存の禁止。
