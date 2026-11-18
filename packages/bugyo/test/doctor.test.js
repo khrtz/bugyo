@@ -89,6 +89,7 @@ test('no-restricted-* はメッセージごとに、それ以外はルールご�
     banOf(violation('import-x/no-restricted-paths', 'Unexpected path "~/app/ui/x" imported in restricted zone. model/ が使えるのは自分のmodelと web/app/lib だけです。')),
     'import-x/no-restricted-paths: model/ が使えるのは自分のmodelと web/app/lib だけです。',
   );
+  assert.equal(banOf({ ruleId: null, message: 'Parsing error: Unexpected token' }), 'eslint: parse-error');
   assert.deepEqual(compareCounts({ a: 2, b: 1 }, { a: 1, c: 1 }), {
     grew: [{ key: 'c', from: 0, to: 1 }],
     shrank: [
@@ -144,6 +145,91 @@ test('warn に下げた禁止（bugyo-warn/…）は、下げる前と同じ禁�
   assert.deepEqual(report.counts, { [banOf(useEffect)]: 1 });
   assert.deepEqual(report.warned, { [banOf(useEffect)]: 1 });
   assert.equal(bugyo(cwd, 'baseline', 'check').status, 0, '下げただけでは件数は変わらない');
+});
+
+/** @bugyo/lint が名前を付けたメッセージ。説明の文だけを差し替えたものを作れる */
+const tagged = (/** @type {string} */ text) => violation('no-restricted-imports', `'useEffect' import from 'react' is restricted. [bugyo:use-effect] ${text}`);
+
+test('名前の付いた禁止は、後ろの説明の文が変わっても同じ禁止として数える', () => {
+  const ja = tagged('製品コードでuseEffectは使えません。');
+  const en = tagged('Do not use useEffect in product code.');
+  assert.equal(banOf(ja), "no-restricted-imports: 'useEffect' import from 'react' is restricted. [bugyo:use-effect]");
+  assert.equal(banOf(en), banOf(ja));
+  assert.notEqual(banOf(violation('no-restricted-imports', "'useLayoutEffect' import from 'react' is restricted. [bugyo:use-effect] x")), banOf(ja), 'import した名前が違えば別に数える');
+  assert.equal(
+    banOf(violation('import-x/no-restricted-paths', 'Unexpected path "~/app/ui/x" imported in restricted zone. [bugyo:model-is-pure] model/ が使えるのは…')),
+    'import-x/no-restricted-paths: [bugyo:model-is-pure]',
+  );
+
+  const cwd = project();
+  setResults(cwd, { 'a.ts': [ja] });
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  const saved = readFileSync(join(cwd, '.bugyo/baseline.json'), 'utf8');
+  assert.equal(JSON.parse(saved).version, 2);
+  setResults(cwd, { 'a.ts': [en] });
+  const check = bugyo(cwd, 'baseline', 'check');
+  assert.equal(check.status, 0, check.all);
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  assert.equal(readFileSync(join(cwd, '.bugyo/baseline.json'), 'utf8'), saved, '説明の文が変わっても、作り直したベースラインは同じ');
+});
+
+test('名前で数える前の形式のベースラインは、今までの数え方で確かめる', () => {
+  const cwd = project();
+  const ja = tagged('製品コードでuseEffectは使えません。');
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo/baseline.json'), JSON.stringify({ counts: { "no-restricted-imports: 'useEffect' import from 'react' is restricted. 製品コードでuseEffectは使えません。": 1 } }));
+  setResults(cwd, { 'a.ts': [ja] });
+  const same = bugyo(cwd, 'baseline', 'check');
+  assert.equal(same.status, 0, same.all);
+  assert.match(same.all, /前の形式です/);
+
+  setResults(cwd, { 'a.ts': [ja, ja] });
+  assert.equal(bugyo(cwd, 'baseline', 'check').status, 1, '古い形式でも、増えたら落ちる');
+});
+
+test('baseline diff は、base のベースラインが前の形式なら、ルールごとの件数で比べる', () => {
+  const cwd = project();
+  git(cwd, 'init', '-q', '-b', 'main');
+  git(cwd, 'config', 'user.email', 'test@example.com');
+  git(cwd, 'config', 'user.name', 'test');
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo/baseline.json'), JSON.stringify({ counts: { "no-restricted-imports: 'useEffect' import from 'react' is restricted. 製品コードでuseEffectは使えません。": 1 } }));
+  writeFileSync(join(cwd, 'eslint-suppressions.json'), JSON.stringify({ 'a.ts': { 'no-restricted-imports': { count: 1 } } }));
+  setResults(cwd, { 'a.ts': [] });
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-q', '-m', 'base');
+
+  setResults(cwd, { 'a.ts': [tagged('製品コードでuseEffectは使えません。')] });
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  const resaved = bugyo(cwd, 'baseline', 'diff', '--base', 'main');
+  assert.match(resaved.all, /より増えたところはありません/, '作り直しただけでは増えたことにならない');
+
+  setResults(cwd, { 'a.ts': [tagged('x'), tagged('x')] });
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  const grown = bugyo(cwd, 'baseline', 'diff', '--base', 'main');
+  assert.equal(grown.status, 1);
+  assert.match(grown.all, /\.bugyo\/baseline\.json: no-restricted-imports 1 → 2/);
+});
+
+test('baseline diff は、base より古い形式に戻したベースラインを、増えたことにする', () => {
+  const cwd = project();
+  git(cwd, 'init', '-q', '-b', 'main');
+  git(cwd, 'config', 'user.email', 'test@example.com');
+  git(cwd, 'config', 'user.name', 'test');
+  const fetchBan = violation('no-restricted-globals', "Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。");
+  const timerBan = violation('no-restricted-globals', "Unexpected use of 'setTimeout'. [bugyo:ui-timers] UIでsetTimeoutによるタイミング合わせはできません。");
+  setResults(cwd, { 'a.ts': [fetchBan] });
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-q', '-m', 'base');
+
+  // 同じルールの中で fetch を直して setTimeout を足し、古い形式（version なし、文で数える）に書き戻す
+  writeFileSync(join(cwd, '.bugyo/baseline.json'), JSON.stringify({ counts: { "no-restricted-globals: Unexpected use of 'setTimeout'. UIでsetTimeoutによるタイミング合わせはできません。": 1 } }));
+  const downgraded = bugyo(cwd, 'baseline', 'diff', '--base', 'main');
+  assert.equal(downgraded.status, 1, downgraded.all);
+  assert.match(downgraded.all, /形式が main の 2 から 1 に戻っています/);
+  setResults(cwd, { 'a.ts': [timerBan] });
+  assert.equal(bugyo(cwd, 'baseline', 'check').status, 0, 'check は古い形式のまま通るので、diff で止める');
 });
 
 test('baseline check はベースラインがなければ何もしない', () => {

@@ -5,6 +5,7 @@ import { commonDir, dirsOfLayers, featureRoots, loadConfig, sourcesOf } from './
 import {
   baselineFile,
   baselineGrowth,
+  baselineVersion,
   banCounts,
   compareCounts,
   depcruiseConfig,
@@ -150,12 +151,16 @@ export function baselineCommand(args, cwd = process.cwd()) {
         console.log(`baseline: ${baselineFile} がないので、確かめるものはありません`);
         return 0;
       }
-      const { counts, errors } = banCounts(cwd, dirs);
+      const { counts, legacy, errors } = banCounts(cwd, dirs);
       if (errors.length > 0) {
         for (const error of errors) console.error(`error ${error}`);
         return 1;
       }
-      const { grew, shrank } = compareCounts(baseline, counts);
+      const current = baseline.version === baselineVersion ? counts : legacy;
+      if (baseline.version !== baselineVersion) {
+        console.log(`baseline: ${baselineFile} は禁止の名前で数える前の形式です。今までの数え方で比べます。bugyo baseline save で作り直すと、メッセージの言語や言い回しが変わっても同じ禁止として数えます`);
+      }
+      const { grew, shrank } = compareCounts(baseline.counts, current);
       for (const { key, from, to } of grew) console.error(`error 増えた: ${key} ${from} → ${to}。ベースラインに足さず、直してください`);
       for (const { key, from, to } of shrank) console.error(`error 減った: ${key} ${from} → ${to}。bugyo baseline save でベースラインを縮めてください`);
       const ok = grew.length === 0 && shrank.length === 0;

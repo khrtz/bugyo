@@ -30,19 +30,49 @@ function runTool(cwd, command, args) {
   return { status: result.status ?? 1, stdout: result.stdout ?? '', stderr: `${result.stderr ?? ''}${result.error ? result.error.message : ''}` };
 }
 
+/** @bugyo/lint がメッセージの頭に付ける、禁止の名前 */
+const banTag = /\[bugyo:[a-z0-9-]+\]/;
+
 /**
  * ESLint の1件の違反を、禁止の名前にする。no-restricted-* はメッセージで分ける（useEffect と useLayoutEffect を別に数えるため）。
  * no-restricted-paths は、import したパスを除いた、境界ごとのメッセージで分ける。
+ * メッセージに @bugyo/lint の名前（`[bugyo:<名前>]`）があれば、そこまでで切る。後ろの説明の文が言語や言い回しで変わっても、同じ禁止として数えるため。
  *
  * @param {{ ruleId: string | null, message: string }} message
  */
 export function banOf(message) {
+  if (message.ruleId === null) return 'eslint: parse-error';
+  const key = messageKey(message.ruleId, message.message);
+  if (key === undefined) return message.ruleId.replace(warnedPrefix, '');
+  const tag = banTag.exec(key.text);
+  return `${key.ruleId}: ${tag === null ? key.text : key.text.slice(0, tag.index + tag[0].length)}`;
+}
+
+/**
+ * 名前で数える前のベースライン（`version` のない `.bugyo/baseline.json`）と同じ数え方。名前を除いた、メッセージの文そのもので分ける。
+ *
+ * @param {{ ruleId: string | null, message: string }} message
+ */
+export function legacyBanOf(message) {
   if (message.ruleId === null) return 'eslint: 構文エラー';
-  const ruleId = message.ruleId.replace(warnedPrefix, '');
+  const key = messageKey(message.ruleId, message.message);
+  if (key === undefined) return message.ruleId.replace(warnedPrefix, '');
+  return `${key.ruleId}: ${key.text.replace(new RegExp(`${banTag.source} `), '')}`;
+}
+
+/**
+ * メッセージで分けるルールなら、ルール ID と、分けるのに使うメッセージの部分を返す。
+ *
+ * @param {string} rawRuleId
+ * @param {string} text
+ * @returns {{ ruleId: string, text: string } | undefined}
+ */
+function messageKey(rawRuleId, text) {
+  const ruleId = rawRuleId.replace(warnedPrefix, '');
   if (ruleId === 'import-x/no-restricted-paths' || ruleId === 'import/no-restricted-paths') {
-    return `${ruleId}: ${message.message.replace(/^Unexpected path ".*?" imported in restricted zone\.\s*/, '')}`;
+    return { ruleId, text: text.replace(/^Unexpected path ".*?" imported in restricted zone\.\s*/, '') };
   }
-  return combinedRules.has(ruleId) ? `${ruleId}: ${message.message}` : ruleId;
+  return combinedRules.has(ruleId) ? { ruleId, text } : undefined;
 }
 
 /** @bugyo/lint で warn に下げた禁止のルール ID の頭。下げても同じ禁止として数える */
@@ -54,7 +84,7 @@ const warnedPrefix = /^bugyo-warn\//;
  * 構文エラー（ルールのない違反）は、ファイルと場所とメッセージも返す。ESLint がそのファイルを読めておらず、ほかの禁止が当たっていないため。
  *
  * @param {string} cwd
- * @returns {{ counts: Map<string, number>, warned: Map<string, number>, files: Map<string, Set<string>>, parseErrors: ParseError[] } | { error: string }}
+ * @returns {{ counts: Map<string, number>, legacy: Map<string, number>, warned: Map<string, number>, files: Map<string, Set<string>>, parseErrors: ParseError[] } | { error: string }}
  */
 export function eslintCounts(cwd) {
   const run = runTool(cwd, 'eslint', ['.', '--format', 'json']);
@@ -66,6 +96,8 @@ export function eslintCounts(cwd) {
   }
   /** @type {Map<string, number>} */
   const counts = new Map();
+  /** @type {Map<string, number>} 名前で数える前の数え方（legacyBanOf）での件数 */
+  const legacy = new Map();
   /** @type {Map<string, Set<string>>} */
   const files = new Map();
   /** @type {Map<string, number>} warn に下げた禁止の件数（counts にも入っている） */
@@ -80,6 +112,8 @@ export function eslintCounts(cwd) {
     for (const message of all) {
       const ban = banOf(message);
       counts.set(ban, (counts.get(ban) ?? 0) + 1);
+      const old = legacyBanOf(message);
+      legacy.set(old, (legacy.get(old) ?? 0) + 1);
       if (message.severity === 1) warned.set(ban, (warned.get(ban) ?? 0) + 1);
       files.set(ban, (files.get(ban) ?? new Set()).add(result.filePath));
       if (message.ruleId === null) {
@@ -87,7 +121,7 @@ export function eslintCounts(cwd) {
       }
     }
   }
-  return { counts, warned, files, parseErrors };
+  return { counts, legacy, warned, files, parseErrors };
 }
 
 /**
@@ -149,13 +183,15 @@ export function tscErrors(cwd, tsconfig) {
  *
  * @param {string} cwd
  * @param {string[]} dirs dependency-cruiser に渡すフォルダ
- * @returns {{ counts: Record<string, number>, warned: Record<string, number>, parseErrors: ParseError[], errors: string[] }}
+ * @returns {{ counts: Record<string, number>, legacy: Record<string, number>, warned: Record<string, number>, parseErrors: ParseError[], errors: string[] }}
  */
 export function banCounts(cwd, dirs) {
   /** @type {string[]} */
   const errors = [];
   /** @type {Map<string, number>} */
   const merged = new Map();
+  /** @type {Map<string, number>} */
+  const legacy = new Map();
   /** @type {Record<string, number>} */
   let warned = {};
   /** @type {ParseError[]} */
@@ -164,15 +200,23 @@ export function banCounts(cwd, dirs) {
   if ('error' in eslint) errors.push(eslint.error);
   else {
     for (const [key, value] of eslint.counts) merged.set(key, value);
+    for (const [key, value] of eslint.legacy) legacy.set(key, value);
     warned = Object.fromEntries(eslint.warned);
     parseErrors = eslint.parseErrors;
   }
   const depcruise = depcruiseCounts(cwd, dirs);
   if (depcruise !== undefined) {
-    if (depcruise instanceof Map) for (const [key, value] of depcruise) merged.set(key, value);
+    if (depcruise instanceof Map) {
+      for (const [key, value] of depcruise) {
+        merged.set(key, value);
+        legacy.set(key, value);
+      }
+    }
     else errors.push(depcruise.error);
   }
-  return { counts: Object.fromEntries([...merged].sort(([a], [b]) => a.localeCompare(b))), warned, parseErrors, errors };
+  /** @param {Map<string, number>} map */
+  const sorted = (map) => Object.fromEntries([...map].sort(([a], [b]) => a.localeCompare(b)));
+  return { counts: sorted(merged), legacy: sorted(legacy), warned, parseErrors, errors };
 }
 
 const codeFile = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
@@ -254,13 +298,28 @@ export function filesOutsideLayers(cwd, layers, root) {
 }
 
 /**
+ * ベースラインの形式。2 は禁止の名前（`[bugyo:<名前>]`）で数える。`version` のないものは、名前で数える前のもの（メッセージの文で数える）。
+ */
+export const baselineVersion = 2;
+
+/**
  * @param {string} cwd
- * @returns {Record<string, number> | undefined}
+ * @returns {{ version: number, counts: Record<string, number> } | undefined}
  */
 export function readBaseline(cwd) {
   const path = join(cwd, baselineFile);
   if (!existsSync(path)) return undefined;
-  return JSON.parse(readFileSync(path, 'utf8')).counts ?? {};
+  return parseBaseline(readFileSync(path, 'utf8'));
+}
+
+/**
+ * @param {string | undefined} text
+ * @returns {{ version: number, counts: Record<string, number> }}
+ */
+function parseBaseline(text) {
+  if (text === undefined) return { version: baselineVersion, counts: {} };
+  const parsed = JSON.parse(text);
+  return { version: typeof parsed.version === 'number' ? parsed.version : 1, counts: parsed.counts ?? {} };
 }
 
 /**
@@ -282,7 +341,7 @@ export function saveBaseline(cwd, dirs) {
   const { counts, errors } = banCounts(cwd, dirs);
   if (errors.length > 0) throw new Error(errors.join('\n'));
   mkdirSync(dirname(join(cwd, baselineFile)), { recursive: true });
-  writeFileSync(join(cwd, baselineFile), `${JSON.stringify({ counts }, null, 2)}\n`);
+  writeFileSync(join(cwd, baselineFile), `${JSON.stringify({ version: baselineVersion, counts }, null, 2)}\n`);
   return counts;
 }
 
@@ -300,7 +359,23 @@ export function compareCounts(baseline, current) {
 }
 
 /**
+ * 禁止ごとの件数を、ルールごとの件数にまとめる（dependency-cruiser はもともとルールごと）。形式の違うベースラインどうしを比べるときに使う。
+ *
+ * @param {Record<string, number>} counts
+ */
+function byRule(counts) {
+  /** @type {Record<string, number>} */
+  const rules = {};
+  for (const [key, count] of Object.entries(counts)) {
+    const rule = key.startsWith('depcruise: ') ? key : (key.split(': ')[0] ?? key);
+    rules[rule] = (rules[rule] ?? 0) + count;
+  }
+  return rules;
+}
+
+/**
  * ベースラインのファイル（禁止ごとの件数、ESLint の抑制、dependency-cruiser の既知の違反）が `base` より増えたところを返す。
+ * 禁止ごとの件数の形式が `base` より新しければ（名前で数える前のものから作り直したとき）、ルールごとの件数で比べる。`base` より古い形式に戻したものは、増えたことにする。
  *
  * @param {string} cwd
  * @param {string} base
@@ -318,7 +393,13 @@ export function baselineGrowth(cwd, base) {
   const grown = [];
 
   const parse = (/** @type {string | undefined} */ text) => (text === undefined ? {} : JSON.parse(text));
-  const bans = compareCounts(parse(atBase(baselineFile)).counts ?? {}, parse(now(baselineFile)).counts ?? {});
+  const before = parseBaseline(atBase(baselineFile));
+  const after = parseBaseline(now(baselineFile));
+  if (after.version < before.version) {
+    grown.push(`${baselineFile}: 形式が ${base} の ${before.version} から ${after.version} に戻っています（古い形式では、同じルールの中の入れ替えを見つけられません）。bugyo baseline save で作り直してください`);
+  }
+  const sameVersion = before.version === after.version;
+  const bans = compareCounts(sameVersion ? before.counts : byRule(before.counts), sameVersion ? after.counts : byRule(after.counts));
   grown.push(...bans.grew.map(({ key, from, to }) => `${baselineFile}: ${key} ${from} → ${to}`));
 
   /** @param {Record<string, Record<string, { count: number }>>} suppressions */

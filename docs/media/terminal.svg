@@ -22,9 +22,9 @@ text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',mo
 <circle cx="62" cy="18" r="6" fill="#35e0c2"/>
 <text class="l0" x="28" y="64" xml:space="preserve"><tspan fill="#35e0c2">$ </tspan><tspan fill="#e6edf3">pnpm check</tspan></text>
 <text class="l1" x="28" y="88" xml:space="preserve"><tspan fill="#8b949e">src/features/a/ui/Bad.tsx</tspan></text>
-<text class="l2" x="28" y="112" xml:space="preserve"><tspan fill="#8b949e">   1:17  </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">'useEffect' import from 'react' is restricted. 製品コードでuseEffectは使えません。</tspan></text>
+<text class="l2" x="28" y="112" xml:space="preserve"><tspan fill="#8b949e">   1:17  </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">'useEffect' import from 'react' is restricted. [bugyo:use-effect] 製品コードでuseEffectは使えません。</tspan></text>
 <text class="l3" x="28" y="136" xml:space="preserve"><tspan fill="#e6edf3">                購読やタイマーは src/shared/lib の専用フックを使ってください。</tspan></text>
-<text class="l4" x="28" y="160" xml:space="preserve"><tspan fill="#8b949e">  10:3   </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">Unexpected use of 'fetch'. fetchを直接呼ばないでください。</tspan></text>
+<text class="l4" x="28" y="160" xml:space="preserve"><tspan fill="#8b949e">  10:3   </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。</tspan></text>
 <text class="l5" x="28" y="184" xml:space="preserve"><tspan fill="#e6edf3">                src/shared/api のクライアントを使い、スキーマで応答を検証してください。</tspan></text>
 <text class="l6" x="28" y="222.4" xml:space="preserve"><tspan fill="#35e0c2">$ </tspan><tspan fill="#e6edf3">pnpm verify todos</tspan></text>
 <text class="l7" x="28" y="246.4" xml:space="preserve"><tspan fill="#35e0c2">PASS </tspan><tspan fill="#e6edf3">todos  確認手順: docs/features/todos.md</tspan></text>
