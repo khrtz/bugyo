@@ -531,14 +531,19 @@ export function bugyo(options) {
     const without = (list) => list.filter((entry) => !entry.allow.includes(place));
     /** @param {Entry[]} list */
     const touches = (list) => list.some((entry) => entry.allow.includes(place));
+    /** @param {string} scope */
+    const both = (scope) => scopeGlobs(scope).flatMap((scopeGlob) => placeGlobs(place).map((placeGlob) => [scopeGlob, placeGlob]));
+    /** @type {Record<string, unknown>} */
+    const off = {};
+    for (const ban of bans) if (ban.allow.includes(place)) for (const id of Object.keys(ban.rules)) off[id] = 'off';
+    if (Object.keys(off).length > 0) placeBlocks.push({ files: placeGlobs(place), rules: off });
     /** @type {Record<string, unknown>} */
     const rules = {};
-    for (const ban of bans) if (ban.allow.includes(place)) for (const id of Object.keys(ban.rules)) rules[id] = 'off';
     for (const group of combined) {
       const list = inGroup(group, srcEntries);
       if (touches(list)) Object.assign(rules, pair(group, without(list), true));
     }
-    if (Object.keys(rules).length > 0) placeBlocks.push({ files: placeGlobs(place), rules });
+    if (Object.keys(rules).length > 0) placeBlocks.push({ files: both('src'), rules });
     for (const scope of scopes) {
       /** @type {Record<string, unknown>} */
       const scoped = {};
@@ -548,7 +553,7 @@ export function bugyo(options) {
         if (own.length > 0 && touches(list)) Object.assign(scoped, pair(group, without(list), true));
       }
       if (Object.keys(scoped).length > 0) {
-        placeBlocks.push({ files: scopeGlobs(scope).flatMap((scopeGlob) => placeGlobs(place).map((placeGlob) => [scopeGlob, placeGlob])), rules: scoped });
+        placeBlocks.push({ files: both(scope), rules: scoped });
       }
     }
   }

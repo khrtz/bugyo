@@ -248,6 +248,15 @@ test('featureParts: doctor は、どの役割にも入っていないフォル�
   assert.deepEqual(after.featureParts, { features: 1, ui: 2, model: 1, unassigned: [] });
 });
 
+test('featureParts: ui のない構成（model だけの feature）では、0件の注意を出さない', () => {
+  const cwd = project();
+  setResults(cwd, {});
+  withFiles(cwd, {}, ['src/features/slug/model/slug.ts', 'src/features/slug/index.ts']);
+  const run = bugyo(cwd, 'doctor');
+  assert.equal(run.status, 0, run.all);
+  assert.doesNotMatch(run.all, /何にも当たっていません/);
+});
+
 test('featureParts: フォルダ名は / を含まない名前の、空でない配列でなければ断る', async () => {
   const { loadConfig } = await import('../src/config.js');
   for (const featureParts of [{ ui: [] }, { ui: ['a/b'] }, { ui: ['..'] }, { ui: 'components' }, { view: ['components'] }, { model: ['ui'] }]) {

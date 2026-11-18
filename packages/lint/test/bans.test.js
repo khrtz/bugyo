@@ -86,14 +86,11 @@ test('部品と禁止の順番を変えても同じ設定になる', () => {
 });
 
 test('defineBan: 決めた入口だけで使える import を、allow に場所を書いて作れる（glob の記号のない場所はフォルダの下のすべて）', async () => {
-  const processOnlyInSystem = defineBan({
-    name: 'child-process',
-    allow: ['src/shared/system', 'tests'],
-    imports: {
-      paths: [{ name: 'node:child_process', message: '子プロセスは src/shared/system から起動してください。' }],
-      patterns: [{ group: ['child_process'], message: '子プロセスは src/shared/system から起動してください。' }],
-    },
-  });
+  const imports = {
+    paths: [{ name: 'node:child_process', message: '子プロセスは src/shared/system から起動してください。' }],
+    patterns: [{ group: ['child_process'], message: '子プロセスは src/shared/system から起動してください。' }],
+  };
+  const processOnlyInSystem = defineBan({ name: 'child-process', allow: ['src/shared/system', 'tests'], imports });
   const config = bugyo({ root, explicitExtensions: true, parts: [common, structure, processOnlyInSystem] });
   const banned = async (/** @type {string} */ file) =>
     importMessages((await rulesFor(config, file))['no-restricted-imports']).filter((message) => message.startsWith('子プロセス')).length;
@@ -101,6 +98,13 @@ test('defineBan: 決めた入口だけで使える import を、allow に場所�
   assert.equal(await banned('src/app/main.ts'), 2);
   for (const file of ['src/shared/system/run.ts', 'src/shared/system/git/status.ts', 'src/features/calc/model/add.test.ts']) {
     assert.equal(await banned(file), 0, `${file} では許す`);
+  }
+
+  const outside = bugyo({ root, explicitExtensions: true, parts: [common, structure, defineBan({ name: 'scripts-process', allow: ['scripts'], imports })] });
+  const importsRule = async (/** @type {import('eslint').Linter.Config[]} */ config, /** @type {string} */ file) => (await rulesFor(config, file))['no-restricted-imports'];
+  for (const [built, file] of /** @type {const} */ ([[config, 'src/shared/system/run.js'], [outside, 'scripts/release.ts']])) {
+    const rule = await importsRule(built, file);
+    assert.ok(rule === undefined || (Array.isArray(rule) && rule[0] === 0), `許す場所のブロックが src の .ts / .tsx の外に禁止を足さない: ${file} ${JSON.stringify(rule)}`);
   }
 });
 

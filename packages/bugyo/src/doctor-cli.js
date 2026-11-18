@@ -94,8 +94,9 @@ export function doctorCommand(args, cwd = process.cwd()) {
     if (parts !== undefined && parts.features > 0) {
       const roles = featureParts(config);
       console.log(`feature の中: ui の禁止が当たるファイル ${parts.ui}件（${roles.ui.join('・')}）、model の禁止が当たるファイル ${parts.model}件（${roles.model.join('・')}）`);
-      if (parts.ui === 0) console.log('  ui の禁止が何にも当たっていません。layers.featureParts.ui にフォルダ名を書いてください');
-      if (parts.model === 0) console.log('  model の禁止が何にも当たっていません。layers.featureParts.model にフォルダ名を書いてください');
+      const hint = parts.unassigned.length > 0;
+      if (hint && parts.ui === 0) console.log('  ui の禁止が何にも当たっていません。下のフォルダが ui なら、layers.featureParts.ui に名前を書いてください');
+      if (hint && parts.model === 0) console.log('  model の禁止が何にも当たっていません。下のフォルダが model なら、layers.featureParts.model に名前を書いてください');
       if (parts.unassigned.length > 0) {
         console.log(`どの役割（layers.featureParts）にも入っていないフォルダ ${parts.unassigned.length}件（ui・model の禁止が当たりません）`);
         for (const path of parts.unassigned.slice(0, 20)) console.log(`  ${path}`);
