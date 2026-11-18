@@ -1,0 +1,54 @@
+{
+  "task": "t-001",
+  "type": "feature",
+  "feature": "asset-review",
+  "closedAt": "2026-11-18T00:35:18.857Z",
+  "attempt": 2,
+  "rework": 1,
+  "conditions": [
+    "docs/features/asset-review.md の4見出しを埋める"
+  ],
+  "steps": [
+    {
+      "name": "check",
+      "command": "pnpm check",
+      "status": 0,
+      "ms": 8191
+    },
+    {
+      "name": "test",
+      "command": "pnpm test",
+      "status": 0,
+      "ms": 2195
+    },
+    {
+      "name": "verify",
+      "command": "bugyo verify asset-review",
+      "status": 0,
+      "ms": 2357,
+      "results": {
+        "file": "artifacts/verify.json",
+        "runner": "command",
+        "passed": true,
+        "features": [
+          {
+            "id": "asset-review",
+            "ok": true,
+            "command": "pnpm exec vitest run checks/asset-review.spec.tsx"
+          }
+        ],
+        "evidence": [
+          "artifacts/verify/asset-review.log"
+        ]
+      }
+    }
+  ],
+  "tree": {
+    "paths": [
+      "src",
+      "checks",
+      "e2e"
+    ],
+    "hash": "sha256:8d768396c44004583ca1b35268cde362bb10b1733f7acb0ee244225106a21a22"
+  }
+}

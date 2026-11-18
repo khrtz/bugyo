@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -33,6 +35,37 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
+      - name: PRで完了したタスクの証拠を取り直す
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          pnpm --filter todo-app exec bugyo task audit --base "$BASE_SHA"
+          pnpm --filter node-lib exec bugyo task audit --base "$BASE_SHA"
+          pnpm --filter asset-review exec bugyo task audit --base "$BASE_SHA"
+
+  asset-review-e2e:
+    name: Asset Review / browser E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: examples/asset-review
+      - run: pnpm e2e
+        working-directory: examples/asset-review
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: asset-review-evidence
+          path: examples/asset-review/artifacts/
+          retention-days: 14
 
   e2e:
     name: e2e（証拠つき）

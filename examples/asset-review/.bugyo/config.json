@@ -1,0 +1,6 @@
+{
+  "template": "react-vite",
+  "verify": { "runner": "command", "command": "pnpm exec vitest run {spec}" },
+  "featureMap": { "specDir": "checks", "specSuffix": ".spec.tsx", "featuresDir": "src/features" },
+  "evidence": { "tree": ["src", "checks", "e2e"] }
+}

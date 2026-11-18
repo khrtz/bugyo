@@ -1,0 +1,6 @@
+[
+  { "id": "hero", "name": "CHR_HERO_A.fbx", "category": "Character", "triangles": 62400, "textureMb": 192, "owner": "Character Art" },
+  { "id": "cafe", "name": "ENV_CAFE_01.glb", "category": "Environment", "triangles": 35200, "textureMb": 128, "owner": "Environment Art" },
+  { "id": "npc", "name": "chr_npc draft.fbx", "category": "Character", "triangles": 112500, "textureMb": 384, "owner": "Outsource" },
+  { "id": "lamp", "name": "PROP_LAMP_01.fbx", "category": "Prop", "triangles": 4600, "textureMb": 32, "owner": "Environment Art" }
+]

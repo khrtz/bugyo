@@ -1,4 +1,6 @@
 import { parseArgs } from 'node:util';
+import { spawnSync } from 'node:child_process';
+import { auditTask } from './audit.js';
 import { configFile, loadConfig } from './config.js';
 import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
@@ -31,6 +33,8 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo task drop <id> -r "<理由>"
   bugyo task ls [--all]                  一覧（--all で完了・中止も）
   bugyo task lint                        台帳の整合を検査する
+  bugyo task audit <id>                  完了タスクの証拠を独立に取り直す
+  bugyo task audit --base <git-ref>      base 以降に完了したタスクを検証する
   bugyo mistake ls                       ミスの種類ごとの回数とルール
   bugyo mistake rule <種類> --at <パス>  ルールに変えたことを記録する
   bugyo gate                             任せる範囲を広げてよいかを計算する
@@ -53,6 +57,7 @@ function parse(args) {
         reason: { type: 'string', short: 'r' },
         kind: { type: 'string' },
         at: { type: 'string' },
+        base: { type: 'string' },
         json: { type: 'boolean' },
         all: { type: 'boolean' },
       },
@@ -339,6 +344,38 @@ function lint(args, cwd) {
   return errors.length > 0 ? 1 : 0;
 }
 
+/** @param {string} cwd @param {string} base */
+function changedClosedTasks(cwd, base) {
+  const diff = spawnSync('git', ['diff', '--name-only', '--diff-filter=AMR', '-z', '--relative', `${base}...HEAD`, '--', '.bugyo/tasks/archive/'], {
+    cwd, encoding: 'utf8',
+  });
+  if (diff.status !== 0) throw new Error(`git diff を実行できません: ${diff.stderr?.trim() || base}`);
+  return [...new Set((diff.stdout ?? '').split('\0')
+    .filter((file) => /^\.bugyo\/tasks\/archive\/t-\d{3,}\.md$/.test(file))
+    .map((file) => file.split('/').pop()?.replace(/\.md$/, '')))];
+}
+
+/** @param {string[]} args @param {string} cwd */
+function audit(args, cwd) {
+  const { values, positionals } = parse(args);
+  const id = positionals[0];
+  if ((id === undefined) === (values.base === undefined)) {
+    throw new UsageError('bugyo task audit <id> または bugyo task audit --base <git-ref> を指定してください');
+  }
+  const ids = values.base === undefined ? [required(id, 'タスク id が必要です')] : changedClosedTasks(cwd, required(values.base, 'base が必要です'));
+  const tasks = loadTasks(cwd);
+  const config = loadConfig(cwd);
+  const outcomes = ids.map((taskId) => {
+    const task = findTask(tasks, taskId);
+    return { id: taskId, ...auditTask(task, config, cwd) };
+  });
+  print(values.json,
+    outcomes.length === 0 ? ['新たに完了したタスクはありません'] : outcomes.map((outcome) =>
+      `${outcome.ok ? 'PASS' : 'FAIL'} ${outcome.id}${outcome.ok ? '' : `: ${outcome.reason}`}`),
+    outcomes);
+  return outcomes.every((outcome) => outcome.ok) ? 0 : 1;
+}
+
 /**
  * @param {string[]} args
  * @param {string} cwd
@@ -366,6 +403,8 @@ export function taskCommand(args, cwd = process.cwd()) {
       return ls(rest, cwd);
     case 'lint':
       return lint(rest, cwd);
+    case 'audit':
+      return audit(rest, cwd);
     default:
       throw new UsageError(`bugyo task のサブコマンドは add / ready / start / show / repro / done / rework / drop / ls / lint です`);
   }

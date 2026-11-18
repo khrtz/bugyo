@@ -159,9 +159,10 @@ function readVerifySummary(cwd) {
  * @param {import('./tasks.js').Task} task gate-attempts を数え終えたタスク
  * @param {import('./index.js').BugyoConfig} config
  * @param {string} cwd
+ * @param {{ persist?: boolean }} [options] audit では既存の証拠を書き換えない
  * @returns {CollectOutcome}
  */
-export function collectEvidence(task, config, cwd) {
+export function collectEvidence(task, config, cwd, { persist = true } = {}) {
   /** @type {StepRecord[]} */
   const records = [];
   /** @type {string[]} */
@@ -201,8 +202,10 @@ export function collectEvidence(task, config, cwd) {
     ...(task.repro === undefined ? {} : { repro: { command: task.repro, failedAt: task['repro-at'] } }),
     tree: { paths: config.evidence.tree, hash: tree },
   };
-  mkdirSync(join(cwd, evidenceDir), { recursive: true });
-  writeFileSync(join(cwd, file), `${JSON.stringify(evidence, null, 2)}\n`);
+  if (persist) {
+    mkdirSync(join(cwd, evidenceDir), { recursive: true });
+    writeFileSync(join(cwd, file), `${JSON.stringify(evidence, null, 2)}\n`);
+  }
   return { ok: true, evidence, file, tree };
 }
 

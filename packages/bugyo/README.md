@@ -7,7 +7,7 @@ feature map、検証、タスク台帳と門番、雛形生成の CLI です。
 | `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。テンプレートは `react-vite`（既定）か `node-lib` |
 | `bugyo new feature <id>` | feature を、テンプレートに合わせた雛形・feature map・spec つきで作る |
 | `bugyo verify <id>` / `--all` | 機能を実際に動かし、合否と証拠の場所だけを出す。Playwright か、`.bugyo/config.json` に書いた任意のコマンドで確かめる |
-| `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | タスク台帳。`done` だけが証拠を取って閉じる（[docs/tasks.md](../../docs/tasks.md)） |
+| `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` / `audit` | タスク台帳。`done` が証拠を取り、`audit <id>` または `audit --base <git-ref>` が現在のコードで独立に再検証する（[docs/tasks.md](../../docs/tasks.md)） |
 | `bugyo mistake ls` / `rule` | ミスの種類ごとの記録と、ルール化の記録 |
 | `bugyo gate` | 任せる範囲を広げてよいかを計算する |
 

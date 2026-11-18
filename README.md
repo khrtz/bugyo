@@ -75,6 +75,7 @@ PASS todos  確認手順: docs/features/todos.md
 | [plugin](plugin) | Claude Code プラグイン（スキル5つとレビュー用サブエージェント） |
 | [examples/todo-app](examples/todo-app) | React（Vite）の見本。`bugyo init --template react-vite`（既定）のテンプレートの元 |
 | [examples/node-lib](examples/node-lib) | 画面のない TypeScript のライブラリ／CLI の見本。React・Vite・Playwright を使わない。`bugyo init --template node-lib` のテンプレートの元 |
+| [examples/asset-review](examples/asset-review) | bugyo で新規作成し、タスク台帳・画面操作の検証・証拠監査まで通した 3D アセットレビューアプリ |
 
 ## 始め方
 

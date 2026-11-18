@@ -188,6 +188,49 @@ test('done: verify が落ちる状態だと断られて作業中のまま、直�
   ok(cwd, 'task', 'lint');
 });
 
+test('audit は完了タスクを再検証し、既存の証拠を書き換えない', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'agent');
+  ok(cwd, 'task', 'done', 't-001');
+  const path = join(cwd, '.bugyo/evidence/t-001.json');
+  const before = readFileSync(path, 'utf8');
+  assert.match(ok(cwd, 'task', 'audit', 't-001').stdout, /^PASS t-001\n$/);
+  assert.equal(readFileSync(path, 'utf8'), before);
+});
+
+test('audit は見かけだけ整合する偽の証拠と、完了後のコード変更を断る', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'agent');
+  ok(cwd, 'task', 'done', 't-001');
+  const path = join(cwd, '.bugyo/evidence/t-001.json');
+  const evidence = JSON.parse(readFileSync(path, 'utf8'));
+  evidence.steps[0].command = 'true';
+  writeFileSync(path, JSON.stringify(evidence));
+  assert.equal(bugyo(cwd, 'task', 'lint').status, 0);
+  assert.match(bugyo(cwd, 'task', 'audit', 't-001').stdout, /FAIL t-001: 1番目のコマンド/);
+  evidence.steps[0].command = 'node scripts/check.js';
+  writeFileSync(path, JSON.stringify(evidence));
+  breakGreet(cwd);
+  assert.match(bugyo(cwd, 'task', 'audit', 't-001').stdout, /FAIL t-001: 証拠のハッシュ/);
+});
+
+test('audit --base は変更された完了タスクだけを検証する', () => {
+  const cwd = project();
+  const git = (...args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(git('init', '-q').status, 0);
+  assert.equal(git('add', '.').status, 0);
+  assert.equal(git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'base').status, 0);
+  const base = git('rev-parse', 'HEAD').stdout.trim();
+  ok(cwd, 'task', 'add', '文書', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'agent');
+  ok(cwd, 'task', 'done', 't-001');
+  assert.equal(git('add', '.').status, 0);
+  assert.equal(git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'task').status, 0);
+  assert.match(ok(cwd, 'task', 'audit', '--base', base).stdout, /^PASS t-001\n$/);
+});
+
 test('手で status を done に書き換えると task lint が落ちる', () => {
   const cwd = project();
   ok(cwd, 'task', 'add', '文書', '--type', 'chore');
