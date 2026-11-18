@@ -85,6 +85,25 @@ test('部品と禁止の順番を変えても同じ設定になる', () => {
   );
 });
 
+test('defineBan: 決めた入口だけで使える import を、allow に場所を書いて作れる（glob の記号のない場所はフォルダの下のすべて）', async () => {
+  const processOnlyInSystem = defineBan({
+    name: 'child-process',
+    allow: ['src/shared/system', 'tests'],
+    imports: {
+      paths: [{ name: 'node:child_process', message: '子プロセスは src/shared/system から起動してください。' }],
+      patterns: [{ group: ['child_process'], message: '子プロセスは src/shared/system から起動してください。' }],
+    },
+  });
+  const config = bugyo({ root, explicitExtensions: true, parts: [common, structure, processOnlyInSystem] });
+  const banned = async (/** @type {string} */ file) =>
+    importMessages((await rulesFor(config, file))['no-restricted-imports']).filter((message) => message.startsWith('子プロセス')).length;
+  assert.equal(await banned('src/features/calc/model/add.ts'), 2);
+  assert.equal(await banned('src/app/main.ts'), 2);
+  for (const file of ['src/shared/system/run.ts', 'src/shared/system/git/status.ts', 'src/features/calc/model/add.test.ts']) {
+    assert.equal(await banned(file), 0, `${file} では許す`);
+  }
+});
+
 test('defineBan: 書き方の誤りと、同じ名前の禁止は断る', () => {
   assert.throws(() => defineBan({ name: 'No Spaces', globals: ['x'] }), /小文字・数字・ハイフン/);
   // @ts-expect-error 知らない項目

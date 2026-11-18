@@ -339,6 +339,13 @@ export function resolveLayers(src, layers) {
 const trimSlash = (path) => path.replace(/^\.\//, '').replace(/\/+$/, '');
 
 /**
+ * 禁止の scope と allow に書いた場所の glob。glob の記号（`*?[]{}!`）のないものは、そのファイルか、そのフォルダの下のすべてにする。
+ *
+ * @param {string} path
+ */
+const pathGlobs = (path) => (/[*?[\]{}!]/.test(path) ? [path] : [trimSlash(path), `${trimSlash(path)}/**`]);
+
+/**
  * 禁止を、合成するルールに入る項目に分ける。
  *
  * @param {Ban[]} bans
@@ -470,7 +477,7 @@ export function bugyo(options) {
           ...layers.shared.model.map((dir) => `${dir}/**/*.ts`),
         ];
       default:
-        return [scope];
+        return pathGlobs(scope);
     }
   };
   /** @param {string} place */
@@ -483,7 +490,7 @@ export function bugyo(options) {
       case 'tests':
         return [`${src}/**/*.test.{ts,tsx}`];
       default:
-        return [place];
+        return pathGlobs(place);
     }
   };
 

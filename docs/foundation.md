@@ -217,7 +217,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 | --- | --- | --- |
 | `name` | 小文字・数字・ハイフン | 禁止の名前。`severity` のキーにもなる。同じ名前の禁止は2つ置けない |
 | `scope` | `src`（既定）・`ui`・`model`。`rules` だけの禁止は root からの glob も使える | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/`（`layers.featureParts` で変えられる）。`imports`・`globals`・`syntax`・`properties` は bugyo の禁止と1つのルールに合成するので、glob の範囲にすると断る（範囲を絞るなら `allow` で除く） |
-| `allow` | `effects`・`api`・`tests`、または root からの glob の配列 | どこでは許すか。`effects` は `effectHooksDir`、`api` は `apiClientDir`、`tests` は `src` の下の `*.test.ts(x)` |
+| `allow` | `effects`・`api`・`tests`、または root からのパスか glob の配列 | どこでは許すか。`effects` は `effectHooksDir`、`api` は `apiClientDir`、`tests` は `src` の下の `*.test.ts(x)`。glob の記号（`*?[]{}!`）のないパスは、そのファイルか、そのフォルダの下のすべて（`scope` の glob も同じ） |
 | `imports` | `{ paths: [{ name, importNames?, message }], patterns: [{ group, message }] }` | `no-restricted-imports` に合成する |
 | `globals` | `[{ name, message }]` | `no-restricted-globals` に合成する |
 | `properties` | `[{ object?, property?, message }]` | `no-restricted-properties` に合成する |
@@ -229,6 +229,28 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 - 禁止したものの「正しい入口」は、`allow` に書いた場所に作ります（例: `Date.now` を禁止し、`shared/lib/clock.ts` だけで使う）
 - 知らない項目、何も止めていない禁止、同じ名前の禁止は断ります
 - `no-restricted-imports` などを自分の設定ブロックで直接書くと、合成した bugyo の禁止が上書きされて消えます。必ず `defineBan` で足します
+
+#### 決めた入口だけで使える import
+
+`fetchOnlyInApi` と同じ形で、ほかの import も決めた場所でだけ使えるようにできます。IPC の呼び出し、データベースのクライアント、OS の API などです。
+
+```js
+const processOnlyInSystem = defineBan({
+  name: 'child-process',
+  allow: ['src/shared/system', 'tests'],
+  imports: {
+    paths: [
+      { name: 'node:child_process', message: '子プロセスは src/shared/system のクライアントから起動してください' },
+      { name: 'node:fs', importNames: ['writeFileSync'], message: 'ファイルの書き込みは src/shared/system から行ってください' },
+    ],
+    patterns: [{ group: ['child_process'], message: '子プロセスは src/shared/system のクライアントから起動してください' }],
+  },
+});
+
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, processOnlyInSystem] });
+```
+
+入口を `layers.shared.api` に置くなら、`allow` は `['api', 'tests']` です。
 - 1つのファイルが2つの許す場所に当たるとき（例: `shared/lib` の中のテスト）は、後ろの場所（`effects`・`api`・`tests`・glob の順）で作り直したルールが前の場所の分を上書きします。同じ種類（`imports` 同士など）の別々の禁止を、片方は前の場所で、もう片方は後ろの場所で許していると、前の場所で許した禁止がそのファイルでは戻ります
 
 ### dependency-cruiser
