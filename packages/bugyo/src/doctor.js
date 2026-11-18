@@ -375,7 +375,7 @@ function byRule(counts) {
 
 /**
  * ベースラインのファイル（禁止ごとの件数、ESLint の抑制、dependency-cruiser の既知の違反）が `base` より増えたところを返す。
- * 禁止ごとの件数の形式が `base` と違えば（名前で数える前のものから作り直したとき）、ルールごとの件数で比べる。
+ * 禁止ごとの件数の形式が `base` より新しければ（名前で数える前のものから作り直したとき）、ルールごとの件数で比べる。`base` より古い形式に戻したものは、増えたことにする。
  *
  * @param {string} cwd
  * @param {string} base
@@ -395,6 +395,9 @@ export function baselineGrowth(cwd, base) {
   const parse = (/** @type {string | undefined} */ text) => (text === undefined ? {} : JSON.parse(text));
   const before = parseBaseline(atBase(baselineFile));
   const after = parseBaseline(now(baselineFile));
+  if (after.version < before.version) {
+    grown.push(`${baselineFile}: 形式が ${base} の ${before.version} から ${after.version} に戻っています（古い形式では、同じルールの中の入れ替えを見つけられません）。bugyo baseline save で作り直してください`);
+  }
   const sameVersion = before.version === after.version;
   const bans = compareCounts(sameVersion ? before.counts : byRule(before.counts), sameVersion ? after.counts : byRule(after.counts));
   grown.push(...bans.grew.map(({ key, from, to }) => `${baselineFile}: ${key} ${from} → ${to}`));

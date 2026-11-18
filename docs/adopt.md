@@ -161,7 +161,7 @@ ESLint の抑制はファイルとルールごとの件数なので、同じフ�
 
 `@bugyo/lint` は、禁止のメッセージの頭に禁止の名前（`[bugyo:use-effect]` のような形）を付けます。`.bugyo/baseline.json` は、メッセージのうち、この名前までを数えるのに使います。名前の後ろの説明の文を書き換えても、同じ禁止として数えます。メッセージのない禁止の項目には名前を付けず、ESLint の既定のメッセージで数えます。
 
-名前で数える前の `.bugyo/baseline.json`（`version` のないもの）は、`baseline check` が今までの数え方で確かめます。`bugyo baseline save` で作り直すと、名前で数える形式（`"version": 2`）になります。作り直した PR では、`baseline diff` は base と形式が違うので、ルールごとの件数で比べます。作り直しただけでは増えたことになりません。
+名前で数える前の `.bugyo/baseline.json`（`version` のないもの）は、`baseline check` が今までの数え方で確かめます。`bugyo baseline save` で作り直すと、名前で数える形式（`"version": 2`）になります。作り直した PR では、`baseline diff` は base と形式が違うので、ルールごとの件数で比べます。作り直しただけでは増えたことになりません。逆に、base より古い形式に戻したベースラインは、増えたことにして落とします。
 
 ### 3. `check` で件数を確かめる
 

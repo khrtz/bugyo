@@ -211,6 +211,27 @@ test('baseline diff は、base のベースラインが前の形式なら、ル�
   assert.match(grown.all, /\.bugyo\/baseline\.json: no-restricted-imports 1 → 2/);
 });
 
+test('baseline diff は、base より古い形式に戻したベースラインを、増えたことにする', () => {
+  const cwd = project();
+  git(cwd, 'init', '-q', '-b', 'main');
+  git(cwd, 'config', 'user.email', 'test@example.com');
+  git(cwd, 'config', 'user.name', 'test');
+  const fetchBan = violation('no-restricted-globals', "Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。");
+  const timerBan = violation('no-restricted-globals', "Unexpected use of 'setTimeout'. [bugyo:ui-timers] UIでsetTimeoutによるタイミング合わせはできません。");
+  setResults(cwd, { 'a.ts': [fetchBan] });
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-q', '-m', 'base');
+
+  // 同じルールの中で fetch を直して setTimeout を足し、古い形式（version なし、文で数える）に書き戻す
+  writeFileSync(join(cwd, '.bugyo/baseline.json'), JSON.stringify({ counts: { "no-restricted-globals: Unexpected use of 'setTimeout'. UIでsetTimeoutによるタイミング合わせはできません。": 1 } }));
+  const downgraded = bugyo(cwd, 'baseline', 'diff', '--base', 'main');
+  assert.equal(downgraded.status, 1, downgraded.all);
+  assert.match(downgraded.all, /形式が main の 2 から 1 に戻っています/);
+  setResults(cwd, { 'a.ts': [timerBan] });
+  assert.equal(bugyo(cwd, 'baseline', 'check').status, 0, 'check は古い形式のまま通るので、diff で止める');
+});
+
 test('baseline check はベースラインがなければ何もしない', () => {
   const cwd = project();
   setResults(cwd, { 'a.ts': [useEffect] });
