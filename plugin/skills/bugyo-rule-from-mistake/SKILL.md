@@ -75,6 +75,10 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, /* 
 1〜5 のどれでも止められないときだけ、CLAUDE.md に1行足す。
 その行が後でルール化できたら、昇格させて文章から消す。
 
+## 記録
+
+`.bugyo/mistakes/<種類>.md` にそのミスがあれば、`bugyo mistake rule <種類> --at <ルールを書いたファイル> --name <ルールの名前>` で記録する（名前は `defineBan` の `name`、ルール ID、テストの名前など）。`bugyo mistake ls` に、種類ごとのルールとルール化済みの種類の数が出る。
+
 ## 報告
 
 どの層で止めたか、追加したルールのエラー文、直した既存違反の数を書く。わざと違反するコードを一度書いてルールが実際にエラーを出すことを確かめ、その結果も載せる（確かめたら消す）。

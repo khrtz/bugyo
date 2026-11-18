@@ -83,7 +83,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `bugyo task ls [--all]` | 人 | 一覧。`--all` で完了とやめたものも出す |
 | `bugyo task lint [--base <ref>]` | `pnpm check`・CI | 台帳の整合を検査する。`--base` なら、`<ref>...HEAD` で足したタスクのうち、`<ref>` にすでにある id の別のタスク（作った日時が違うもの）も見つける |
 | `bugyo task recheck [<id>...] [--base <ref>] [--notify]` | CI | 完了タスクの証拠を取り直して照合する。`--base` なら `<ref>...HEAD` で `archive/` に追加・変更されたタスクが対象。証拠ファイルは書き換えない。`--notify` なら、照合に通った `issue` つきのタスクを `notify.verified` のコマンドで知らせる |
-| `bugyo mistake ls` / `rule <種類> --at <パス>` | 人・エージェント | ミスの一覧と、ルール化したことの記録 |
+| `bugyo mistake ls` / `rule <種類> --at <パス> [--name <ルールの名前>]` | 人・エージェント | ミスの一覧とルール化済みの種類の数と、ルール化したことの記録 |
 | `bugyo gate` | 人 | 任せる範囲を広げてよいかを計算する。合格で 0、不合格で 1 |
 
 親子関係を出す `bugyo task tree` は、親子関係の持ち方が決まっていないのでまだありません。
@@ -254,8 +254,20 @@ rule:
 2. ミスのファイルに、起きたタスクの id と理由が追記され、`count` が1増える。タスクの本文の「## 手直し」にも1行足し、`evidence-*` を消して `active` に戻す
 3. 同じ種類が2回目になると、`bugyo task lint` が警告し、`bugyo gate` が不合格になる
 4. ルールに変える。優先する順は、型・API → lint・依存ルール → テスト・feature map → `CLAUDE.md`
-5. `bugyo mistake rule <種類> --at <ルールを書いたファイル>` で記録する。そのファイルが実在しなければ断る。記録したときの回数が `ruled-count` に残る
+5. `bugyo mistake rule <種類> --at <ルールを書いたファイル> [--name <ルールの名前>]` で記録する。そのファイルが実在しなければ断る。記録したときの回数が `ruled-count` に、`--name`（禁止の名前、ルール ID、テストの名前など）が `rule-name` に残る
 6. ルール化済みの種類がまた起きたら（`count` が `ruled-count` を超えたら）、「ルールが漏れている」として `mistake ls` の先頭に出し、門番を不合格にする
+
+`bugyo mistake ls` は、種類ごとの回数と対応するルールに続けて、ルール化済みの種類の数を出します。ミスがルールに変わった数を、そのまま数えられます。
+
+```
+$ bugyo mistake ls
+date-now 2回  ルール: clock（eslint.config.js）  ルール化のとき 1回  ← ルールが漏れている（ルール化のあとにまた起きた）
+deep-import 2回  ルール: なし  ← ルール化が必要
+wrong-name 1回  ルール: なし
+ミス 3種類  ルール化済み 1種類（うちルールが漏れている 1種類）  ルール化が必要 1種類  1回だけ 1種類
+```
+
+`--json` では `{ summary, mistakes }` を出します。`summary` は種類の数（`kinds`・`ruled`・`leak`・`unruled`・`once`）、`mistakes` は種類ごとの `kind`・`count`・`rule`・`ruleName`・`ruledCount`・`state` です。
 
 ## 門番（`bugyo gate`）
 

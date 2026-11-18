@@ -5,7 +5,7 @@ import { configFile, loadConfig } from './config.js';
 import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
 import { evaluateGate } from './gate.js';
-import { isMistakeKind, loadMistakes, mistakeLine, mistakeState, recordMistake, recordRule, sortMistakes } from './mistakes.js';
+import { isMistakeKind, loadMistakes, mistakeJson, mistakeLine, mistakeState, mistakeSummary, mistakeSummaryLine, recordMistake, recordRule, sortMistakes } from './mistakes.js';
 import { claimTask, fetchClaims, listRecords, openClaims, reassignClaim, readRecord, releaseClaim, reserveId } from './claims.js';
 import { changedArchiveIds, duplicateIdsAgainst, notifyVerified, recheckTask } from './recheck.js';
 import { commandExists, ranNoTests, runCommand, tail } from './run.js';
@@ -40,8 +40,8 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo task lint [--base <ref>]         台帳の整合を検査する（--base なら、<ref> にすでにある id と重なるタスクも見つける）
   bugyo task recheck [<id>...] [--base <ref>] [--notify]  完了タスクの証拠を取り直して照合する（CI 用。--base なら <ref>...HEAD で閉じたタスク。
                                          --notify なら、通ったタスクの課題に notify.verified のコマンドで知らせる）
-  bugyo mistake ls                       ミスの種類ごとの回数とルール
-  bugyo mistake rule <種類> --at <パス>  ルールに変えたことを記録する
+  bugyo mistake ls                       ミスの種類ごとの回数とルール、ルール化済みの種類の数
+  bugyo mistake rule <種類> --at <パス> [--name <ルールの名前>]  ルールに変えたことを記録する
   bugyo gate [--scope <まとまり>]        任せる範囲を広げてよいかを、作業の種類のまとまりごとに計算する
   （どれも --json で短い JSON を出す）`;
 
@@ -64,6 +64,7 @@ function parse(args) {
         reason: { type: 'string', short: 'r' },
         kind: { type: 'string' },
         at: { type: 'string' },
+        name: { type: 'string' },
         base: { type: 'string' },
         scope: { type: 'string' },
         expect: { type: 'string' },
@@ -506,18 +507,16 @@ export function mistakeCommand(args, cwd = process.cwd()) {
   const { values, positionals } = parse(rest);
   if (sub === 'ls') {
     const mistakes = sortMistakes(loadMistakes(cwd));
-    print(
-      values.json,
-      mistakes.length === 0 ? ['ミスの記録はありません'] : mistakes.map(mistakeLine),
-      mistakes.map((mistake) => ({ kind: mistake.kind, count: mistake.count, rule: mistake.rule, state: mistakeState(mistake) })),
-    );
+    const summary = mistakeSummary(mistakes);
+    print(values.json, mistakes.length === 0 ? ['ミスの記録はありません'] : [...mistakes.map(mistakeLine), mistakeSummaryLine(summary)], { summary, mistakes: mistakes.map(mistakeJson) });
     return 0;
   }
   if (sub === 'rule') {
-    const kind = required(positionals[0], '使い方: bugyo mistake rule <種類> --at <ルールを書いたファイル>');
+    const kind = required(positionals[0], '使い方: bugyo mistake rule <種類> --at <ルールを書いたファイル> [--name <ルールの名前>]');
     const at = required(values.at, '--at <パス> で、ルールを書いたファイルを渡してください');
-    const mistake = recordRule(cwd, kind, at);
-    print(values.json, [mistakeLine(mistake)], { kind: mistake.kind, count: mistake.count, rule: mistake.rule, state: mistakeState(mistake) });
+    const name = values.name === undefined ? undefined : required(values.name, '--name に、ルールの名前（禁止の名前、ルール ID、テストの名前など）を渡してください');
+    const mistake = recordRule(cwd, kind, at, name);
+    print(values.json, [mistakeLine(mistake)], mistakeJson(mistake));
     return 0;
   }
   throw new UsageError('bugyo mistake のサブコマンドは ls / rule です');
