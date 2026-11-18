@@ -189,6 +189,19 @@ ESLint の抑制はファイルとルールごとの件数なので、同じフ�
 
 `baseline diff` は、3つのファイルのどれかが base より増えていれば落ちます。減らすのと、ファイルを消すのは通ります。どうしても増やすときは、人が差分を確かめてから通す仕組みにします。このリポジトリの [config guard](../.github/workflows/config-guard.yml) は、ラベル `bugyo-baseline-approved` が付いた PR だけを通します。
 
+### 外の lint の結果も数える
+
+ESLint と dependency-cruiser のほかの lint も、結果を SARIF で書き出せれば、`bugyo doctor` と `bugyo baseline` で一緒に数えられます。`.bugyo/config.json` の `sarif` に、書き出すコマンドとファイルを並べます。
+
+```json
+{ "sarif": [{ "command": "semgrep scan --sarif --output artifacts/semgrep.sarif", "file": "artifacts/semgrep.sarif" }] }
+```
+
+- ツールとルールごとに数えます（`sarif: <ツール>/<ルール>`。ツールの名前は SARIF の `tool.driver.name`）。ファイルと行は数えないので、違反が別の場所に移っただけでは件数は変わりません
+- `command` があれば、`file` を消してから実行し、書かれたものを読みます。終了コードは見ません（違反があると 0 でないツールが多いため）。`file` が書かれなければ落ちます
+- `command` を書かなければ、`file` を読むだけです（CI の前の手順で書き出すとき）
+- 抑制が認められた結果（`suppressions` の `status` が `rejected` でないもの）と、`kind` が `fail` でない結果は数えません
+
 ## 確かめられないこと
 
 `bugyo verify` が確かめるのは、spec に書いた手順が今の環境で通るかだけです。外の環境の状態（本番のデータ、別のサービスの設定など）についての「確認しました」は止められません。

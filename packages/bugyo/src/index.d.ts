@@ -27,6 +27,11 @@ export interface BugyoConfig {
   template?: string | undefined;
   /** パッケージマネージャー。書かなければ package.json の packageManager か lockfile から決める（見つからなければ pnpm）。commands の既定を選ぶ */
   packageManager: 'pnpm' | 'npm' | 'yarn' | 'bun';
+  /**
+   * bugyo doctor と bugyo baseline で数える、外の lint の結果（SARIF）。`command` があれば実行してから `file` を読む。
+   * ツールとルールごとに数える（`sarif: <ツール>/<ルール>`）
+   */
+  sarif?: { command?: string | undefined; file: string }[] | undefined;
   /** @bugyo/lint の禁止のメッセージの言語。書かなければ `ja`（環境変数 `BUGYO_LOCALE` のほうが先） */
   locale?: 'ja' | 'en';
   verify: {

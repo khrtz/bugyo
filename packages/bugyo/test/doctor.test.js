@@ -357,6 +357,62 @@ test('sources: layers と一緒に書いたり、src が重なったりする設
   }
 });
 
+/**
+ * 外の lint の代わりに、sarif-results.json の結果を SARIF にして書くスクリプトを置き、.bugyo/config.json の sarif に登録する。
+ *
+ * @param {string} cwd
+ */
+function withSarif(cwd) {
+  writeFileSync(
+    join(cwd, 'fake-scan.cjs'),
+    "const { readFileSync, writeFileSync, mkdirSync } = require('node:fs');\nconst results = JSON.parse(readFileSync('sarif-results.json', 'utf8'));\nmkdirSync('artifacts', { recursive: true });\nwriteFileSync('artifacts/scan.sarif', JSON.stringify({ version: '2.1.0', runs: [{ tool: { driver: { name: 'scanner' } }, results }] }));\nprocess.exit(results.length > 0 ? 1 : 0);\n",
+  );
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ sarif: [{ command: 'node fake-scan.cjs', file: 'artifacts/scan.sarif' }] }));
+}
+
+/** @param {string} cwd @param {object[]} results */
+const setSarif = (cwd, results) => writeFileSync(join(cwd, 'sarif-results.json'), JSON.stringify(results));
+/** @param {string} ruleId @param {string} file @param {number} line */
+const finding = (ruleId, file, line) => ({ ruleId, message: { text: 'x' }, locations: [{ physicalLocation: { artifactLocation: { uri: file }, region: { startLine: line } } }] });
+
+test('sarif: 外の lint の結果をツールとルールごとに数え、ファイルや行が変わっただけでは件数は変わらない', () => {
+  const cwd = project();
+  setResults(cwd, { 'a.ts': [] });
+  withSarif(cwd);
+  setSarif(cwd, [
+    finding('no-eval', 'src/a.ts', 3),
+    finding('no-eval', 'src/b.ts', 9),
+    finding('weak-hash', 'src/c.ts', 1),
+    { ...finding('no-eval', 'src/d.ts', 1), suppressions: [{ kind: 'inSource', status: 'accepted' }] },
+    { ...finding('no-eval', 'src/e.ts', 1), kind: 'pass' },
+  ]);
+  const report = JSON.parse(bugyo(cwd, 'doctor', '--json').all);
+  assert.deepEqual(report.counts, { 'sarif: scanner/no-eval': 2, 'sarif: scanner/weak-hash': 1 });
+
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  setSarif(cwd, [finding('no-eval', 'src/x.ts', 40), finding('no-eval', 'src/y.ts', 2), finding('weak-hash', 'src/z.ts', 7)]);
+  const moved = bugyo(cwd, 'baseline', 'check');
+  assert.equal(moved.status, 0, moved.all);
+
+  setSarif(cwd, [finding('no-eval', 'src/x.ts', 40), finding('no-eval', 'src/y.ts', 2), finding('weak-hash', 'src/z.ts', 7), finding('weak-hash', 'src/z.ts', 8)]);
+  const grown = bugyo(cwd, 'baseline', 'check');
+  assert.equal(grown.status, 1);
+  assert.match(grown.all, /増えた: sarif: scanner\/weak-hash 1 → 2/);
+});
+
+test('sarif: コマンドが SARIF を書かなければ、前の実行のファイルを読まずに落ちる', () => {
+  const cwd = project();
+  setResults(cwd, { 'a.ts': [] });
+  withSarif(cwd);
+  setSarif(cwd, [finding('no-eval', 'src/a.ts', 3)]);
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  writeFileSync(join(cwd, 'fake-scan.cjs'), 'process.exit(2);\n');
+  const run = bugyo(cwd, 'baseline', 'check');
+  assert.equal(run.status, 1);
+  assert.match(run.all, /artifacts\/scan\.sarif がありません（node fake-scan\.cjs が書くはずのファイル）/);
+});
+
 test('doctor は構文エラーのファイルと場所とメッセージを出す', () => {
   const cwd = project();
   setResults(cwd, { [join(cwd, 'src', 'broken.ts')]: [{ ruleId: null, message: 'Parsing error: Unexpected token', line: 3 }] });

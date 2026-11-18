@@ -65,7 +65,7 @@ const countLines = (counts) =>
 export function doctorCommand(args, cwd = process.cwd()) {
   const { values } = parse(args);
   const dirs = dirsOf(cwd, values.dirs);
-  const { counts, warned, parseErrors, errors } = banCounts(cwd, dirs);
+  const { counts, warned, parseErrors, errors } = banCounts(cwd, dirs, loadConfig(cwd).sarif ?? []);
   const tsc = values.tsconfig === undefined ? undefined : tscErrors(cwd, values.tsconfig);
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const config = loadConfig(cwd);
@@ -135,7 +135,7 @@ export function baselineCommand(args, cwd = process.cwd()) {
   const dirs = dirsOf(cwd, values.dirs);
   switch (sub) {
     case 'save': {
-      const counts = saveBaseline(cwd, dirs);
+      const counts = saveBaseline(cwd, dirs, loadConfig(cwd).sarif ?? []);
       const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
       console.log(`baseline: ${total}件をベースラインにしました（${baselineFile}）`);
       return 0;
@@ -151,7 +151,7 @@ export function baselineCommand(args, cwd = process.cwd()) {
         console.log(`baseline: ${baselineFile} がないので、確かめるものはありません`);
         return 0;
       }
-      const { counts, legacy, errors } = banCounts(cwd, dirs);
+      const { counts, legacy, errors } = banCounts(cwd, dirs, loadConfig(cwd).sarif ?? []);
       if (errors.length > 0) {
         for (const error of errors) console.error(`error ${error}`);
         return 1;
