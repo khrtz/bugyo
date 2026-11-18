@@ -217,7 +217,7 @@ export default defineBugyoConfig({ port: 5173 });
 | 項目 | 既定 | 意味 |
 | --- | --- | --- |
 | `port` | `5173` | dev サーバーのポート |
-| `command` | `pnpm exec vite --port <port> --strictPort` | dev サーバーを起動するコマンド |
+| `command` | `vite --port <port> --strictPort` | dev サーバーを起動するコマンド。`node_modules/.bin` の `vite` を使うので、パッケージマネージャーを問わない |
 | `overrides` | なし | Playwright の設定を上書きする |
 
 この設定は次のように動きます。
@@ -233,6 +233,7 @@ export default defineBugyoConfig({ port: 5173 });
 | --- | --- |
 | `pnpm check / test` | `pnpm check` と `pnpm test` |
 | `verify（証拠つき）` | `pnpm verify`（todo-app は Playwright、node-lib は機能ごとのコマンド）。`artifacts/` を成果物として上げ、PR に合否と証拠のリンクを載せる |
+| `npm で入れたプロジェクト（pnpm なし）` | パッケージを作り、`react-vite` のプロジェクトを npm で入れ、pnpm を `PATH` から外して、check・test・`verify --all`・`task done` を通す |
 
 Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあります。画面を変えて作り直すときは次の手順です。
 
@@ -274,10 +275,10 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 | `runner` | 動き | 証拠の場所 |
 | --- | --- | --- |
-| `playwright`（既定） | 対象の spec をまとめて `pnpm exec playwright test` に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
+| `playwright`（既定） | 対象の spec をまとめて `playwright test`（`node_modules/.bin` のもの。パッケージマネージャーは通さない）に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
 | `command` | `verify.command` を機能ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は frontmatter の `spec` に置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力） |
 
-`command` のコマンドはシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。
+どちらもシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。pnpm・npm・yarn・bun のどれで入れても動きます（Yarn の PnP のように `node_modules/.bin` を作らない入れ方は対象外です）。
 
 ## 設定ファイル（`.bugyo/config.json`）
 
@@ -292,6 +293,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 | キー | 既定 | 意味 |
 | --- | --- | --- |
+| `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
 | `verify.runner` | `playwright` | `playwright` か `command`（上の「CLI」） |
 | `verify.command` | なし | `runner` が `command` のときは必須 |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |

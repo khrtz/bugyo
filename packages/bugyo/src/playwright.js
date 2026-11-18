@@ -8,7 +8,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export function defineBugyoConfig(options = {}) {
   const port = options.port ?? 5173;
-  const command = options.command ?? `pnpm exec vite --port ${port} --strictPort`;
+  const command = options.command ?? `vite --port ${port} --strictPort`;
   return defineConfig({
     testDir: 'e2e',
     testMatch: '**/*.spec.ts',

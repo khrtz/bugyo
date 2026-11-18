@@ -124,7 +124,7 @@ t-014 [active/bugfix] 絞り込みを切り替えると残り件数がずれる 
   "steps": [
     { "name": "check", "command": "pnpm check", "status": 0, "ms": 11557 },
     { "name": "test", "command": "pnpm test", "status": 0, "ms": 1952 },
-    { "name": "verify", "command": "bugyo verify todos", "status": 0, "ms": 6269, "results": { "file": "artifacts/verify.json", "runner": "playwright", "passed": true, "features": [{ "id": "todos", "ok": true, "command": "pnpm exec playwright test e2e/todos.spec.ts --reporter=line,json,html" }], "evidence": ["…"] } }
+    { "name": "verify", "command": "bugyo verify todos", "status": 0, "ms": 6269, "results": { "file": "artifacts/verify.json", "runner": "playwright", "passed": true, "features": [{ "id": "todos", "ok": true, "command": "playwright test \"e2e/todos.spec.ts\" --reporter=line,json,html" }], "evidence": ["…"] } }
   ],
   "tree": { "paths": ["src", "e2e"], "hash": "sha256:…" }
 }
@@ -158,7 +158,7 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 
 | キー | 既定 | 意味 |
 | --- | --- | --- |
-| `commands.check` / `test` / `verify` | `pnpm check` / `pnpm test` / `bugyo verify {feature}` | `done` が実行するコマンド。`{feature}` はタスクの機能、`{task}` はタスクの id に置き換わる。シェルで実行し、`node_modules/.bin` を `PATH` の先頭に足す |
+| `commands.check` / `test` / `verify` | パッケージマネージャーに合わせる（pnpm: `pnpm check` / `pnpm test`、npm: `npm run check` / `npm test`、yarn: `yarn run check` / `yarn test`、bun: `bun run check` / `bun run test`。`verify` はどれも `bugyo verify {feature}`） | `done` が実行するコマンド。パッケージマネージャーの決め方は [foundation.md](foundation.md#設定ファイルbugyoconfigjson) の `packageManager`。`{feature}` はタスクの機能、`{task}` はタスクの id に置き換わる。シェルで実行し、`node_modules/.bin` を `PATH` の先頭に足す |
 | `evidence.tree` | `["src", "e2e"]` | `evidence-tree` のハッシュを取るパス。テストファイルのハッシュもこの下で取る |
 | `gate.window` | `20` | 門番が見る、直近の閉じたタスク（完了と中止）の件数 |
 | `gate.maxRework` | `2` | そのうち手直しが要ったタスクの上限 |

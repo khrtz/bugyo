@@ -19,6 +19,8 @@ export function loadSweepOrder(cwd?: string): string[];
 export interface BugyoConfig {
   /** bugyo init で使ったテンプレートの名前。bugyo new feature が生成物を選ぶ */
   template?: string | undefined;
+  /** パッケージマネージャー。書かなければ package.json の packageManager か lockfile から決める（見つからなければ pnpm）。commands の既定を選ぶ */
+  packageManager: 'pnpm' | 'npm' | 'yarn' | 'bun';
   verify: {
     /** `playwright`（既定）は JSON レポートから spec ごとの合否を読む。`command` は機能ごとに command を1回ずつ実行する */
     runner: 'playwright' | 'command';
@@ -33,7 +35,7 @@ export interface BugyoConfig {
     /** 機能のフォルダを並べる場所。既定は `src/features`。null で検査を飛ばす */
     featuresDir: string | null;
   };
-  /** bugyo task done が実行するコマンド。このキーがないときだけ既定値（pnpm check / pnpm test / bugyo verify {feature}）を使う */
+  /** bugyo task done が実行するコマンド。このキーがないときだけ、packageManager に合わせた既定値（pnpm なら pnpm check / pnpm test / bugyo verify {feature}）を使う */
   commands?: { check?: string | undefined; test?: string | undefined; verify?: string | undefined } | undefined;
   evidence: {
     /** evidence-tree のハッシュを取るパス。既定は `["src", "e2e"]` */
@@ -80,7 +82,7 @@ export function featureMapChecks(options?: FeatureMapOptions): FeatureMapCheck[]
 
 export interface BugyoPlaywrightOptions {
   port?: number;
-  /** dev サーバーを起動するコマンド。既定は `pnpm exec vite --port <port> --strictPort` */
+  /** dev サーバーを起動するコマンド。既定は `vite --port <port> --strictPort`（node_modules/.bin の vite を使う） */
   command?: string;
   overrides?: PlaywrightTestConfig;
 }

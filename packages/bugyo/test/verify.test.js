@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { loadConfig } from '../src/config.js';
+import { loadConfig, taskCommands } from '../src/config.js';
 import { featureMapChecks } from '../src/feature-map-checks.js';
 import { loadFeatures } from '../src/feature-map.js';
 
@@ -66,11 +66,32 @@ test('設定がなければ playwright 方式と今までの場所になる', ()
   const cwd = plainProject();
   rmSync(join(cwd, '.bugyo'), { recursive: true });
   assert.deepEqual(loadConfig(cwd), {
+    packageManager: 'pnpm',
     verify: { runner: 'playwright' },
     featureMap: { specDir: 'e2e', specSuffix: '.spec.ts', featuresDir: 'src/features' },
     evidence: { tree: ['src', 'e2e'] },
     gate: { window: 20, maxRework: 2, minFirstPass: 16, maxDropped: 2 },
   });
+});
+
+test('パッケージマネージャーは packageManager、lockfile の順に決まり、commands の既定がそれに合う', () => {
+  const cwd = plainProject();
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ verify: { runner: 'command', command: 'node {spec}' } }));
+  const pkgPath = join(cwd, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+
+  writeFileSync(join(cwd, 'package-lock.json'), '{}');
+  assert.equal(loadConfig(cwd).packageManager, 'npm');
+  assert.deepEqual(taskCommands(loadConfig(cwd)), { check: 'npm run check', test: 'npm test', verify: 'bugyo verify {feature}' });
+
+  writeFileSync(pkgPath, JSON.stringify({ ...pkg, packageManager: 'yarn@4.5.0' }));
+  assert.equal(loadConfig(cwd).packageManager, 'yarn');
+
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ packageManager: 'bun', verify: { runner: 'command', command: 'node {spec}' } }));
+  assert.equal(taskCommands(loadConfig(cwd)).check, 'bun run check');
+
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ packageManager: 'deno' }));
+  assert.throws(() => loadConfig(cwd), /config\.json が不正です/);
 });
 
 test('runner が command なのにコマンドがない設定は断る', () => {

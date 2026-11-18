@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import { types } from './tasks.js';
 
@@ -54,16 +54,63 @@ const Gate = z
   })
   .strict();
 
-/** `.bugyo/config.json` に `commands` がないときだけ使う。あるときは書かれたものだけを使う */
-export const defaultCommands = Object.freeze({
-  check: 'pnpm check',
-  test: 'pnpm test',
-  verify: 'bugyo verify {feature}',
+export const packageManagers = /** @type {const} */ (['pnpm', 'npm', 'yarn', 'bun']);
+
+/** パッケージマネージャーごとの、`commands` がないときの既定。あるときは書かれたものだけを使う */
+const defaultCommandsBy = Object.freeze({
+  pnpm: { check: 'pnpm check', test: 'pnpm test', verify: 'bugyo verify {feature}' },
+  npm: { check: 'npm run check', test: 'npm test', verify: 'bugyo verify {feature}' },
+  yarn: { check: 'yarn run check', test: 'yarn test', verify: 'bugyo verify {feature}' },
+  bun: { check: 'bun run check', test: 'bun run test', verify: 'bugyo verify {feature}' },
 });
+
+/** pnpm のときの既定 */
+export const defaultCommands = defaultCommandsBy.pnpm;
+
+/** @type {readonly (readonly [string, typeof packageManagers[number]])[]} */
+const lockfiles = [
+  ['pnpm-lock.yaml', 'pnpm'],
+  ['package-lock.json', 'npm'],
+  ['yarn.lock', 'yarn'],
+  ['bun.lock', 'bun'],
+  ['bun.lockb', 'bun'],
+];
+
+/** @param {string} pkgPath */
+function packageManagerField(pkgPath) {
+  try {
+    const field = JSON.parse(readFileSync(pkgPath, 'utf8')).packageManager;
+    const name = typeof field === 'string' ? field.split('@')[0] : undefined;
+    return packageManagers.find((candidate) => candidate === name);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * プロジェクトのパッケージマネージャーを決める。cwd から上へ、package.json の packageManager と lockfile を探す。
+ * .git のあるフォルダより上は見ない。見つからなければ pnpm。
+ *
+ * @param {string} cwd
+ * @returns {typeof packageManagers[number]}
+ */
+export function detectPackageManager(cwd) {
+  let dir = cwd;
+  for (;;) {
+    const fromField = existsSync(join(dir, 'package.json')) ? packageManagerField(join(dir, 'package.json')) : undefined;
+    if (fromField !== undefined) return fromField;
+    const lock = lockfiles.find(([file]) => existsSync(join(dir, file)));
+    if (lock !== undefined) return lock[1];
+    const parent = dirname(dir);
+    if (existsSync(join(dir, '.git')) || parent === dir) return 'pnpm';
+    dir = parent;
+  }
+}
 
 const Config = z
   .object({
     template: z.string().min(1).optional(),
+    packageManager: z.enum(packageManagers).optional(),
     verify: Verify.prefault({}),
     featureMap: FeatureMap.prefault({}),
     commands: Commands.optional(),
@@ -93,7 +140,7 @@ export function loadConfig(cwd = process.cwd()) {
   if (parsed.data.verify.runner === 'command' && !parsed.data.verify.command?.trim()) {
     throw new Error(`${configFile}: verify.runner が "command" のときは verify.command にコマンドを書いてください（{id} と {spec} が置き換わります）`);
   }
-  return parsed.data;
+  return { ...parsed.data, packageManager: parsed.data.packageManager ?? detectPackageManager(cwd) };
 }
 
 /**
@@ -103,7 +150,7 @@ export function loadConfig(cwd = process.cwd()) {
  * @returns {{ check?: string, test?: string, verify?: string }}
  */
 export function taskCommands(config) {
-  const source = config.commands ?? defaultCommands;
+  const source = config.commands ?? defaultCommandsBy[config.packageManager ?? 'pnpm'];
   return Object.fromEntries(
     Object.entries(source).filter(([, command]) => typeof command === 'string' && command.trim() !== ''),
   );
