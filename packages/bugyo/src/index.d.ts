@@ -25,6 +25,8 @@ export interface BugyoConfig {
   template?: string | undefined;
   /** パッケージマネージャー。書かなければ package.json の packageManager か lockfile から決める（見つからなければ pnpm）。commands の既定を選ぶ */
   packageManager: 'pnpm' | 'npm' | 'yarn' | 'bun';
+  /** @bugyo/lint の禁止のメッセージの言語。書かなければ `ja`（環境変数 `BUGYO_LOCALE` のほうが先） */
+  locale?: 'ja' | 'en';
   verify: {
     /**
      * 既定の確かめ方の名前。`playwright`（既定）は JSON レポートから spec ごとの合否を読む。`command` は spec ごとに command を1回ずつ実行する。
