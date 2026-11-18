@@ -314,6 +314,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 
 - エラー文に `effectHooksDir` などの場所を入れたいときは、`build(context)` で `name` 以外の項目を返します（`defineBan({ name, allow, build: (context) => ({ globals: [...] }) })`）。`context` には `src`・`effectHooksDir`・`apiClientDir`・`layers`・`featuresLabel` が入っています（`effectHooksDir` と `apiClientDir` は、場所がいくつもあれば `・` でつないだ文字列。`layers.shared` の各値は配列）
 - 禁止したものの「正しい入口」は、`allow` に書いた場所に作ります（例: `Date.now` を禁止し、`shared/lib/clock.ts` だけで使う）
+- `message` を書いた項目は、エラー文の頭に禁止の名前が付きます（`[bugyo:clock] shared/lib の systemClock を使ってください`）。`bugyo doctor` と `bugyo baseline` は、この名前までで禁止を数えるので、後ろの説明の文を書き換えても件数は変わりません
 - 知らない項目、何も止めていない禁止、同じ名前の禁止は断ります
 - `no-restricted-imports` などを自分の設定ブロックで直接書くと、合成した bugyo の禁止が上書きされて消えます。必ず `defineBan` で足します
 
@@ -397,6 +398,7 @@ spec: e2e/todos.spec.ts
 - `spec` は、その機能を確かめるファイルへの、プロジェクトのルートからの相対パスです（`/` 区切り。`..` と絶対パスは使えません）。形は問わず、実在だけを確かめます
 - `route` は任意です。画面のある機能で、辿り着く URL のパスを `/` から書きます
 - 4つの見出しは必須です。「よく嘘をつくところ」には、見た目は通るのに壊れていることが起きやすい点を書きます
+- 見出しは英語でも書けます（`## What is there`・`## How to reach it`・`## How to check it`・`## Where it lies`）。見出しごとに日本語と英語を混ぜてもかまいません。雛形のままかどうかは、`（…）` だけの項目と `：` で終わる項目で見ます。英語の見出しの下では、`(…)` だけの項目と `:` で終わる項目も雛形のままとして扱います
 - `docs/features/README.md` に、全体を確かめるときの順番を `[id](id.md)` の形で並べます
 
 対応漏れはテストで落とします。

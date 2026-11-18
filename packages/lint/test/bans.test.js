@@ -29,11 +29,28 @@ async function rulesFor(config, file) {
 }
 
 /** @param {unknown} rule */
-const importMessages = (rule) => {
+const taggedImportMessages = (rule) => {
   if (!Array.isArray(rule) || rule[0] === 0) return [];
   const [, option] = rule;
-  return [...option.paths, ...option.patterns].map((entry) => entry.message);
+  return [...option.paths, ...option.patterns].map((entry) => String(entry.message));
 };
+
+/** メッセージの頭の禁止の名前（`[bugyo:<名前>]`）を除いたもの @param {unknown} rule */
+const importMessages = (rule) => taggedImportMessages(rule).map((message) => message.replace(/^\[bugyo:[a-z0-9-]+\] /, ''));
+
+test('禁止のメッセージの頭には、禁止の名前が付く（メッセージのない項目には付けない）', async () => {
+  const bare = defineBan({ name: 'no-left-pad', imports: { paths: [{ name: 'left-pad' }] }, globals: ['escape'] });
+  const config = bugyo({ root, explicitExtensions: true, parts: [common, structure, noLodash, bare] });
+  const rules = await rulesFor(config, 'src/features/calc/model/add.ts');
+  const messages = taggedImportMessages(rules['no-restricted-imports']);
+  assert.ok(messages.includes('[bugyo:no-lodash] lodash は使いません。'), messages.join('\n'));
+  assert.ok(messages.some((message) => message.startsWith('[bugyo:model-layers] ')), messages.join('\n'));
+  const leftPad = rules['no-restricted-imports'][1].paths.find((/** @type {{ name: string }} */ entry) => entry.name === 'left-pad');
+  assert.deepEqual(leftPad, { name: 'left-pad' }, 'メッセージのない項目は ESLint の既定のメッセージのまま');
+  assert.ok(rules['no-restricted-globals'].includes('escape'));
+  const zones = rules['import-x/no-restricted-paths'][1].zones.map((/** @type {{ message: string }} */ zone) => zone.message);
+  assert.ok(zones.length > 0 && zones.every((/** @type {string} */ message) => /^\[bugyo:[a-z-]+\] /.test(message)), zones.join('\n'));
+});
 
 test('defineBan: 独自の禁止は bugyo の禁止と同じ場所の決まりで当たる', async () => {
   const config = bugyo({ root, explicitExtensions: true, parts: [common, structure, noDateNow, noConsoleInApi] });

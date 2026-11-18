@@ -17,6 +17,8 @@ export interface Feature {
 
 export const featureDir: string;
 export const requiredSections: readonly string[];
+/** feature map の4つの見出し。日本語（ja）と英語（en）のどちらで書いてもよい */
+export const sectionHeadings: readonly { readonly ja: string; readonly en: string }[];
 export function loadFeatures(cwd?: string): Feature[];
 export function loadSweepOrder(cwd?: string): string[];
 
