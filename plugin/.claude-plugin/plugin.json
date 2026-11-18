@@ -1,7 +1,7 @@
 {
   "name": "bugyo",
   "version": "0.1.0",
-  "description": "エージェント開発の土台（bugyo）で作業するためのスキル集。作業の種類に合う進め方を選び、ミスをlintに変え、証拠つきで完了させる。",
+  "description": "エージェント開発の土台（bugyo）で作業するためのスキル集とフック。作業の種類に合う進め方を選び、ミスをlintに変え、証拠つきで完了させる。完了の判定を決めるファイルの直接の書き換えを断る。",
   "author": { "name": "bugyo" },
   "license": "MIT",
   "keywords": ["agents", "lint", "verification", "feature-map", "react", "typescript"]
