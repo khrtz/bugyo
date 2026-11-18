@@ -71,7 +71,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 
 | コマンド | 使う人 | すること |
 | --- | --- | --- |
-| `bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]` | 人・エージェント | タスクを作る。`--feature` が feature map になければ断る。`feature` `ui-flow` `ui-look` `logic` では `--feature` が必須。存在しない `--blocked-by` も断る。`--issue` は英数字と `# . _ : / -` だけ |
+| `bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]` | 人・エージェント | タスクを作る。`--feature` が feature map になければ断る。`feature` `ui-flow` `ui-look` `logic` では `--feature` が必須。存在しない `--blocked-by` も断る。`--issue` は英数字で始め、英数字と `# . _ : / -` だけ（先頭の `#` はシェルでコメントになるので、`#123` ではなく `123`） |
 | `bugyo task ready` | エージェント | 未着手で、`blocked-by` がすべて `done` のタスクを、作った順に出す |
 | `bugyo task start <id> --as <名前>` | エージェント | 作業中にする。すでに誰かが作業中なら断る。同じ名前で別のタスクが作業中のときも、`blocked-by` が終わっていないときも断る |
 | `bugyo task show <id>` | エージェント | 本文、読むべき feature map、完了に必要なものを出す |
@@ -162,15 +162,29 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 { "notify": { "verified": "gh issue comment {issue} --body \"{task} の証拠を CI で取り直して確かめました（{evidence}）\"" } }
 ```
 
+PR のたびに `--notify` を付けると、push するたびに同じ課題へ知らせてしまいます。知らせるのは main に入ったときの1回にします。
+
 ```yaml
+on:
+  push:
+    branches: [main]
 permissions:
   contents: read
   issues: write
-# …
-- run: npx bugyo task recheck --base "origin/${{ github.base_ref }}" --notify
-  env:
-    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - run: npm ci
+      - run: npx bugyo task recheck --base HEAD^ --notify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+`--base HEAD^` で、main に入ったコミット（マージかスカッシュ）で閉じたタスクだけを照合します。
 
 - コマンドはシェルで実行します。`{issue}`・`{task}`・`{evidence}`（証拠ファイルの場所）が置き換わり、同じ値とタスクのタイトルが環境変数 `BUGYO_ISSUE`・`BUGYO_TASK`・`BUGYO_EVIDENCE`・`BUGYO_TITLE` にも入ります。タイトルはコマンドに埋め込まないので、環境変数から読みます
 - 知らせるのは照合に通ったタスクだけです。コマンドが失敗しても警告を出すだけで、`recheck` の合否は変わりません

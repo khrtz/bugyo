@@ -13,8 +13,11 @@ export const types = /** @type {const} */ (['feature', 'ui-flow', 'ui-look', 'lo
 export const typesNeedingFeature = new Set(['feature', 'ui-flow', 'ui-look', 'logic']);
 
 const idPattern = /^t-\d{3,}$/;
-/** 課題の参照（`123`、`#123`、`PROJ-45`、URL）。通知のコマンドにそのまま埋め込むので、シェルで意味を持つ文字は使えない */
-export const issuePattern = /^[A-Za-z0-9#._:/-]+$/;
+/**
+ * 課題の参照（`123`、`PROJ-45`、URL）。通知のコマンドにそのまま埋め込むので、シェルで意味を持つ文字は使えない。
+ * 先頭は英数字に限る（先頭の `#` はシェルでコメントに、`-` はオプションになるため）
+ */
+export const issuePattern = /^[A-Za-z0-9][A-Za-z0-9#._:/-]*$/;
 const count = z
   .string()
   .regex(/^\d+$/, '0 以上の整数にしてください')
@@ -26,7 +29,7 @@ const Fields = z
     status: z.enum(statuses),
     type: z.enum(types),
     feature: z.string().default(''),
-    issue: z.string().regex(issuePattern, '英数字と # . _ : / - だけにしてください').optional(),
+    issue: z.string().regex(issuePattern, '英数字で始め、英数字と # . _ : / - だけにしてください').optional(),
     'blocked-by': z
       .string()
       .default('')

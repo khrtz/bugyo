@@ -129,7 +129,7 @@ function add(args, cwd) {
     if (!isTaskId(id) || !tasks.some((task) => task.id === id)) throw new Error(`blocked-by の ${id} というタスクはありません`);
   }
   const issue = values.issue?.trim() || undefined;
-  if (issue !== undefined && !issuePattern.test(issue)) throw new UsageError('--issue は英数字と # . _ : / - だけにしてください（例: 123、PROJ-45、課題の URL）');
+  if (issue !== undefined && !issuePattern.test(issue)) throw new UsageError('--issue は英数字で始め、英数字と # . _ : / - だけにしてください（例: 123、PROJ-45、課題の URL）');
   const claims = openClaims(cwd, loadConfig(cwd).claims.remote);
   const id = claims === undefined ? nextTaskId(tasks) : reserveId(claims, Number(nextTaskId(tasks).slice(2)) - 1);
   const description = values.body?.trim() || '（何が起きているか、どうなれば終わりか）';

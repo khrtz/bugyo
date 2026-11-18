@@ -79,7 +79,7 @@ export function duplicateIdsAgainst(cwd, base) {
  * @typedef {{ id: string, ok: boolean, reason: string, output: string }} RecheckResult
  */
 
-const safeValue = /^[A-Za-z0-9#._:/-]+$/;
+const safeValue = /^[A-Za-z0-9.][A-Za-z0-9#._:/-]*$/;
 
 /**
  * 証拠を取り直して通ったタスクを、課題に知らせる。`notify.verified` のコマンドの `{issue}`・`{task}`・`{evidence}` を置き換えてシェルで実行する。

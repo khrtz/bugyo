@@ -2,7 +2,19 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { commonDir, layerDirs, loadConfig } from './config.js';
-import { baselineFile, baselineGrowth, banCounts, compareCounts, depcruiseConfig, filesOutsideLayers, readBaseline, saveBaseline, tscErrors } from './doctor.js';
+import {
+  baselineFile,
+  baselineGrowth,
+  banCounts,
+  compareCounts,
+  depcruiseConfig,
+  depcruiseKnownFile,
+  eslintSuppressionsFile,
+  filesOutsideLayers,
+  readBaseline,
+  saveBaseline,
+  tscErrors,
+} from './doctor.js';
 import { UsageError } from './task-cli.js';
 
 export const doctorUsage = `  bugyo doctor [--dirs <a,b>] [--tsconfig <path>]  何も変えずに、禁止ごとの違反の件数と、どの層にも入っていないファイルを出す（入れる前の見積もり）
@@ -89,6 +101,11 @@ export function baselineCommand(args, cwd = process.cwd()) {
     case 'check': {
       const baseline = readBaseline(cwd);
       if (baseline === undefined) {
+        const orphans = [eslintSuppressionsFile, depcruiseKnownFile].filter((file) => existsSync(join(cwd, file)));
+        if (orphans.length > 0) {
+          console.error(`error ${orphans.join(' と ')} があるのに ${baselineFile} がありません。抑制した違反の入れ替えを見つけられないので、bugyo baseline save で作り直してください`);
+          return 1;
+        }
         console.log(`baseline: ${baselineFile} がないので、確かめるものはありません`);
         return 0;
       }

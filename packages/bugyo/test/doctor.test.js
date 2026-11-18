@@ -139,6 +139,16 @@ test('baseline check はベースラインがなければ何もしない', () =>
   assert.match(run.all, /がないので/);
 });
 
+test('baseline check は、抑制ファイルだけを残して .bugyo/baseline.json を消すと落ちる', () => {
+  const cwd = project();
+  setResults(cwd, { 'a.ts': [useEffect] });
+  assert.equal(bugyo(cwd, 'baseline', 'save').status, 0);
+  rmSync(join(cwd, '.bugyo'), { recursive: true });
+  const run = bugyo(cwd, 'baseline', 'check');
+  assert.equal(run.status, 1);
+  assert.match(run.all, /eslint-suppressions\.json があるのに \.bugyo\/baseline\.json がありません/);
+});
+
 const layers = { app: 'web/pages', features: 'web/features', shared: { ui: 'web/app/ui', api: 'web/app/api', lib: 'web/app/lib' } };
 
 /** @param {string} cwd */

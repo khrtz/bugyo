@@ -432,7 +432,10 @@ test('issue: add --issue で課題の参照を残し、シェルで意味を持�
   assert.equal(added.issue, 'PROJ-45');
   assert.match(readFileSync(taskFile(cwd, 't-001'), 'utf8'), /^issue: PROJ-45$/m);
   assert.match(ok(cwd, 'task', 'ls').stdout, /課題: PROJ-45/);
-  assert.equal(bugyo(cwd, 'task', 'add', 'x', '--type', 'chore', '--issue', '1; rm -rf ~').status, 2);
+  for (const issue of ['1; rm -rf ~', '#12', '-x', '$(id)']) {
+    assert.equal(bugyo(cwd, 'task', 'add', 'x', '--type', 'chore', '--issue', issue).status, 2, issue);
+  }
+  ok(cwd, 'task', 'add', 'x', '--type', 'chore', '--issue', 'https://example.com/a/issues/12#top');
 });
 
 test('recheck --notify: 通った課題つきのタスクだけを知らせ、done では知らせず、知らせられなくても合否は変えない', () => {

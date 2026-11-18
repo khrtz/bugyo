@@ -167,6 +167,7 @@ ESLint の抑制はファイルとルールごとの件数なので、同じフ�
 
 - 増えたとき: 新しい違反です。ベースラインに足さずに直します
 - 減ったとき: 直した違反がベースラインに残っています。`bugyo baseline save` で縮めて、一緒にコミットします
+- `eslint-suppressions.json` か `.dependency-cruiser-known-violations.json` があるのに `.bugyo/baseline.json` がないとき: 入れ替えを見つけられないので落ちます
 
 ### 4. CI でベースラインが増えていないか確かめる
 
