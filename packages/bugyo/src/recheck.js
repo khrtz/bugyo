@@ -25,6 +25,56 @@ export function changedArchiveIds(cwd, base) {
 }
 
 /**
+ * @param {string} cwd
+ * @param {string[]} args
+ */
+function gitOut(cwd, args) {
+  const run = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (run.status !== 0) throw new Error(`git ${args.join(' ')} が失敗しました: ${(run.stderr ?? '').trim()}`);
+  return run.stdout;
+}
+
+/** @param {string} path */
+const idOf = (path) => path.split('/').pop()?.replace(/\.md$/, '') ?? '';
+
+/** @param {string} text */
+const createdOf = (text) => /^created: ?(.*)$/m.exec(text)?.[1]?.trim() ?? '';
+
+/**
+ * `base...HEAD` で新しく足したタスクのうち、`base` にすでに同じ id の別のタスク（作った日時が違うもの）があるものを返す。
+ * 別々のブランチで同じ id を振ったとき、マージする前に見つけるため。
+ *
+ * @param {string} cwd
+ * @param {string} base
+ * @returns {string[]}
+ */
+export function duplicateIdsAgainst(cwd, base) {
+  const tasksRoot = archiveDir.replace(/\/archive$/, '');
+  const added = gitOut(cwd, ['diff', '--name-only', '--relative', '--diff-filter=A', `${base}...HEAD`, '--', tasksRoot])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.endsWith('.md'));
+  const existing = new Map(
+    gitOut(cwd, ['ls-tree', '-r', '--name-only', base, '--', tasksRoot])
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.endsWith('.md'))
+      .map((line) => [idOf(line), line]),
+  );
+  /** @type {string[]} */
+  const errors = [];
+  for (const file of added) {
+    const id = idOf(file);
+    const before = existing.get(id);
+    if (before === undefined) continue;
+    const ours = createdOf(gitOut(cwd, ['show', `HEAD:./${file}`]));
+    const theirs = createdOf(gitOut(cwd, ['show', `${base}:./${before}`]));
+    if (ours !== theirs) errors.push(`${file}: ${id} は ${base} の ${before} と同じ id の別のタスクです（作った日時 ${ours} / ${theirs}）。id を振り直してください`);
+  }
+  return errors;
+}
+
+/**
  * @typedef {{ id: string, ok: boolean, reason: string, output: string }} RecheckResult
  */
 

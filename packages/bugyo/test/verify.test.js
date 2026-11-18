@@ -71,6 +71,7 @@ test('設定がなければ playwright 方式と今までの場所になる', ()
     featureMap: { specDir: 'e2e', specSuffix: '.spec.ts', featuresDir: 'src/features' },
     evidence: { tree: ['src', 'e2e'] },
     gate: { window: 20, maxRework: 2, minFirstPass: 16, maxDropped: 2 },
+    claims: {},
   });
 });
 

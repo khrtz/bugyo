@@ -56,6 +56,10 @@ export interface BugyoConfig {
      */
     scopes?: Record<string, { types: string[]; window?: number; maxRework?: number; minFirstPass?: number; maxDropped?: number }> | undefined;
   };
+  claims: {
+    /** id の予約と着手の記録（git の ref）を共有するリモート。書かなければ、同じマシンの worktree の間だけで共有する */
+    remote?: string | undefined;
+  };
 }
 
 export const configFile: string;

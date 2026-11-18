@@ -116,6 +116,10 @@ const Config = z
     commands: Commands.optional(),
     evidence: Evidence.prefault({}),
     gate: Gate.prefault({}),
+    claims: z
+      .object({ remote: z.string().min(1).optional() })
+      .strict()
+      .prefault({}),
   })
   .strict();
 

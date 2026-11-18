@@ -127,6 +127,10 @@ jobs:
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: pnpm recheck --base "origin/${{ github.base_ref }}"
 
+      - name: ベースのブランチと同じ id を振ったタスクがないか確かめる
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: pnpm --filter todo-app --filter node-lib exec bugyo task lint --base "origin/${{ github.base_ref }}"
+
       - name: Linuxの基準画像を作り直す
         if: ${{ inputs.update_snapshots }}
         working-directory: examples/todo-app

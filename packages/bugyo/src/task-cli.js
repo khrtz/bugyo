@@ -6,7 +6,8 @@ import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
 import { evaluateGate } from './gate.js';
 import { isMistakeKind, loadMistakes, mistakeLine, mistakeState, recordMistake, recordRule, sortMistakes } from './mistakes.js';
-import { changedArchiveIds, recheckTask } from './recheck.js';
+import { claimTask, fetchClaims, listRecords, openClaims, reassignClaim, readRecord, releaseClaim, reserveId } from './claims.js';
+import { changedArchiveIds, duplicateIdsAgainst, recheckTask } from './recheck.js';
 import { commandExists, ranNoTests, runCommand, tail } from './run.js';
 import { lintTasks } from './task-lint.js';
 import {
@@ -34,7 +35,8 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo task rework <id> -r "<理由>" --kind <ミスの種類> [--as <名前>]
   bugyo task drop <id> -r "<理由>"
   bugyo task ls [--all]                  一覧（--all で完了・中止も）
-  bugyo task lint                        台帳の整合を検査する
+  bugyo task release <id>                人: 止まったエージェントの着手の記録を消す
+  bugyo task lint [--base <ref>]         台帳の整合を検査する（--base なら、<ref> にすでにある id と重なるタスクも見つける）
   bugyo task recheck [<id>...] [--base <ref>]  完了タスクの証拠を取り直して照合する（CI 用。--base なら <ref>...HEAD で閉じたタスク）
   bugyo mistake ls                       ミスの種類ごとの回数とルール
   bugyo mistake rule <種類> --at <パス>  ルールに変えたことを記録する
@@ -122,7 +124,8 @@ function add(args, cwd) {
   for (const id of blockedBy) {
     if (!isTaskId(id) || !tasks.some((task) => task.id === id)) throw new Error(`blocked-by の ${id} というタスクはありません`);
   }
-  const id = nextTaskId(tasks);
+  const claims = openClaims(cwd, loadConfig(cwd).claims.remote);
+  const id = claims === undefined ? nextTaskId(tasks) : reserveId(claims, Number(nextTaskId(tasks).slice(2)) - 1);
   const description = values.body?.trim() || '（何が起きているか、どうなれば終わりか）';
   const task = saveTask(cwd, {
     id,
@@ -150,7 +153,10 @@ function add(args, cwd) {
 function ready(args, cwd) {
   const { values } = parse(args);
   const tasks = loadTasks(cwd);
-  const candidates = tasks.filter((task) => task.status === 'open' && openBlockers(task, tasks).length === 0);
+  const claims = openClaims(cwd, loadConfig(cwd).claims.remote);
+  if (claims !== undefined) fetchClaims(claims);
+  const claimed = new Set(claims === undefined ? [] : listRecords(claims, 'claims'));
+  const candidates = tasks.filter((task) => task.status === 'open' && !claimed.has(task.id) && openBlockers(task, tasks).length === 0);
   print(values.json, candidates.length === 0 ? ['着手できるタスクはありません'] : candidates.map(taskLine), candidates.map(taskJson));
   return 0;
 }
@@ -172,6 +178,14 @@ function start(args, cwd) {
   const busy = tasks.find((other) => other.status === 'active' && other.assignee === assignee);
   if (busy !== undefined) throw new Error(`${assignee} はすでに ${busy.id} を作業中です。1人1件にしてください`);
   const config = loadConfig(cwd);
+  const claims = openClaims(cwd, config.claims.remote);
+  if (claims !== undefined) {
+    const claim = claimTask(claims, id, assignee);
+    if (!claim.ok) {
+      const where = claim.holder.branch === '' ? '' : `（ブランチ ${claim.holder.branch}）`;
+      throw new Error(`${id} はすでに ${claim.holder.assignee ?? '誰か'} が作業中です${where}。止まっているなら、人が bugyo task release ${id} で記録を消してください`);
+    }
+  }
   const started = saveTask(cwd, { ...task, status: 'active', assignee, 'tests-hash': testsHash(cwd, config.evidence.tree) });
   print(values.json, [taskLine(started)], taskJson(started));
   return 0;
@@ -308,6 +322,8 @@ function rework(args, cwd) {
   if (busy !== undefined) {
     throw new Error(`${assignee} はいま ${busy.id} を作業中です。1人1件なので、--as <名前> で手直しする担当を指定してください`);
   }
+  const claims = openClaims(cwd, loadConfig(cwd).claims.remote);
+  if (claims !== undefined && assignee !== task.assignee) reassignClaim(claims, id, assignee);
   const day = today();
   const count = task.rework + 1;
   const body = `${task.body.trimEnd()}\n${task.body.includes('\n## 手直し\n') ? '' : '\n## 手直し\n\n'}- ${count}回目（${kind}、${day}）: ${reason}\n`;
@@ -342,7 +358,29 @@ function drop(args, cwd) {
   if (task.status === 'done') throw new Error(`${id} は完了しています。直すなら bugyo task rework を使ってください`);
   if (task.status === 'dropped') throw new Error(`${id} はすでにやめています`);
   const dropped = saveTask(cwd, { ...task, status: 'dropped', 'drop-reason': reason, 'dropped-at': now() });
+  const claims = openClaims(cwd, loadConfig(cwd).claims.remote);
+  if (claims !== undefined) releaseClaim(claims, id);
   print(values.json, [taskLine(dropped)], taskJson(dropped));
+  return 0;
+}
+
+/**
+ * 止まったエージェントの着手の記録を、人が消す。台帳のファイルは変えない。
+ *
+ * @param {string[]} args
+ * @param {string} cwd
+ */
+function release(args, cwd) {
+  const { values, positionals } = parse(args);
+  const id = required(positionals[0], '使い方: bugyo task release <id>');
+  const claims = openClaims(cwd, loadConfig(cwd).claims.remote);
+  if (claims === undefined) throw new Error('git のリポジトリではないので、着手の記録はありません');
+  if (claims.remote !== undefined) fetchClaims(claims);
+  const holder = readRecord(claims, 'claims', id);
+  if (holder === undefined) throw new Error(`${id} の着手の記録はありません`);
+  releaseClaim(claims, id);
+  const line = `${id} の着手の記録を消しました（${holder.assignee ?? '担当なし'}${holder.branch === '' ? '' : `、ブランチ ${holder.branch}`}）`;
+  print(values.json, [line], { id, released: true, assignee: holder.assignee, branch: holder.branch });
   return 0;
 }
 
@@ -366,6 +404,7 @@ function ls(args, cwd) {
 function lint(args, cwd) {
   const { values } = parse(args);
   const { count, errors, warnings } = lintTasks(cwd);
+  if (values.base !== undefined) errors.push(...duplicateIdsAgainst(cwd, values.base));
   const summary = `task lint: タスク ${count}件、エラー ${errors.length}件、警告 ${warnings.length}件`;
   if (values.json) console.log(JSON.stringify({ ok: errors.length === 0, count, errors, warnings }));
   else {
@@ -425,8 +464,10 @@ export function taskCommand(args, cwd = process.cwd()) {
       return lint(rest, cwd);
     case 'recheck':
       return recheck(rest, cwd);
+    case 'release':
+      return release(rest, cwd);
     default:
-      throw new UsageError(`bugyo task のサブコマンドは add / ready / start / show / repro / done / rework / drop / ls / lint / recheck です`);
+      throw new UsageError(`bugyo task のサブコマンドは add / ready / start / show / repro / done / rework / drop / release / ls / lint / recheck です`);
   }
 }
 

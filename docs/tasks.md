@@ -16,6 +16,14 @@
 
 タスクは `.bugyo/tasks/<id>.md` に1件1ファイルで置きます。複数のエージェントが同時に別のタスクを更新しても衝突せず、人もエディタでそのまま読めます。id は `t-001` から順に CLI が振ります。
 
+タスクごとに worktree を切って並行で動かしても、id と着手がぶつからないようにしています。
+
+- git のリポジトリの中では、`add` が id を、`start` が着手を、git の ref（`refs/bugyo/<プロジェクトのパス>/ids/<id>` と `.../claims/<id>`）に「まだ無いときだけ作る」形で記録します。同じリポジトリの worktree は ref を共有するので、2つの worktree で同時に `add` しても別々の id になり、別の worktree で着手したタスクは `start` が断り、`ready` にも出ません
+- 別のマシン（別のクローン）とも共有するときは、`.bugyo/config.json` の `claims.remote` にリモートの名前を書きます。予約と着手の前にリモートの ref を取ってきて、作ったあとに push します
+- 着手の記録は、`drop` で消え、`rework --as` で担当が書き換わります。止まったエージェントの記録は、人が `bugyo task release <id>` で消します
+- 力ずくの push で ref が上書きされたときの最後の網として、CI で `bugyo task lint --base <ref>` を実行し、ベースのブランチにすでにある id と同じ id の別のタスクを、マージする前に落とします
+- git のリポジトリでなければ、手元のファイルだけで決めます（今までどおり）
+
 ```md
 ---
 status: active
@@ -69,9 +77,10 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `bugyo task repro <id> [--expect "<文言>"] -- <テストコマンド>` | エージェント | `bugfix` 用。直す前にそのコマンドが失敗することを確かめ、終了コード・出力の末尾・テストファイルのハッシュを記録する。今通るコマンド、最初のコマンドが見つからないもの（終了コード 127 / 9009 も）、テストを1件も実行していないもの、`--expect` の文言が出力にないものは断る |
 | `bugyo task done <id>` | エージェント | 証拠を取り、通れば閉じる。通らなければ理由を出して作業中のままにする |
 | `bugyo task rework <id> -r "<理由>" --kind <ミスの種類> [--as <名前>]` | 人 | 完了したタスクを作業中に戻し、手直しとミスの種類を記録する。担当は元の担当のままで、その人が別のタスクを作業中なら断るので、`--as` で別の担当を指定する |
-| `bugyo task drop <id> -r "<理由>"` | 人 | やめる。完了したタスクはやめられない |
+| `bugyo task drop <id> -r "<理由>"` | 人 | やめる。完了したタスクはやめられない。着手の記録も消す |
+| `bugyo task release <id>` | 人 | 止まったエージェントの着手の記録を消す。台帳のファイルは変えない |
 | `bugyo task ls [--all]` | 人 | 一覧。`--all` で完了とやめたものも出す |
-| `bugyo task lint` | `pnpm check` | 台帳の整合を検査する |
+| `bugyo task lint [--base <ref>]` | `pnpm check`・CI | 台帳の整合を検査する。`--base` なら、`<ref>...HEAD` で足したタスクのうち、`<ref>` にすでにある id の別のタスク（作った日時が違うもの）も見つける |
 | `bugyo task recheck [<id>...] [--base <ref>]` | CI | 完了タスクの証拠を取り直して照合する。`--base` なら `<ref>...HEAD` で `archive/` に追加・変更されたタスクが対象。証拠ファイルは書き換えない |
 | `bugyo mistake ls` / `rule <種類> --at <パス>` | 人・エージェント | ミスの一覧と、ルール化したことの記録 |
 | `bugyo gate` | 人 | 任せる範囲を広げてよいかを計算する。合格で 0、不合格で 1 |
@@ -165,6 +174,7 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 | `gate.minFirstPass` | `16` | そのうち1回の `done` で閉じたタスクの下限 |
 | `gate.maxDropped` | `2` | そのうち中止したタスクの上限 |
 | `gate.scopes` | 下の3つ | 作業の種類のまとまりごとの判定。`{ "<名前>": { "types": [...], "window"?: …, "maxRework"?: …, "minFirstPass"?: …, "maxDropped"?: … } }`。しきい値を省いたまとまりは上の値を使う |
+| `claims.remote` | なし | id の予約と着手の記録を共有するリモートの名前（例: `origin`）。書かなければ、同じマシンの worktree の間だけで共有する |
 
 - 既定値を使うのは、`commands` のキーそのものがないときだけです。`commands` があれば書かれたものだけを使い、そのタスクの種類に必要なコマンドが未定義か空なら `done` は断ります
 - **`.bugyo/config.json` を変えるのは人だけです。** コマンドを変えれば `done` の判定も変わるからです。エージェントはこのファイルを書き換えません。変えた跡が残るように、証拠ファイルには実行したコマンドの文字列（verify が中で実行したコマンドも）とハッシュを取ったパスをそのまま記録します
@@ -175,10 +185,11 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 
 | どこで止めるか | 止めるもの | 状態 |
 | --- | --- | --- |
-| CLI | `done` だけが証拠を取って書く。`start` は二重着手と1人2件を断る。`add` は feature map にない機能と存在しない `blocked-by` を断る。`done` は必要なコマンドが設定にないときに断る | 実装済み |
+| CLI | `done` だけが証拠を取って書く。`start` は二重着手（別の worktree・`claims.remote` を書いたときは別のクローンのものも）と1人2件を断る。`add` は別の worktree と同じ id を振らない。`add` は feature map にない機能と存在しない `blocked-by` を断る。`done` は必要なコマンドが設定にないときに断る | 実装済み |
 | `bugyo task lint`（`pnpm check` に入れる） | 手で `status: done` に書き換えたタスク（証拠ファイルがない、`archive/` にない、証拠と `evidence-tree`・`rework`・`gate-attempts` が合わない）、担当のいない `active`、1人が2件同時に `active`、存在しない `blocked-by`、feature map にない機能、読めない frontmatter、同じ id の重複。再発したミスは警告として出す | 実装済み |
 | CI（`bugyo task recheck --base`） | その PR で閉じたタスクのうち、取り直すと通らないもの、`evidence-tree` が今のコードと合わないもの、記録されたコマンドが今の設定と違うもの | 実装済み |
 | CI（`config guard`） | `.bugyo/config.json` を変えた PR で、ラベル `bugyo-config-approved` が付いていないもの | 実装済み |
+| CI（`bugyo task lint --base`） | ベースのブランチにすでにある id と同じ id の別のタスクを足した PR | 実装済み |
 | CI | タスクに紐づかない PR（ブランチ名 `task/<id>` で判定） | 未実装 |
 | Claude Code のフック | セッション開始時に `bugyo task ready` を見せる。`active` なタスクを残したまま終わろうとしたら知らせる | 未実装 |
 
