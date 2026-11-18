@@ -50,7 +50,8 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `created` | 作った日時 |
 | `tests-hash` | `start` のときのテストファイルのハッシュ。`refactor` の完了で比べる |
 | `repro` / `repro-at` | `bugfix` で、直す前に失敗したテストのコマンドと、その日時 |
-| `drop-reason` | やめた理由 |
+| `repro-status` / `repro-log` / `repro-tests-hash` / `repro-expect` | `repro` のときの終了コード、出力の末尾を書いたファイル（`.bugyo/evidence/<id>.repro.log`）、テストファイルのハッシュ、`--expect` の文言 |
+| `drop-reason` / `dropped-at` | やめた理由と、その日時 |
 | `evidence-file` / `evidence-tree` / `evidence-at` | 完了時に CLI だけが書く。証拠ファイルの場所、そのときのコードのハッシュ、閉じた日時 |
 
 完了したタスクとやめたタスクは `.bugyo/tasks/archive/` に移します。一覧もエージェントが読む量も増え続けません。
@@ -65,7 +66,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `bugyo task ready` | エージェント | 未着手で、`blocked-by` がすべて `done` のタスクを、作った順に出す |
 | `bugyo task start <id> --as <名前>` | エージェント | 作業中にする。すでに誰かが作業中なら断る。同じ名前で別のタスクが作業中のときも、`blocked-by` が終わっていないときも断る |
 | `bugyo task show <id>` | エージェント | 本文、読むべき feature map、完了に必要なものを出す |
-| `bugyo task repro <id> -- <テストコマンド>` | エージェント | `bugfix` 用。直す前にそのコマンドが失敗することを確かめて記録する。今通るコマンドは断る |
+| `bugyo task repro <id> [--expect "<文言>"] -- <テストコマンド>` | エージェント | `bugfix` 用。直す前にそのコマンドが失敗することを確かめ、終了コード・出力の末尾・テストファイルのハッシュを記録する。今通るコマンド、最初のコマンドが見つからないもの（終了コード 127 / 9009 も）、テストを1件も実行していないもの、`--expect` の文言が出力にないものは断る |
 | `bugyo task done <id>` | エージェント | 証拠を取り、通れば閉じる。通らなければ理由を出して作業中のままにする |
 | `bugyo task rework <id> -r "<理由>" --kind <ミスの種類> [--as <名前>]` | 人 | 完了したタスクを作業中に戻し、手直しとミスの種類を記録する。担当は元の担当のままで、その人が別のタスクを作業中なら断るので、`--as` で別の担当を指定する |
 | `bugyo task drop <id> -r "<理由>"` | 人 | やめる。完了したタスクはやめられない |
@@ -101,7 +102,7 @@ t-014 [active/bugfix] 絞り込みを切り替えると残り件数がずれる 
 | `ui-flow` | UI の操作 | check、test、verify |
 | `ui-look` | UI の見た目 | check、verify |
 | `logic` | `model/` のロジック | その機能の `model/` にテスト（`*.test.*`）があること、check、test |
-| `bugfix` | バグ修正 | `repro` の記録、同じコマンドが今は通ること、check、test |
+| `bugfix` | バグ修正 | `repro` の記録、同じコマンドが今は通ること、check、test。`repro` のあとにテストファイルが変わっていたら、閉じたうえで警告し、証拠の `warnings` に残す |
 | `refactor` | リファクタリング | テストファイルを `start` のときから変えていないこと、check、test |
 | `chore` | 設定・文書 | check のみ |
 
@@ -149,7 +150,7 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 {
   "commands": { "check": "pnpm check", "test": "pnpm test", "verify": "bugyo verify {feature}" },
   "evidence": { "tree": ["src", "e2e"] },
-  "gate": { "window": 20, "maxRework": 2, "minFirstPass": 16 }
+  "gate": { "window": 20, "maxRework": 2, "minFirstPass": 16, "maxDropped": 2 }
 }
 ```
 
@@ -157,9 +158,11 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 | --- | --- | --- |
 | `commands.check` / `test` / `verify` | `pnpm check` / `pnpm test` / `bugyo verify {feature}` | `done` が実行するコマンド。`{feature}` はタスクの機能、`{task}` はタスクの id に置き換わる。シェルで実行し、`node_modules/.bin` を `PATH` の先頭に足す |
 | `evidence.tree` | `["src", "e2e"]` | `evidence-tree` のハッシュを取るパス。テストファイルのハッシュもこの下で取る |
-| `gate.window` | `20` | 門番が見る、直近の完了タスクの件数 |
+| `gate.window` | `20` | 門番が見る、直近の閉じたタスク（完了と中止）の件数 |
 | `gate.maxRework` | `2` | そのうち手直しが要ったタスクの上限 |
 | `gate.minFirstPass` | `16` | そのうち1回の `done` で閉じたタスクの下限 |
+| `gate.maxDropped` | `2` | そのうち中止したタスクの上限 |
+| `gate.scopes` | 下の3つ | 作業の種類のまとまりごとの判定。`{ "<名前>": { "types": [...], "window"?: …, "maxRework"?: …, "minFirstPass"?: …, "maxDropped"?: … } }`。しきい値を省いたまとまりは上の値を使う |
 
 - 既定値を使うのは、`commands` のキーそのものがないときだけです。`commands` があれば書かれたものだけを使い、そのタスクの種類に必要なコマンドが未定義か空なら `done` は断ります
 - **`.bugyo/config.json` を変えるのは人だけです。** コマンドを変えれば `done` の判定も変わるからです。エージェントはこのファイルを書き換えません。変えた跡が残るように、証拠ファイルには実行したコマンドの文字列（verify が中で実行したコマンドも）とハッシュを取ったパスをそのまま記録します
@@ -204,15 +207,24 @@ rule:
 
 ## 門番（`bugyo gate`）
 
-エージェントに任せる範囲を広げてよいかを、直近の完了タスク（既定は20件。閉じた日時の新しい順）とミスの記録から計算します。4つの条件をすべて満たしたときだけ合格です。
+エージェントに任せる範囲を広げてよいかを、作業の種類のまとまりごとに、直近の閉じたタスク（完了と中止。既定は20件。閉じた日時の新しい順）とミスの記録から計算します。`chore` をいくら通しても、画面の作業を任せる判定には数えません。
+
+| まとまり（既定） | 種類 |
+| --- | --- |
+| `ui` | `feature`、`ui-flow`、`ui-look` |
+| `code` | `logic`、`bugfix`、`refactor` |
+| `chore` | `chore` |
+
+`bugyo gate --scope <まとまり>` でそのまとまりだけを判定し、`--scope` がなければすべてのまとまりが合格のときだけ合格です。まとまりごとに、次の5つの条件をすべて満たしたときだけ合格です。
 
 | 条件 | 計算 | 既定のしきい値 |
 | --- | --- | --- |
-| 完了タスクが足りている | 直近の完了タスクの件数 | 20件 |
+| 閉じたタスクが足りている | 直近の閉じたタスク（完了と中止）の件数 | 20件 |
+| 途中でやめていない | そのうち中止したタスクの件数 | 2件以下 |
 | 人の手直しがほとんど要らない | そのうち `rework` が1以上のタスクの件数 | 2件以下 |
 | check と verify が1回で通っている | そのうち `gate-attempts` が1のタスクの件数 | 16件以上 |
 | 同じ種類のミスが再発していない | 2回以上起きてまだルール化されていない種類と、ルール化のあとにまた起きた種類の数 | 0 |
 
-しきい値は `.bugyo/config.json` の `gate` で変えられます。完了タスクが足りない間は「件数不足」で不合格です。手直しされたタスクは、やり直しの `done` で `gate-attempts` が2以上になるので、「1回で通った」には数えません。
+しきい値は `.bugyo/config.json` の `gate` で変えられます。閉じたタスクが足りない間は「件数不足」で不合格です。通らなかったタスクを中止にしても、閉じたタスクに数えたうえで中止の件数が増えるので、実績はよく見えません。手直しされたタスクは、やり直しの `done` で `gate-attempts` が2以上になるので、「1回で通った」には数えません。
 
 複数の作業セッションの同時実行と自動マージ（[agents.md](agents.md)）は、この判定が合格でないと動かない設計です。土台が回る前に任せる範囲を広げると、質の低いコードが速く増えるだけだからです。

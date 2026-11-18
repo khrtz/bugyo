@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { types } from './tasks.js';
 
 export const configFile = '.bugyo/config.json';
 
@@ -33,11 +34,23 @@ const Evidence = z
   })
   .strict();
 
+const Scope = z
+  .object({
+    types: z.array(z.enum(types)).min(1),
+    window: z.int().positive().optional(),
+    maxRework: z.int().nonnegative().optional(),
+    minFirstPass: z.int().nonnegative().optional(),
+    maxDropped: z.int().nonnegative().optional(),
+  })
+  .strict();
+
 const Gate = z
   .object({
     window: z.int().positive().default(20),
     maxRework: z.int().nonnegative().default(2),
     minFirstPass: z.int().nonnegative().default(16),
+    maxDropped: z.int().nonnegative().default(2),
+    scopes: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/, '小文字・数字・ハイフンの名前にしてください'), Scope).optional(),
   })
   .strict();
 

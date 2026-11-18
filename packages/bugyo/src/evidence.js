@@ -160,7 +160,7 @@ function readVerifySummary(cwd) {
 
 /**
  * @typedef {{ name: string, command: string, status: number, ms: number, results?: unknown }} StepRecord
- * @typedef {{ ok: true, evidence: object, file: string, tree: string }
+ * @typedef {{ ok: true, evidence: object, file: string, tree: string, warnings: string[] }
  *   | { ok: false, step: Step, reason: string, output: string }} CollectOutcome
  */
 
@@ -200,6 +200,11 @@ export function collectEvidence(task, config, cwd, options = {}) {
     }
   }
   const tree = treeHash(cwd, config.evidence.tree);
+  /** @type {string[]} */
+  const warnings = [];
+  if (task['repro-tests-hash'] !== undefined && testsHash(cwd, config.evidence.tree) !== task['repro-tests-hash']) {
+    warnings.push(`repro のあとにテストファイルが変わっています。直す前に落ちたテストを弱めていないか、差分を確かめてください（${config.evidence.tree.join(', ')} の *.test.* / *.spec.*）`);
+  }
   const file = `${evidenceDir}/${task.id}.json`;
   const evidence = {
     task: task.id,
@@ -210,14 +215,26 @@ export function collectEvidence(task, config, cwd, options = {}) {
     rework: task.rework,
     conditions,
     steps: records,
-    ...(task.repro === undefined ? {} : { repro: { command: task.repro, failedAt: task['repro-at'] } }),
+    ...(task.repro === undefined
+      ? {}
+      : {
+          repro: {
+            command: task.repro,
+            failedAt: task['repro-at'],
+            status: task['repro-status'],
+            testsHash: task['repro-tests-hash'],
+            log: task['repro-log'],
+            expect: task['repro-expect'],
+          },
+        }),
+    warnings,
     tree: { paths: config.evidence.tree, hash: tree },
   };
   if (options.write ?? true) {
     mkdirSync(join(cwd, evidenceDir), { recursive: true });
     writeFileSync(join(cwd, file), `${JSON.stringify(evidence, null, 2)}\n`);
   }
-  return { ok: true, evidence, file, tree };
+  return { ok: true, evidence, file, tree, warnings };
 }
 
 /**
