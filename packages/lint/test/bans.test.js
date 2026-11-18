@@ -38,16 +38,14 @@ const taggedImportMessages = (rule) => {
 /** メッセージの頭の禁止の名前（`[bugyo:<名前>]`）を除いたもの @param {unknown} rule */
 const importMessages = (rule) => taggedImportMessages(rule).map((message) => message.replace(/^\[bugyo:[a-z0-9-]+\] /, ''));
 
-test('禁止のメッセージの頭には、禁止の名前が付く（メッセージのない項目には付けない）', async () => {
-  const bare = defineBan({ name: 'no-left-pad', imports: { paths: [{ name: 'left-pad' }] }, globals: ['escape'] });
-  const config = bugyo({ root, explicitExtensions: true, parts: [common, structure, noLodash, bare] });
+test('禁止のメッセージの頭には、禁止の名前が付く', async () => {
+  const noEscape = defineBan({ name: 'no-escape', globals: [{ name: 'escape', message: 'encodeURIComponent を使ってください。' }] });
+  const config = bugyo({ root, explicitExtensions: true, parts: [common, structure, noLodash, noEscape] });
   const rules = await rulesFor(config, 'src/features/calc/model/add.ts');
   const messages = taggedImportMessages(rules['no-restricted-imports']);
   assert.ok(messages.includes('[bugyo:no-lodash] lodash は使いません。'), messages.join('\n'));
   assert.ok(messages.some((message) => message.startsWith('[bugyo:model-layers] ')), messages.join('\n'));
-  const leftPad = rules['no-restricted-imports'][1].paths.find((/** @type {{ name: string }} */ entry) => entry.name === 'left-pad');
-  assert.deepEqual(leftPad, { name: 'left-pad' }, 'メッセージのない項目は ESLint の既定のメッセージのまま');
-  assert.ok(rules['no-restricted-globals'].includes('escape'));
+  assert.deepEqual(rules['no-restricted-globals'].slice(1), [{ name: 'escape', message: '[bugyo:no-escape] encodeURIComponent を使ってください。' }]);
   const zones = rules['import-x/no-restricted-paths'][1].zones.map((/** @type {{ message: string }} */ zone) => zone.message);
   assert.ok(zones.length > 0 && zones.every((/** @type {string} */ message) => /^\[bugyo:[a-z-]+\] /.test(message)), zones.join('\n'));
 });
@@ -130,16 +128,31 @@ test('defineBan: 書き方の誤りと、同じ名前の禁止は断る', () => 
   // @ts-expect-error 知らない項目
   assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'typo', global: ['x'] })] }), /知らない項目があります: global/);
   assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'empty' })] }), /何も止めていません/);
+  for (const [spec, where] of /** @type {const} */ ([
+    [{ imports: { paths: ['moment'] } }, 'imports.paths[0]'],
+    [{ imports: { paths: [{ name: 'lodash', message: 'x' }, { name: 'moment' }] } }, 'imports.paths[1]'],
+    [{ imports: { patterns: [{ group: ['lodash/*'], message: '  ' }] } }, 'imports.patterns[0]'],
+    [{ globals: ['escape'] }, 'globals[0]'],
+    [{ syntax: ['WithStatement'] }, 'syntax[0]'],
+    [{ properties: [{ object: 'Date', property: 'now' }] }, 'properties[0]'],
+  ])) {
+    assert.throws(
+      // @ts-expect-error message のない項目
+      () => bugyo({ root, parts: [common, defineBan({ name: 'no-message', ...spec })] }),
+      (error) => error instanceof Error && error.message.startsWith(`禁止 no-message の ${where} に message がありません。`) && error.message.includes('代わりに使うもの'),
+      where,
+    );
+  }
   assert.throws(
     () => bugyo({ root, parts: [common, structure, defineBan({ name: 'calc-only', scope: 'src/features/calc/**/*.ts', imports: { paths: [{ name: 'lodash', message: 'x' }] } })] }),
     /scope を src \/ ui \/ model のどれかにしてください/,
     'glob の範囲の合成する禁止は、model/ の禁止を上書きしてしまうので断る',
   );
   assert.throws(
-    () => bugyo({ root, parts: [common, fetchOnlyInApi, defineBan({ name: 'e2e-only', scope: 'e2e/**/*.ts', globals: ['alert'] })] }),
+    () => bugyo({ root, parts: [common, fetchOnlyInApi, defineBan({ name: 'e2e-only', scope: 'e2e/**/*.ts', globals: [{ name: 'alert', message: 'x' }] })] }),
     /scope を src \/ ui \/ model のどれかにしてください/,
     'src の外の glob に合成する禁止を置くと、src の禁止が漏れるので断る',
   );
-  assert.throws(() => bugyo({ root, parts: [common, structure, fetchOnlyInApi, defineBan({ name: 'fetch', globals: ['x'] })] }), /同じ名前の禁止が2つ以上あります: fetch/);
+  assert.throws(() => bugyo({ root, parts: [common, structure, fetchOnlyInApi, defineBan({ name: 'fetch', globals: [{ name: 'x', message: 'x' }] })] }), /同じ名前の禁止が2つ以上あります: fetch/);
   assert.throws(() => bugyo({ root, severity: { fetch: 'warn' } }), /fetch は、禁止の名前/, '入れていない禁止は下げられない');
 });

@@ -53,7 +53,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, /* 
 `no-restricted-imports`・`no-restricted-globals`・`no-restricted-properties`・`no-restricted-syntax` を自分のブロックで直接設定しないこと。bugyo の禁止が上書きされて黙って消える。必ず `defineBan` で足す。
 `defineBan` で表せない禁止が必要なら、それは bugyo 側に拡張口が足りないということなので、ユーザーにそう伝える（自分のブロックで回避しない）。
 
-**エラー文には「代わりに何を使うか」まで書く。** エージェントはエラー文を読んで直すので、禁止だけだと抜け道を探される。
+**エラー文には「代わりに何を使うか」まで書く。** エージェントはエラー文を読んで直すので、禁止だけだと抜け道を探される。`imports`・`globals`・`syntax`・`properties` の項目は `message` がないと `defineBan` が断る。
 
 良い例: `'製品コードで Date.now() は使えません。shared/lib の useClock() を使ってください。テストでは fakeClock を渡せます。'`
 悪い例: `'Date.now() は禁止です'`

@@ -69,6 +69,9 @@ const combined = /** @type {const} */ ([
 const namedScopes = ['src', 'ui', 'model'];
 const namedPlaces = ['effects', 'api', 'tests'];
 
+/** @param {unknown} value */
+const hasMessage = (value) => typeof value === 'object' && value !== null && 'message' in value && typeof value.message === 'string' && value.message.trim() !== '';
+
 const banKeys = new Set(['name', 'scope', 'allow', 'imports', 'globals', 'syntax', 'properties', 'rules', 'plugins']);
 
 /**
@@ -101,6 +104,20 @@ export function normalizeBan(spec) {
     rules: { ...(spec.rules ?? {}) },
     plugins: { ...(spec.plugins ?? {}) },
   };
+  for (const [key, list] of /** @type {[string, unknown[]][]} */ ([
+    ['imports.paths', ban.imports.paths],
+    ['imports.patterns', ban.imports.patterns],
+    ['globals', ban.globals],
+    ['syntax', ban.syntax],
+    ['properties', ban.properties],
+  ])) {
+    const index = list.findIndex((value) => !hasMessage(value));
+    if (index !== -1) {
+      throw new Error(
+        `禁止 ${name} の ${key}[${String(index)}] に message がありません。止めた相手が次に何をすればよいか（代わりに使うものと置き場所）を message に書いてください（例: { name: 'moment', message: 'src/shared/lib/date.ts の formatDate を使ってください' }）`,
+      );
+    }
+  }
   const combinedSize = ban.imports.paths.length + ban.imports.patterns.length + ban.globals.length + ban.syntax.length + ban.properties.length;
   if (combinedSize + Object.keys(ban.rules).length === 0) throw new Error(`禁止 ${name} は何も止めていません。imports・globals・syntax・properties・rules のどれかを書いてください`);
   if (combinedSize > 0 && !namedScopes.includes(scope)) {
@@ -366,7 +383,7 @@ const pathGlobs = (path) => (/[*?[\]{}!]/.test(path) ? [path] : [trimSlash(path)
 const tagged = (id, text) => `[bugyo:${id}] ${text}`;
 
 /**
- * 項目にメッセージがあれば、禁止の名前を付ける。メッセージのない項目は ESLint の既定の英語のメッセージのまま。
+ * 項目のメッセージに、禁止の名前を付ける（項目にメッセージがあることは normalizeBan が確かめている）。
  *
  * @param {string} name
  * @param {unknown} value
