@@ -17,6 +17,29 @@
   <img alt="TypeScript (templates: React / Vite and Node)" src="https://img.shields.io/badge/TypeScript-React%20%2F%20Vite%20%7C%20Node-ffd23f?style=flat-square">
 </p>
 
+<p align="center">
+  <img src="docs/media/terminal.svg" alt="pnpm check stops useEffect and fetch, pnpm verify todos prints PASS and where the evidence is, and bugyo task done closes the task with evidence" width="860">
+</p>
+
+<table>
+  <tr>
+    <td colspan="2" align="center"><a href="docs/media/trace.png"><img src="docs/media/trace.png" alt="Playwright trace: time per action and the page at that moment"></a></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>Trace</b> <sub>— step through each action later, with the page, network and logs at that moment</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/verify.gif" alt="Video that verify recorded while operating the Todo app"></td>
+    <td width="50%" align="center"><a href="docs/media/report.png"><img src="docs/media/report.png" alt="HTML report: pass or fail and time for each test step"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Video</b> <sub>— the run, recorded as is</sub></td>
+    <td align="center"><b>HTML report</b> <sub>— pass or fail and time per step</sub></td>
+  </tr>
+</table>
+
+<p align="center"><sub>All of this is evidence that <code>pnpm verify todos</code> leaves on every run of the <a href="examples/todo-app">todo-app</a> example. CI keeps the same evidence and posts the result and a link to it on the PR. The messages are in Japanese for now.</sub></p>
+
 ---
 
 **bugyo** is a toolkit for handing development work to AI agents.

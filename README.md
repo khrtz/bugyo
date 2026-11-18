@@ -17,6 +17,29 @@
   <img alt="TypeScript（雛形: React / Vite と Node）" src="https://img.shields.io/badge/TypeScript-React%20%2F%20Vite%20%7C%20Node-ffd23f?style=flat-square">
 </p>
 
+<p align="center">
+  <img src="docs/media/terminal.svg" alt="pnpm check が useEffect と fetch を止め、pnpm verify todos が PASS と証拠の場所を出し、bugyo task done が証拠つきでタスクを閉じる" width="860">
+</p>
+
+<table>
+  <tr>
+    <td colspan="2" align="center"><a href="docs/media/trace.png"><img src="docs/media/trace.png" alt="Playwright のトレース。操作ごとの時間と、その時点の画面"></a></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>トレース</b> <sub>— 操作ごとに、その時点の画面・通信・ログをあとから辿れる</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/verify.gif" alt="verify が録画した、Todo の操作の動画"></td>
+    <td width="50%" align="center"><a href="docs/media/report.png"><img src="docs/media/report.png" alt="HTML レポート。テストの手順ごとの合否と時間"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><b>動画</b> <sub>— 操作をそのまま録画する</sub></td>
+    <td align="center"><b>HTML レポート</b> <sub>— 手順ごとの合否と時間</sub></td>
+  </tr>
+</table>
+
+<p align="center"><sub>どれも <code>pnpm verify todos</code> が見本の <a href="examples/todo-app">todo-app</a> で毎回残す証拠です。CI でも同じ証拠を残し、PR に合否と証拠のリンクを書きます。</sub></p>
+
 ---
 
 **bugyo（奉行）** は、AI エージェントに開発を任せるためのツール群です。
