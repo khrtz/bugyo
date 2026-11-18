@@ -1,8 +1,30 @@
 {
   "name": "@bugyo/lint",
   "version": "0.1.0",
-  "description": "エージェントが正しいやり方しか選べないようにする ESLint / dependency-cruiser / tsconfig のプリセット",
+  "description": "ESLint, dependency-cruiser, and tsconfig presets that leave agents only the right way to write code",
+  "keywords": [
+    "eslint",
+    "eslint-config",
+    "dependency-cruiser",
+    "typescript",
+    "agents",
+    "architecture"
+  ],
+  "homepage": "https://github.com/khrtz/bugyo/tree/main/packages/lint#readme",
+  "bugs": "https://github.com/khrtz/bugyo/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khrtz/bugyo.git",
+    "directory": "packages/lint"
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "exports": {
     ".": {

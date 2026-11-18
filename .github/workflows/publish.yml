@@ -1,0 +1,58 @@
+name: Publish
+
+# v<版> のタグを main のコミットに付けて push すると、3つのパッケージを npm に公開する。
+# 公開には、リポジトリの secret NPM_TOKEN（@bugyo の組織と bugyo に公開できる npm のトークン）が要る。
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: npm に公開する
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+      - name: タグが main のコミットで、3つのパッケージの版と同じか確かめる
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "タグ $GITHUB_REF_NAME のコミットが main にありません"; exit 1; }
+          for dir in lint lint-react bugyo; do
+            version=$(node -p "require('./packages/$dir/package.json').version")
+            [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "packages/$dir の版 $version がタグ $GITHUB_REF_NAME と合いません"; exit 1; }
+          done
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - name: 公開する（依存される順。公開済みの版は飛ばす）
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          [ -n "$NODE_AUTH_TOKEN" ] || { echo "secret NPM_TOKEN がありません"; exit 1; }
+          out="$RUNNER_TEMP/publish"
+          version="${GITHUB_REF_NAME#v}"
+          for name in @bugyo/lint @bugyo/lint-react bugyo; do
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version は公開済みなので飛ばします"
+              continue
+            fi
+            rm -rf "$out" && mkdir -p "$out"
+            pnpm --filter "$name" pack --pack-destination "$out"
+            npm publish "$out"/*.tgz --access public --provenance
+          done

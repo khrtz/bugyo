@@ -1,8 +1,14 @@
 # @bugyo/lint
 
-エージェントが正しい書き方しか選べないようにする、ESLint・dependency-cruiser・tsconfig のプリセットです。React に依存しません。React 用の部品と禁止は [@bugyo/lint-react](../lint-react) にあります。
+English ・ [日本語](https://github.com/khrtz/bugyo/blob/main/packages/lint/README.ja.md)
 
-ESLint 9.24 以上（10 を含む）と TypeScript 5.8〜6.0 で動きます。`eslint` と `@eslint/js`（同じ大きな版）、`typescript`、`dependency-cruiser` はプロジェクトの側に入れます。
+ESLint, dependency-cruiser, and tsconfig presets that leave agents only the right way to write code. No React dependency. The React part and bans live in [@bugyo/lint-react](https://www.npmjs.com/package/@bugyo/lint-react).
+
+Works with ESLint 9.24 or later (including 10) and TypeScript 5.8–6.0. Install `eslint` and `@eslint/js` (same major version), `typescript`, and `dependency-cruiser` in your project.
+
+```bash
+npm install --save-dev @bugyo/lint eslint @eslint/js typescript dependency-cruiser
+```
 
 ```js
 // eslint.config.js
@@ -11,31 +17,33 @@ import { bugyo, common, fetchOnlyInApi, noComments, structure } from '@bugyo/lin
 export default bugyo({ root: import.meta.dirname, parts: [common, structure, noComments, fetchOnlyInApi] });
 ```
 
-設定は、部品と禁止の組み合わせです。`parts` に並べたものだけが当たります。
+The config is a combination of parts and bans. Only what you list in `parts` applies.
 
-- 部品 `common`（必須）: 厳しい型検査、`any`・型アサーション・非 null アサーション・待っていない Promise・`switch` の漏れ、理由のない `eslint-disable`
-- 部品 `structure`: `app` / `features` / `shared` の境界、feature の外からは `index.ts` だけ、`model/` から `ui/`・`api/` への依存の禁止
-- 禁止 `noComments`: コメントは公開 API の JSDoc と理由つきの `eslint-disable` だけ
-- 禁止 `fetchOnlyInApi`: `fetch` は `shared/api`（`apiClientDir`）とテストでだけ呼べる
+- Part `common` (required): strict type checking; no `any`, type assertions, non-null assertions, floating promises, non-exhaustive `switch`, or `eslint-disable` without a reason
+- Part `structure`: boundaries between `app` / `features` / `shared`, only `index.ts` from outside a feature, no imports from `model/` into `ui/` or `api/`
+- Ban `noComments`: comments only as JSDoc on public APIs and `eslint-disable` with a reason
+- Ban `fetchOnlyInApi`: `fetch` only in `shared/api` (`apiClientDir`) and tests
 
-`parts` を省くと `[common, structure]` で、書き方の禁止は入りません。React を使うプロジェクトは [@bugyo/lint-react](../lint-react) の部品と禁止も足します。独自の禁止は `defineBan` で作り、同じように `parts` に足します。
+Without `parts`, you get `[common, structure]` and no style bans. React projects also add the part and bans from [@bugyo/lint-react](https://www.npmjs.com/package/@bugyo/lint-react). Write your own bans with `defineBan` and add them to `parts` the same way.
 
 ```js
-// eslint.config.js（独自の禁止を足す）
+// eslint.config.js (with your own ban)
 import { bugyo, common, defineBan, structure } from '@bugyo/lint';
 
 const clock = defineBan({
   name: 'clock',
   allow: ['effects', 'tests'],
-  properties: [{ object: 'Date', property: 'now', message: 'shared/lib の systemClock を使ってください' }],
+  properties: [{ object: 'Date', property: 'now', message: 'Use systemClock from shared/lib.' }],
 });
 
 export default bugyo({ root: import.meta.dirname, parts: [common, structure, clock] });
 ```
 
+Every entry in `imports`, `globals`, `syntax`, and `properties` needs a `message` that tells the reader what to use instead. `defineBan` refuses entries without one.
+
 ```js
 // .dependency-cruiser.cjs
-module.exports = require('@bugyo/lint/depcruise').config(); // React を使うなら config({ react: true })
+module.exports = require('@bugyo/lint/depcruise').config(); // config({ react: true }) for React
 ```
 
 ```jsonc
@@ -43,12 +51,12 @@ module.exports = require('@bugyo/lint/depcruise').config(); // React を使う�
 { "extends": "@bugyo/lint/tsconfig.json" }
 ```
 
-層のフォルダが `src/app`・`src/features`・`src/shared` でないプロジェクトは、`bugyo({ root, src, layers })` と `config({ src, layers })` に場所を渡します（[層のフォルダ名を変える](../../docs/foundation.md#層のフォルダ名を変える)）。feature の中のフォルダが `ui/`・`api/`・`model/` でなければ、`layers.featureParts` に役割ごとのフォルダ名を書きます。
+Rule messages are in English by default. Set `"locale": "ja"` in `.bugyo/config.json`, set `BUGYO_LOCALE=ja`, or pass `bugyo({ locale: 'ja' })` for Japanese.
 
-部品と禁止ごとに止めるものの一覧、設定項目、`defineBan` の書き方は [docs/foundation.md](../../docs/foundation.md) にあります。
+If your layer folders are not `src/app`, `src/features`, and `src/shared`, pass their locations to `bugyo({ root, src, layers })` and `config({ src, layers })`. If the folders inside a feature are not `ui/`, `api/`, and `model/`, list the folder names per role in `layers.featureParts`.
 
-テストは、わざと違反した `.ts` だけのファイル（`test/fixture-node`）に対して共通と構成のルールと禁止がエラーを出すこと、既定の組み合わせに書き方の禁止と React 用のルールが入らないこと、`defineBan` の禁止が bugyo の禁止と同じ決まりで当たることを確かめます。`test/fixture-layers` は、層のフォルダ名、feature の中のフォルダ名、import の別名が既定と違うプロジェクトです。`test/fixture-sources` は、フロントとサーバーの2つのソースを、それぞれの tsconfig と部品で1つの設定にまとめたプロジェクトです。
+What each part and ban stops, every option, and how to write `defineBan` are in [docs/foundation.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.md) (in Japanese).
 
-```bash
-pnpm test
-```
+## License
+
+MIT

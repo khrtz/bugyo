@@ -1,8 +1,29 @@
 {
   "name": "@bugyo/lint-react",
   "version": "0.1.0",
-  "description": "@bugyo/lint に足す React 用の部品（useEffect の置き場所、react-hooks、UI でのタイマー禁止）",
+  "description": "The React part and bans for @bugyo/lint: where useEffect may live, react-hooks, no timers in UI",
+  "keywords": [
+    "eslint",
+    "eslint-config",
+    "react",
+    "react-hooks",
+    "agents"
+  ],
+  "homepage": "https://github.com/khrtz/bugyo/tree/main/packages/lint-react#readme",
+  "bugs": "https://github.com/khrtz/bugyo/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khrtz/bugyo.git",
+    "directory": "packages/lint-react"
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "exports": {
     ".": {

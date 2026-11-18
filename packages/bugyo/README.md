@@ -1,15 +1,24 @@
 # bugyo
 
-feature map、検証、タスク台帳と門番、雛形生成の CLI です。
+English ・ [日本語](https://github.com/khrtz/bugyo/blob/main/packages/bugyo/README.ja.md)
 
-| コマンド | すること |
+A CLI for the feature map, verification, the task ledger and gate, and scaffolding. Needs Node 24 or later.
+
+```bash
+npx bugyo init my-app                     # React + Vite (default)
+npx bugyo init my-lib --template node-lib # TypeScript library / CLI with no UI
+```
+
+| Command | What it does |
 | --- | --- |
-| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。テンプレートは `react-vite`（既定）か `node-lib` |
-| `bugyo new feature <id>` | feature を、テンプレートに合わせた雛形・feature map・spec つきで作る |
-| `bugyo verify <id>` / `--all` | 機能を実際に動かし、合否と証拠の場所だけを出す。Playwright か、`.bugyo/config.json` に書いた任意のコマンドで確かめる |
-| `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | タスク台帳。`done` だけが証拠を取って閉じる（[docs/tasks.md](../../docs/tasks.md)） |
-| `bugyo mistake ls` / `rule` | ミスの種類ごとの記録と、ルール化の記録 |
-| `bugyo gate` | 任せる範囲を広げてよいかを計算する |
+| `bugyo init <dir> [--template <name>]` | Create a new project with the foundation in place. Templates: `react-vite` (default) or `node-lib` |
+| `bugyo new feature <id>` | Create a feature with the template's scaffold, a feature map entry, and a spec |
+| `bugyo verify <id>` / `--all` | Run the feature for real and print only pass/fail and where the evidence is. Checks with Playwright or with any command set in `.bugyo/config.json` |
+| `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | The task ledger. Only `done` collects evidence and closes a task ([docs/tasks.md](https://github.com/khrtz/bugyo/blob/main/docs/tasks.md)) |
+| `bugyo mistake ls` / `rule` | Mistakes per kind, and which rule each became |
+| `bugyo gate` | Decide whether to widen what agents may do |
+| `bugyo stats` | Results of closed tasks per task type, model, and harness |
+| `bugyo doctor` / `baseline` | Count violations per ban before adopting the rules, and keep a baseline that can only shrink |
 
 ```ts
 // playwright.config.ts
@@ -19,12 +28,16 @@ export default defineBugyoConfig({ port: 5173 });
 ```
 
 ```ts
-// e2e/feature-map.test.ts（Vitest。node:test なら 'bugyo/node-test'）
+// e2e/feature-map.test.ts (Vitest; use 'bugyo/node-test' for node:test)
 import { registerFeatureMapTests } from 'bugyo/vitest';
 
 registerFeatureMapTests();
 ```
 
-くわしい動きと設定項目は [docs/foundation.md](../../docs/foundation.md) にあります。
+`@playwright/test` and `vitest` are optional peer dependencies; `node-lib` installs neither. The verify output and the result of `bugyo task done` are in English by default; set `"locale": "ja"` in `.bugyo/config.json` for Japanese. The rest of the CLI output is in Japanese for now.
 
-`init` のテンプレートは、`react-vite` を [examples/todo-app](../../examples/todo-app) から、`node-lib` を [examples/node-lib](../../examples/node-lib) から作ります（`pnpm sync-template`。`pack` と `test` の前に自動で走ります）。`@playwright/test` と `vitest` は任意の peer 依存で、`node-lib` では入りません。
+How it all works and every option are in [docs/foundation.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.md); adding bugyo to an existing project is in [docs/adopt.md](https://github.com/khrtz/bugyo/blob/main/docs/adopt.md) (both in Japanese).
+
+## License
+
+MIT

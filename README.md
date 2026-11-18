@@ -153,6 +153,16 @@ pnpm validate-plugin
 - `packages/bugyo` のテストは、両方のテンプレートでの `new feature` と `init` の生成物と、React も Playwright も使わないフィクスチャ（`test/fixtures/plain`）での `verify` とタスク台帳の動き（断られるべきものが断られること）を確かめます
 - TypeScript は 6.0 系に固定しています
 
+### npm への公開
+
+`packages/lint`・`packages/lint-react`・`packages/bugyo` の `version` を同じ版に上げて main にマージし、そのコミットに `v<版>` のタグを付けて push します。GitHub Actions（`.github/workflows/publish.yml`）が、タグと版が合うことを確かめ、`pnpm check` と `pnpm test` を通してから、`@bugyo/lint`・`@bugyo/lint-react`・`bugyo` の順に来歴（provenance）つきで公開します。公開済みの版は飛ばします。
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+公開には、npm の組織 `bugyo` と、リポジトリの secret `NPM_TOKEN`（その組織と `bugyo` に公開できる npm のトークン）が要ります。
+
 ## ライセンス
 
 [MIT](LICENSE)

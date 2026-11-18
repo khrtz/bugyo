@@ -1,17 +1,57 @@
 {
   "name": "bugyo",
   "version": "0.1.0",
-  "description": "エージェント開発の土台: feature map・検証ハーネス・雛形生成CLI",
-  "license": "MIT",
-  "type": "module",
-  "bin": { "bugyo": "./bin/bugyo.js" },
-  "exports": {
-    ".": { "types": "./src/index.d.ts", "default": "./src/index.js" },
-    "./vitest": { "types": "./src/vitest.d.ts", "default": "./src/vitest.js" },
-    "./node-test": { "types": "./src/node-test.d.ts", "default": "./src/node-test.js" },
-    "./playwright": { "types": "./src/playwright.d.ts", "default": "./src/playwright.js" }
+  "description": "Feature map, verification with evidence, task ledger and gate, and scaffolding for agent-written code",
+  "keywords": [
+    "cli",
+    "agents",
+    "verification",
+    "feature-map",
+    "playwright",
+    "scaffold"
+  ],
+  "homepage": "https://github.com/khrtz/bugyo/tree/main/packages/bugyo#readme",
+  "bugs": "https://github.com/khrtz/bugyo/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khrtz/bugyo.git",
+    "directory": "packages/bugyo"
   },
-  "files": ["bin", "src", "template"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "type": "module",
+  "bin": {
+    "bugyo": "./bin/bugyo.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./vitest": {
+      "types": "./src/vitest.d.ts",
+      "default": "./src/vitest.js"
+    },
+    "./node-test": {
+      "types": "./src/node-test.d.ts",
+      "default": "./src/node-test.js"
+    },
+    "./playwright": {
+      "types": "./src/playwright.d.ts",
+      "default": "./src/playwright.js"
+    }
+  },
+  "files": [
+    "bin",
+    "src",
+    "template"
+  ],
   "scripts": {
     "sync-template": "node scripts/sync-template.js",
     "prepack": "node scripts/sync-template.js",
@@ -26,7 +66,11 @@
     "vitest": ">=4"
   },
   "peerDependenciesMeta": {
-    "@playwright/test": { "optional": true },
-    "vitest": { "optional": true }
+    "@playwright/test": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
   }
 }

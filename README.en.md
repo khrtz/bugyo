@@ -159,6 +159,16 @@ pnpm validate-plugin
 - The `packages/bugyo` tests check what `new feature` and `init` generate for both templates, and how `verify` and the task ledger behave (including that what should be refused is refused) on a fixture that uses neither React nor Playwright (`test/fixtures/plain`)
 - TypeScript is pinned to 6.0
 
+### Publishing to npm
+
+Bump `version` in `packages/lint`, `packages/lint-react`, and `packages/bugyo` to the same version, merge to main, then tag that commit `v<version>` and push the tag. GitHub Actions (`.github/workflows/publish.yml`) checks that the tag matches the versions, runs `pnpm check` and `pnpm test`, and publishes `@bugyo/lint`, `@bugyo/lint-react`, and `bugyo` in that order with provenance. Versions already on npm are skipped.
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+Publishing needs the npm organization `bugyo` and a repository secret `NPM_TOKEN` (an npm token that can publish to that organization and to `bugyo`).
+
 ## License
 
 [MIT](LICENSE)
