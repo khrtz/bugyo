@@ -59,16 +59,14 @@ Three things happen when you delegate to agents. bugyo stops each of them with t
 
 ## See it
 
-**Every block comes with what to use instead.** In a project that turns on the `useEffect` and `fetch` bans (the `react-vite` template does), an agent that writes them gets this back (rule messages are in Japanese for now):
+**Every block comes with what to use instead.** In a project that turns on the `useEffect` and `fetch` bans (the `react-vite` template does), an agent that writes them gets this back:
 
 ```
- 1:17  error  'useEffect' import from 'react' is restricted. [bugyo:use-effect] 製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは src/shared/lib の専用フックを使ってください。該当するフックがなければ src/shared/lib に追加してください。  no-restricted-imports
-10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。src/shared/api のクライアントを使い、スキーマで応答を検証してください。  no-restricted-globals
+ 1:17  error  'useEffect' import from 'react' is restricted. [bugyo:use-effect] useEffect is not allowed in product code. Fetch data with useXxxQuery in features/*/api, and use a dedicated hook in src/shared/lib for subscriptions and timers. If no such hook exists, add one to src/shared/lib.  no-restricted-imports
+10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] Do not call fetch directly. Use the client in src/shared/api and validate the response with a schema.  no-restricted-globals
 ```
 
-(Two entries taken from the output for the deliberately broken test file `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx`.)
-
-In English: *"`useEffect` is not allowed in product code. Fetch data through `useXxxQuery` in `features/*/api`; put subscriptions and timers in a dedicated hook under `src/shared/lib`."* and *"Do not call `fetch` directly. Use the client in `src/shared/api` and validate the response with a schema."*
+(Two entries taken from the output for the deliberately broken test file `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx`, with `"locale": "en"` in `.bugyo/config.json`. Rule messages are in Japanese by default. The rest of the CLI output is in Japanese for now.)
 
 **Verification returns pass/fail and where the evidence is, nothing more.** No long logs eating the agent's context.
 
