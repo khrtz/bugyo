@@ -96,7 +96,7 @@ PASS todos  確認手順: docs/features/todos.md
 | [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config（共通と構成の部品、コメントと `fetch` の禁止、独自の禁止を作る `defineBan`）、dependency-cruiser のルール、厳しい tsconfig。React に依存しない |
 | [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | `@bugyo/lint` に足す React 用の部品（react-hooks）と禁止（`useEffect` の置き場所、UI でのタイマー） |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI（`init` / `new feature` / `verify` / `task` / `mistake` / `gate`）、feature map の読み込みと整合テスト、Playwright 設定 |
-| [plugin](plugin) | Claude Code プラグイン（スキル5つとレビュー用サブエージェント） |
+| [plugin](plugin) | Claude Code プラグイン（スキル5つ、レビュー用サブエージェント、完了の判定を決めるファイルの直接の書き換えを断るフック） |
 | [examples/todo-app](examples/todo-app) | React（Vite）の見本。`bugyo init --template react-vite`（既定）のテンプレートの元 |
 | [examples/node-lib](examples/node-lib) | 画面のない TypeScript のライブラリ／CLI の見本。React・Vite・Playwright を使わない。`bugyo init --template node-lib` のテンプレートの元 |
 

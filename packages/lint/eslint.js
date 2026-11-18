@@ -5,7 +5,8 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import { noComments as noCommentsRule } from './rules/no-comments.js';
+import { joinList, messagesFor, resolveLocale } from './messages.js';
+import { noCommentsFor } from './rules/no-comments.js';
 
 /**
  * @typedef {import('./index.js').BugyoOptions} BugyoOptions
@@ -27,6 +28,7 @@ import { noComments as noCommentsRule } from './rules/no-comments.js';
  *   layers: Layers,
  *   customLayers: boolean,
  *   featuresLabel: string,
+ *   locale: import('./messages.js').Locale,
  * }} Context
  * @typedef {'paths' | 'patterns' | 'globals' | 'syntax' | 'properties'} Kind
  * @typedef {{
@@ -144,7 +146,7 @@ export const fetchOnlyInApi = defineBan({
     globals: [
       {
         name: 'fetch',
-        message: `fetchを直接呼ばないでください。${context.apiClientDir} のクライアントを使い、スキーマで応答を検証してください。`,
+        message: messagesFor(context.locale).fetch({ apiClientDir: context.apiClientDir }),
       },
     ],
   }),
@@ -172,7 +174,7 @@ export const common = {
     },
     plugins: {
       '@eslint-community/eslint-comments': comments,
-      bugyo: { rules: { 'no-comments': noCommentsRule } },
+      bugyo: { rules: { 'no-comments': noCommentsFor(context.locale) } },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -203,27 +205,29 @@ export const structure = {
   name: 'structure',
   rank: 2,
   build: (context) => {
-    const { root, src, layers, customLayers } = context;
+    const { root, src, layers, customLayers, locale } = context;
+    const m = messagesFor(locale);
+    const list = (/** @type {string[]} */ items) => joinList(locale, items);
     const { app, features, shared, featureParts } = layers;
     const featuresName = features.split('/').at(-1) ?? features;
     const outerParts = [...featureParts.ui, ...featureParts.api];
-    const roleLabel = (/** @type {string[]} */ list) => list.map((name) => `${name}/`).join('・');
+    const roleLabel = (/** @type {string[]} */ names) => list(names.map((name) => `${name}/`));
     const internals = customLayers ? [`**/${featuresName}/*/*`] : ['@/features/*/*', '**/features/*/*'];
     const indexes = customLayers ? [`!**/${featuresName}/*/index.ts`] : ['!@/features/*/index.ts', '!**/features/*/index.ts'];
     const sharedDirs = [...shared.ui, ...shared.api, ...shared.lib, ...shared.model, ...shared.other];
-    const pureDirs = [...shared.lib, ...shared.model].join('・');
+    const pureDirs = list([...shared.lib, ...shared.model]);
     const zones = customLayers
       ? [
           {
             target: sharedDirs.map((dir) => `./${dir}`),
             from: [`./${features}`, `./${app}`],
-            message: tagged('shared-is-leaf', `${sharedDirs.join('・')} は ${features} や ${app} に依存できません。`),
+            message: tagged('shared-is-leaf', m.sharedIsLeaf({ shared: list(sharedDirs), features, app })),
           },
-          { target: `./${features}`, from: `./${app}`, message: tagged('features-not-to-app', `${features} は ${app} に依存できません。`) },
+          { target: `./${features}`, from: `./${app}`, message: tagged('features-not-to-app', m.featuresNotToApp({ features, app })) },
           {
             target: featureParts.model.map((name) => `./${features}/*/${name}/**/*`),
             from: [...shared.ui, ...shared.api, ...shared.other].map((dir) => `./${dir}`),
-            message: tagged('model-is-pure', `${roleLabel(featureParts.model)} が使えるのは自分の${roleLabel(featureParts.model)}と ${pureDirs} だけです。`),
+            message: tagged('model-is-pure', m.modelIsPure({ model: roleLabel(featureParts.model), pure: pureDirs })),
           },
           ...(shared.model.length === 0
             ? []
@@ -231,7 +235,7 @@ export const structure = {
                 {
                   target: shared.model.map((dir) => `./${dir}`),
                   from: [...shared.ui, ...shared.api, ...shared.other].map((dir) => `./${dir}`),
-                  message: tagged('shared-model-is-pure', `${shared.model.join('・')} が使えるのは ${pureDirs} だけです。`),
+                  message: tagged('shared-model-is-pure', m.sharedModelIsPure({ sharedModel: list(shared.model), pure: pureDirs })),
                 },
               ]),
         ]
@@ -239,9 +243,9 @@ export const structure = {
           {
             target: `./${src}/shared`,
             from: [`./${src}/features`, `./${src}/app`],
-            message: tagged('shared-is-leaf', 'shared は features や app に依存できません。'),
+            message: tagged('shared-is-leaf', m.sharedIsLeaf({ shared: 'shared', features: 'features', app: 'app' })),
           },
-          { target: `./${src}/features`, from: `./${src}/app`, message: tagged('features-not-to-app', 'features は app に依存できません。') },
+          { target: `./${src}/features`, from: `./${src}/app`, message: tagged('features-not-to-app', m.featuresNotToApp({ features: 'features', app: 'app' })) },
         ];
     return {
       plugins: { 'import-x': importX },
@@ -256,7 +260,7 @@ export const structure = {
             patterns: [
               {
                 group: context.explicitExtensions ? [...internals, ...indexes] : internals,
-                message: `featureの内部ファイルは直接importできません。${customLayers ? features : 'features'}/<名前>/index.ts から公開されたものを使ってください。`,
+                message: m.featureInternals({ features: customLayers ? features : 'features' }),
               },
             ],
           },
@@ -269,18 +273,18 @@ export const structure = {
               customLayers
                 ? {
                     group: outerParts.flatMap((name) => [`../${name}`, `../${name}/*`]),
-                    message: `${roleLabel(featureParts.model)} から ${roleLabel(outerParts)} はimportできません。依存の向きは ${roleLabel(featureParts.ui)} → ${roleLabel(featureParts.api)} → ${roleLabel(featureParts.model)} です。`,
+                    message: m.modelLayers({ model: roleLabel(featureParts.model), outer: roleLabel(outerParts), ui: roleLabel(featureParts.ui), api: roleLabel(featureParts.api) }),
                   }
                 : {
                     group: ['../ui', '../ui/*', '../api', '../api/*'],
-                    message: 'model/ から ui/ や api/ はimportできません。依存の向きは ui → api → model です。',
+                    message: m.modelLayersDefault(),
                   },
               ...(customLayers
                 ? []
                 : [
                     {
                       group: ['@/shared/ui', '@/shared/ui/*', '@/shared/api', '@/shared/api/*'],
-                      message: 'model/ が使えるのは自分のmodelと shared/lib だけです。',
+                      message: m.modelSharedLayers(),
                     },
                   ]),
             ],
@@ -409,10 +413,11 @@ const sourceKeys = ['src', 'layers', 'parts', 'tsconfig', 'explicitExtensions', 
  *
  * @param {string} root
  * @param {string[]} ignores
+ * @param {import('./messages.js').Locale} locale
  * @param {import('./index.js').BugyoSource} source
  * @returns {PreparedSource}
  */
-function prepareSource(root, ignores, source) {
+function prepareSource(root, ignores, locale, source) {
   const { src = 'src', parts = [common, structure], explicitExtensions = false, tsconfig = 'tsconfig.json' } = source;
   if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
   const layers = resolveLayers(src, source.layers);
@@ -424,13 +429,14 @@ function prepareSource(root, ignores, source) {
     root,
     src,
     tsconfig: trimSlash(tsconfig),
-    effectHooksDir: effectsDirs.join('・'),
-    apiClientDir: apiDirs.join('・'),
+    effectHooksDir: joinList(locale, effectsDirs),
+    apiClientDir: joinList(locale, apiDirs),
     ignores,
     explicitExtensions,
     layers,
     customLayers,
     featuresLabel: customLayers ? layers.features : 'features',
+    locale,
   };
   const sorted = [...new Set(parts)].sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   const built = sorted.map((part) => part.build(context));
@@ -464,7 +470,8 @@ export function bugyo(options) {
     if (mixed.length > 0) throw new Error(`bugyo({ sources }) を使うときは、${mixed.join(', ')} を sources のそれぞれに書いてください`);
     if (!Array.isArray(options.sources) || options.sources.length === 0) throw new Error('bugyo({ sources }) には、ソースを1つ以上の配列で渡してください');
   }
-  const prepared = (options.sources ?? [options]).map((source) => prepareSource(root, ignores, source));
+  const locale = resolveLocale(root, options.locale);
+  const prepared = (options.sources ?? [options]).map((source) => prepareSource(root, ignores, locale, source));
   const srcs = prepared.map(({ context }) => context.src);
   const nested = srcs.filter((src, index) => srcs.some((other, at) => at !== index && (other === src || src.startsWith(`${other}/`))));
   if (nested.length > 0) throw new Error(`bugyo({ sources }) の src が重なっています: ${nested.join(', ')}。ソースごとに別のフォルダにしてください`);

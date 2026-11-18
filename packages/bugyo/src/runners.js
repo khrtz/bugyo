@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 
 /**
- * @typedef {{ name: string, runner: 'playwright' | 'command', command: string | undefined, env: Record<string, string>, match: string[] }} Runner
+ * @typedef {{ name: string, runner: 'playwright' | 'command', command: string | undefined, env: Record<string, string>, match: string[], evidence: string[], sandbox: boolean }} Runner
  * @typedef {{ spec: string, runner: Runner }} Run
  */
 
@@ -17,12 +17,20 @@ export const builtinRunners = /** @type {const} */ (['playwright', 'command']);
 export function runnersOf(verify) {
   /** @type {Map<string, Runner>} */
   const runners = new Map([
-    ['playwright', { name: 'playwright', runner: 'playwright', command: undefined, env: {}, match: [] }],
-    ['command', { name: 'command', runner: 'command', command: verify.command, env: {}, match: [] }],
+    ['playwright', { name: 'playwright', runner: 'playwright', command: undefined, env: {}, match: [], evidence: [], sandbox: false }],
+    ['command', { name: 'command', runner: 'command', command: verify.command, env: {}, match: [], evidence: [], sandbox: false }],
   ]);
   for (const [name, runner] of Object.entries(verify.runners ?? {})) {
     const match = runner.match === undefined ? [] : typeof runner.match === 'string' ? [runner.match] : runner.match;
-    runners.set(name, { name, runner: runner.runner, command: runner.command, env: { ...(runner.env ?? {}) }, match });
+    runners.set(name, {
+      name,
+      runner: runner.runner,
+      command: runner.command,
+      env: { ...(runner.env ?? {}) },
+      match,
+      evidence: [...(runner.evidence ?? [])],
+      sandbox: runner.requires === 'sandbox',
+    });
   }
   return runners;
 }

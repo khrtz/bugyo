@@ -1,0 +1,11 @@
+{
+  "description": "完了の判定を決めるファイル（.bugyo/config.json・証拠・ベースライン・タスク台帳の状態）を、エージェントが直接書き換えるのを断る",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash|PowerShell",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.mjs\"" }]
+      }
+    ]
+  }
+}

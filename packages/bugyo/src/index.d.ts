@@ -17,6 +17,8 @@ export interface Feature {
 
 export const featureDir: string;
 export const requiredSections: readonly string[];
+/** feature map の4つの見出し。日本語（ja）と英語（en）のどちらで書いてもよい */
+export const sectionHeadings: readonly { readonly ja: string; readonly en: string }[];
 export function loadFeatures(cwd?: string): Feature[];
 export function loadSweepOrder(cwd?: string): string[];
 
@@ -30,6 +32,8 @@ export interface BugyoConfig {
    * ツールとルールごとに数える（`sarif: <ツール>/<ルール>`）
    */
   sarif?: { command?: string | undefined; file: string }[] | undefined;
+  /** @bugyo/lint の禁止のメッセージの言語。書かなければ `ja`（環境変数 `BUGYO_LOCALE` のほうが先） */
+  locale?: 'ja' | 'en';
   verify: {
     /**
      * 既定の確かめ方の名前。`playwright`（既定）は JSON レポートから spec ごとの合否を読む。`command` は spec ごとに command を1回ずつ実行する。
@@ -50,9 +54,18 @@ export interface BugyoConfig {
             command?: string | undefined;
             env?: Record<string, string> | undefined;
             match?: string | string[] | undefined;
+            /**
+             * command のとき、実行が書くはずの証拠のファイルの glob（`{id}` と `{spec}` が置き換わる）。
+             * 実行のあいだに書かれたファイルが1つもなければ、終了コードが 0 でも FAIL。見つかったファイルはハッシュと一緒に verify.json に残る
+             */
+            evidence?: string[] | undefined;
+            /** `sandbox` なら、`verify.sandbox` のコマンドが通るときだけ動かす（通らなければ FAIL） */
+            requires?: 'sandbox' | undefined;
           }
         >
       | undefined;
+    /** 隔離環境かどうかを確かめるコマンド。`requires: 'sandbox'` の確かめ方を動かす前に1回だけ実行する */
+    sandbox?: string | undefined;
   };
   featureMap: {
     /** spec を探すフォルダ。既定は `e2e`。null で検査を飛ばす */

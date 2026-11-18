@@ -14,13 +14,14 @@
   },
   "files": [
     "eslint.js",
+    "messages.js",
     "index.d.ts",
     "depcruise.cjs",
     "tsconfig.base.json",
     "rules"
   ],
   "scripts": {
-    "check": "node --check eslint.js && node --check depcruise.cjs && node --check rules/no-comments.js",
+    "check": "node --check eslint.js && node --check messages.js && node --check depcruise.cjs && node --check rules/no-comments.js",
     "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {

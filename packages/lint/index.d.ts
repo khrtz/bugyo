@@ -58,6 +58,8 @@ export interface BugyoContext {
   layers: ResolvedLayers;
   /** エラー文に書く、機能のフォルダの名前（layers がなければ `features`） */
   featuresLabel: string;
+  /** メッセージの言語。独自の禁止の build で、言語ごとにメッセージを変えるときに使う */
+  locale: BugyoLocale;
 }
 
 /**
@@ -180,7 +182,15 @@ export interface BugyoOptions extends BugyoSource {
    * 知らない名前を渡すと断る。
    */
   severity?: Record<string, 'warn'>;
+  /**
+   * bugyo の禁止のメッセージの言語。省くと、環境変数 `BUGYO_LOCALE`、`<root>/.bugyo/config.json` の `locale` の順に見て、どれもなければ `ja`。
+   * メッセージの頭の禁止の名前（`[bugyo:<名前>]`）は言語によらず同じなので、言語を変えても bugyo baseline の件数は変わらない
+   */
+  locale?: BugyoLocale;
 }
+
+/** bugyo の禁止のメッセージの言語 */
+export type BugyoLocale = 'ja' | 'en';
 
 export function bugyo(options: BugyoOptions): Linter.Config[];
 

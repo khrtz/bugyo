@@ -61,6 +61,7 @@ export default bugyo({
 | `apiClientDir` | `layers.shared.api`（いくつもあればそのすべて） | 禁止の `allow` に書く `api` の場所（`fetchOnlyInApi` を入れたときに `fetch` を呼んでよい場所） |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `severity` | `{}` | 禁止を warn に下げる（下の「禁止を warn に下げる」） |
+| `locale` | `ja` | 禁止のメッセージの言語。`ja` か `en`（下の「メッセージの言語」） |
 | `parts` | `[common, structure]` | 使う部品と禁止（下の「部品と禁止」）。`common` は必須 |
 | `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
 
@@ -113,6 +114,24 @@ export default bugyo({
 - 層の境界（`shared` から `features` / `app`、`features` から `app`、`layers` を渡したときの `model/` から `shared.ui` / `shared.api`）は1つのルール `import-x/no-restricted-paths` なので、1つずつは下げられません。下げるときはルール ID で、境界をまとめて下げます
 - `bugyo doctor` は、warn に下げた禁止を「直す借り」として別に数えます。`bugyo baseline check` は warn に下げた禁止も数えるので、下げても件数は増やせません
 - ESLint の抑制ファイルに入っている禁止を下げると、抑制が使われなくなって `eslint .` が落ちます（抑制は error だけに効くため）。下げたら `bugyo baseline save` を実行し直します
+
+#### メッセージの言語
+
+bugyo の禁止のメッセージは、日本語（`ja`、既定）と英語（`en`）があります。次の順に見て、最初に見つかったものを使います。
+
+1. `bugyo({ locale: 'en' })`
+2. 環境変数 `BUGYO_LOCALE`
+3. `.bugyo/config.json` の `locale`
+
+```
+'useEffect' import from 'react' is restricted. [bugyo:use-effect] useEffect is not allowed in product code. Fetch data with useXxxQuery in features/*/api, ...
+```
+
+- メッセージの頭の禁止の名前（`[bugyo:use-effect]`）は、言語によらず同じです。`bugyo baseline` はこの名前までで数えるので、言語を変えても件数は変わりません
+- 言語が変わるのは、`@bugyo/lint` と `@bugyo/lint-react` の禁止のメッセージ（コメントの禁止を含む）だけです。設定の書き方の誤りを知らせるエラー、dependency-cruiser のルールの説明、`bugyo` の CLI の出力は日本語のままです
+- `defineBan` で作った禁止のメッセージは書いたとおりに出ます。言語ごとに変えたいときは、`build(context)` で `context.locale` を見ます
+- `.bugyo/baseline.json` が名前で数える前の形式（`version` のないもの）なら、言語を変える前に `bugyo baseline save` で作り直します。古い形式はメッセージの文で数えるので、言語を変えると件数が合わなくなります
+- `ja` と `en` のほかを渡すと断ります
 
 #### 層のフォルダ名を変える
 
@@ -398,6 +417,7 @@ spec: e2e/todos.spec.ts
 - `spec` は、その機能を確かめるファイルへの、プロジェクトのルートからの相対パスです（`/` 区切り。`..` と絶対パスは使えません）。形は問わず、実在だけを確かめます
 - `route` は任意です。画面のある機能で、辿り着く URL のパスを `/` から書きます
 - 4つの見出しは必須です。「よく嘘をつくところ」には、見た目は通るのに壊れていることが起きやすい点を書きます
+- 見出しは英語でも書けます（`## What is there`・`## How to reach it`・`## How to check it`・`## Where it lies`）。見出しごとに日本語と英語を混ぜてもかまいません。雛形のままかどうかは、`（…）` だけの項目と `：` で終わる項目で見ます。英語の見出しの下では、`(…)` だけの項目と `:` で終わる項目も雛形のままとして扱います
 - `docs/features/README.md` に、全体を確かめるときの順番を `[id](id.md)` の形で並べます
 
 対応漏れはテストで落とします。
@@ -494,7 +514,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 `verify` は次のように動きます。どちらの実行方法でも同じです。
 
-- 実行のたびに `artifacts/` を消してから始める
+- 実行のたびに、`artifacts/` の中で verify が書くもの（`verify.json`・`results.json`・`report`・`test-results`・`verify`、確かめ方ごとのフォルダ）だけを消してから始める。ほかのファイルには触らない
 - 機能ごとに `PASS` / `FAIL` を1行で出し、次の行に証拠の場所を出す。失敗したときだけ、出力の末尾30行を付ける
 - 終了コードは、すべて通れば 0、1つでも落ちれば 1、機能名が feature map になければ 2
 - 最後に、機能ごとの合否・中で実行したコマンド・証拠の場所の要約を `artifacts/verify.json` に書く（`bugyo task done` が証拠に写す）
@@ -537,12 +557,44 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | `command` | `runner` が `command` のときのコマンド（必須）。`{id}` と `{spec}` が置き換わる |
 | `env` | そのときだけ足す環境変数 |
 | `match` | この確かめ方で動かす spec の glob（1つか配列） |
+| `evidence` | `runner` が `command` のとき、実行が書くはずの証拠のファイルの glob の配列。`{id}` と `{spec}` が置き換わる（下の「証拠のファイル」） |
+| `requires` | `"sandbox"` なら、`verify.sandbox` のコマンドが通るときだけ動かす（下の「隔離環境でだけ動かす」） |
 
 - frontmatter の `spec` には、確かめるファイルを `,` で区切っていくつも書けます。spec のパスに使えるのは英数字と `. _ @ + / -` だけです
 - spec ごとの確かめ方は、frontmatter の `runner`（その機能のすべての spec に使う）、`match` に当たる確かめ方、`verify.runner` の順に決まります。知らない名前、2つの `match` に当たる spec は、動かす前に断ります（終了コード 2。`pnpm test` の feature map の検査でも出ます）
 - Playwright は確かめ方ごとに1回実行します。`verify.runner` の確かめ方の証拠は今までの場所に、ほかの確かめ方の証拠は `artifacts/<名前>/` の下（`test-results`・`report`・`results.json`）に置きます
 - 機能は、そのすべての spec が通ったときに `PASS` です。`artifacts/verify.json` には、spec ごとの確かめ方と合否（`runs`）も書きます
 - `playwright`・`command`・`report`・`test-results`・`verify` は名前に使えません
+
+#### 証拠のファイル
+
+`command` の確かめ方は、終了コードしか見ません。スクリーンショットなど、実行が残すはずのファイルがあるなら、`evidence` に glob で書きます。
+
+```json
+{ "runners": { "desktop": { "runner": "command", "command": "node scripts/shoot.js {id}", "evidence": ["artifacts/screens/{id}/*.png"] } } }
+```
+
+- 実行が始まってから書かれた、glob に当たるファイルが1つもなければ、終了コードが 0 でも `FAIL` です。前の実行で残ったファイルは数えません（ファイルの時刻で見ます。時刻の粗いファイルシステムのぶん、始まる2秒前までは数えます）
+- 見つかったファイルは、パスと中身のハッシュ（sha256）を `artifacts/verify.json` の機能ごとの `files` に書き、`証拠:` の行にも出します。`bugyo task done` の証拠には `verify.json` がそのまま入るので、ハッシュも残ります
+- glob に当たるファイルを verify が消すことはありません
+- Playwright の確かめ方には書けません（証拠を決まった場所に残すため）
+
+#### 隔離環境でだけ動かす
+
+実際のファイルや外のサービスに触る確かめ方は、隔離環境（コンテナや使い捨ての VM など）でだけ動かせます。隔離環境かどうかを確かめるコマンドを `verify.sandbox` に書き、確かめ方に `"requires": "sandbox"` を付けます。
+
+```json
+{
+  "verify": {
+    "sandbox": "node scripts/in-sandbox.js",
+    "runners": { "desktop": { "runner": "command", "command": "node scripts/shoot.js {id}", "requires": "sandbox" } }
+  }
+}
+```
+
+- `requires: "sandbox"` の確かめ方を動かす前に、`verify.sandbox` を1回だけ実行します。終了コードが 0 でなければ、その確かめ方は動かさずに `FAIL` にします（飛ばして通すことはしません）。`bugyo task done` も通りません
+- どれを隔離環境で動かすかは設定にだけ書けます。feature map の frontmatter では変えられません
+- `requires: "sandbox"` があるのに `verify.sandbox` がなければ、設定を読むときに断ります
 
 ## 設定ファイル（`.bugyo/config.json`）
 
@@ -559,9 +611,11 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | --- | --- | --- |
 | `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
 | `sarif` | なし | `bugyo doctor` と `bugyo baseline` で一緒に数える、外の lint の結果。`[{ command?, file }]`（[外の lint の結果も数える](adopt.md#外の-lint-の結果も数える)） |
+| `locale` | `ja` | `@bugyo/lint` の禁止のメッセージの言語。`ja` か `en`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
 | `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
 | `verify.command` | なし | `command` で動かすときは必須 |
 | `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |
+| `verify.sandbox` | なし | 隔離環境かどうかを確かめるコマンド。`requires: "sandbox"` の確かめ方の前に実行する（上の「隔離環境でだけ動かす」） |
 | `sources` | なし | ソースごとの `src`・`layers`・`tsconfig`。`layers` とは一緒に書けない（上の「ソースをいくつも置く」） |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
