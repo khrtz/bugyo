@@ -226,7 +226,7 @@ export default bugyo({
 - 同じ id の機能のフォルダは、どのソースにあっても同じ機能です。どのソースの機能のフォルダにも `docs/features/<id>.md` が要ります。`logic` タスクの「model にテストがある」は、どれかのソースの model にテストがあれば通ります
 - `bugyo doctor` は、どの層にも入っていないファイルと feature の中のフォルダを、ソースごとに見ます。`bugyo new feature` は雛形を作らずに断ります
 - HTTP サーバーのソースの例は、下の「サーバーの層」です
-- dependency-cruiser は1つの設定で1つの tsconfig しか使えないので、ソースごとに設定ファイルを分けて `config({ src, layers, tsConfig })` を呼びます。`bugyo doctor` と `bugyo baseline` が数えるのは、プロジェクトのルートの `.dependency-cruiser.cjs` の1つだけです
+- dependency-cruiser は1つの設定で1つの tsconfig しか使えないので、ソースごとに設定ファイルを分けて `config({ src, layers, tsConfig })` を呼びます。`bugyo doctor` と `bugyo baseline` が数えるのは、プロジェクトのルートの `.dependency-cruiser.cjs` の1つだけで、渡すのは `tsconfig` を書いていないソースだけです（ルートの設定はルートの tsconfig で import を解決するため）。ほかのソースの依存の違反は、そのソースの設定で `depcruise` を実行して確かめます
 
 #### サーバーの層
 

@@ -288,7 +288,7 @@ export function loadConfig(cwd = process.cwd()) {
 
 /**
  * @typedef {{ app: string, features: string, shared: { ui: string[], api: string[], lib: string[], model: string[], other: string[] }, featureParts: { ui: string[], api: string[], model: string[] } }} ResolvedLayers
- * @typedef {{ name: string, src: string, layers: ResolvedLayers, custom: boolean }} ResolvedSource
+ * @typedef {{ name: string, src: string, layers: ResolvedLayers, custom: boolean, tsconfig?: string }} ResolvedSource
  */
 
 /**
@@ -298,7 +298,15 @@ export function loadConfig(cwd = process.cwd()) {
  * @returns {ResolvedSource[]}
  */
 export function sourcesOf(config) {
-  if (config.sources !== undefined) return Object.entries(config.sources).map(([name, source]) => ({ name, src: source.src, layers: source.layers, custom: true }));
+  if (config.sources !== undefined) {
+    return Object.entries(config.sources).map(([name, source]) => ({
+      name,
+      src: source.src,
+      layers: source.layers,
+      custom: true,
+      ...(source.tsconfig === undefined ? {} : { tsconfig: source.tsconfig }),
+    }));
+  }
   return [{ name: 'src', src: 'src', layers: config.layers ?? defaultLayers, custom: config.layers !== undefined }];
 }
 

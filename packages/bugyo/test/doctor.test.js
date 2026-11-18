@@ -229,6 +229,22 @@ test('sources: doctor はソースごとに、どの層にも入っていない�
   assert.deepEqual(report.featureParts, { features: 2, ui: 1, model: 2, unassigned: [] });
 });
 
+test('sources: ルートの dependency-cruiser の設定には、tsconfig を書いていないソースだけを渡す', () => {
+  const cwd = project();
+  setResults(cwd, {});
+  withFiles(cwd, { sources }, sourceFiles);
+  writeFileSync(join(cwd, '.dependency-cruiser.cjs'), 'module.exports = {};\n');
+  writeFileSync(join(cwd, 'fake-depcruise.cjs'), "require('node:fs').writeFileSync('depcruise-args.json', JSON.stringify(process.argv.slice(2)));\nprocess.stdout.write('{\"summary\":{\"violations\":[]}}');\n");
+  const binDir = join(cwd, 'node_modules', '.bin');
+  writeFileSync(join(binDir, 'depcruise'), `#!/bin/sh\nexec node "$(dirname "$0")/../../fake-depcruise.cjs" "$@"\n`, { mode: 0o755 });
+  writeFileSync(join(binDir, 'depcruise.cmd'), '@node "%~dp0\\..\\..\\fake-depcruise.cjs" %*\r\n');
+  const run = bugyo(cwd, 'doctor', '--json');
+  assert.equal(run.status, 0, run.all);
+  const args = JSON.parse(readFileSync(join(cwd, 'depcruise-args.json'), 'utf8'));
+  assert.ok(args.includes('web'), args.join(' '));
+  assert.ok(!args.some((/** @type {string} */ arg) => arg.startsWith('server')), `server は自分の tsconfig を使うので渡さない: ${args.join(' ')}`);
+});
+
 test('sources: 同じ id の機能は1つとして扱い、logic のテストはどのソースの model にあってもよい', async () => {
   const { loadConfig, featureRoots } = await import('../src/config.js');
   const { requirements } = await import('../src/evidence.js');

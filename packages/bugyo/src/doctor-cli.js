@@ -38,22 +38,17 @@ function parse(args) {
 
 /**
  * dependency-cruiser に渡すフォルダ。指定がなければ、layers の層をまとめたフォルダ、layers がなければ src（なければ渡さない）。
+ * sources があれば、ソースごとの層をまとめたフォルダ。ただし tsconfig を書いたソースは渡さない（ルートの設定はルートの tsconfig で import を解決するため）。
  *
  * @param {string} cwd
  * @param {string | undefined} option
  */
 function dirsOf(cwd, option) {
   if (option !== undefined) return option.split(',').map((dir) => dir.trim()).filter((dir) => dir !== '');
-  return sourceRoots(loadConfig(cwd)).filter((root) => existsSync(join(cwd, root)));
-}
-
-/**
- * ソースごとの、層のフォルダをまとめたフォルダ。layers も sources もなければ src。
- *
- * @param {import('./index.js').BugyoConfig} config
- */
-function sourceRoots(config) {
-  return sourcesOf(config).map((source) => (source.custom ? commonDir(dirsOfLayers(source.layers)) : 'src'));
+  return sourcesOf(loadConfig(cwd))
+    .filter((source) => source.tsconfig === undefined)
+    .map((source) => (source.custom ? commonDir(dirsOfLayers(source.layers)) : 'src'))
+    .filter((root) => existsSync(join(cwd, root)));
 }
 
 /** @param {Record<string, number>} counts */
