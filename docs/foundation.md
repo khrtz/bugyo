@@ -107,7 +107,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, rea
 | --- | --- | --- |
 | `feature-internals` | 他の feature の内部ファイルの import | `structure` |
 | `fetch` | `fetch` | `structure` |
-| `model-layers` | `model/` から `ui/`・`api/`・`shared/ui`・`shared/api` への import | `structure` |
+| `model-layers` | `model/` から `ui/`・`api/`・`shared/ui`・`shared/api` への import（`layers` を渡したときは `ui/`・`api/` だけ。下を参照） | `structure` |
 | `use-effect` | `useEffect` / `useLayoutEffect` | `react` |
 | `ui-timers` | feature の UI での `setTimeout` などのタイマー | `react` |
 | `model-react` | `model/` から React とその周辺への import | `react` |
@@ -115,6 +115,8 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, rea
 - 名前のほかに、設定にあるルール ID（例: `@typescript-eslint/no-non-null-assertion`）も渡せます。そのルールがどのファイルでも warn になります
 - 名前で下げた禁止は、同じルールの他の禁止と分けるために、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になります。`eslint-disable` のコメントで止めるときも、この ID を書きます
 - 知らない名前と、組み合わせた部品にない禁止の名前は断ります
+- 層の境界（`shared` から `features` / `app`、`features` から `app`、`layers` を渡したときの `model/` から `shared.ui` / `shared.api`）は1つのルール `import-x/no-restricted-paths` なので、1つずつは下げられません。下げるときはルール ID で、境界をまとめて下げます
+- `extra` で足した禁止には名前がないので、名前では下げられません
 - `bugyo doctor` は、warn に下げた禁止を「直す借り」として別に数えます。`bugyo baseline check` は warn に下げた禁止も数えるので、下げても件数は増やせません
 - ESLint の抑制ファイルに入っている禁止を下げると、抑制が使われなくなって `eslint .` が落ちます（抑制は error だけに効くため）。下げたら `bugyo baseline save` を実行し直します
 
