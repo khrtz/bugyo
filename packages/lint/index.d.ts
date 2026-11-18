@@ -63,7 +63,8 @@ export interface BanSpec {
   /** 禁止の名前。小文字・数字・ハイフン。`severity` で warn に下げるときにも使う。同じ名前の禁止は2つ置けない */
   name: string;
   /**
-   * どこで止めるか。`src`（既定。src の下の .ts / .tsx）、`ui`（features の各 feature の ui/）、`model`（各 feature の model/）か、root からの glob
+   * どこで止めるか。`src`（既定。src の下の .ts / .tsx）、`ui`（features の各 feature の ui/）、`model`（各 feature の model/）。
+   * root からの glob は、`rules` だけの禁止で使える（imports・globals・syntax・properties があると断る）
    */
   scope?: string;
   /**

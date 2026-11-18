@@ -87,8 +87,13 @@ export function normalizeBan(spec) {
     rules: { ...(spec.rules ?? {}) },
     plugins: { ...(spec.plugins ?? {}) },
   };
-  const size = ban.imports.paths.length + ban.imports.patterns.length + ban.globals.length + ban.syntax.length + ban.properties.length + Object.keys(ban.rules).length;
-  if (size === 0) throw new Error(`禁止 ${name} は何も止めていません。imports・globals・syntax・properties・rules のどれかを書いてください`);
+  const combinedSize = ban.imports.paths.length + ban.imports.patterns.length + ban.globals.length + ban.syntax.length + ban.properties.length;
+  if (combinedSize + Object.keys(ban.rules).length === 0) throw new Error(`禁止 ${name} は何も止めていません。imports・globals・syntax・properties・rules のどれかを書いてください`);
+  if (combinedSize > 0 && !namedScopes.includes(scope)) {
+    throw new Error(
+      `禁止 ${name}: imports・globals・syntax・properties は、scope を ${namedScopes.join(' / ')} のどれかにしてください（glob の範囲では、bugyo の禁止と合成したルールが上書きし合うため）。範囲を絞るなら、scope は src のまま allow で除くか、rules で書いてください`,
+    );
+  }
   return ban;
 }
 

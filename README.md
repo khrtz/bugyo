@@ -36,14 +36,14 @@
 
 ## 見てわかる例
 
-**止めるときは、代わりに何を使うかまで言います。** エージェントが `useEffect` と `fetch` を書くと、こう返ります。
+**止めるときは、代わりに何を使うかまで言います。** `useEffect` と `fetch` の禁止を入れたプロジェクト（`react-vite` のテンプレートは入れています）でエージェントがそれを書くと、こう返ります。
 
 ```
  1:17  error  'useEffect' import from 'react' is restricted. 製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは src/shared/lib の専用フックを使ってください。該当するフックがなければ src/shared/lib に追加してください。  no-restricted-imports
 10:3   error  Unexpected use of 'fetch'. fetchを直接呼ばないでください。src/shared/api のクライアントを使い、スキーマで応答を検証してください。  no-restricted-globals
 ```
 
-（テスト用の違反ファイル `packages/lint/test/fixture/src/features/a/ui/Bad.tsx` に対する出力から2件を抜き出したものです）
+（テスト用の違反ファイル `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx` に対する出力から2件を抜き出したものです）
 
 **確かめた結果は、合否と証拠の場所だけを返します。** 長いログでエージェントの文脈を埋めません。
 

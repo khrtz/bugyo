@@ -25,8 +25,8 @@ src/
     index.ts                外に見せる窓口。外からはここだけを import する
   shared/
     ui/                     共通の部品
-    lib/                    useEffect を書いてよい唯一の場所
-    api/                    fetch を呼んでよい唯一の場所
+    lib/                    useEffect を書いてよい唯一の場所（noUseEffect を入れたとき）
+    api/                    fetch を呼んでよい唯一の場所（fetchOnlyInApi を入れたとき）
 docs/features/<id>.md       feature map（機能ごとの確かめ方）
 e2e/<id>.spec.ts            その機能を実際に操作するテスト
 ```
@@ -171,7 +171,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 | 項目 | 形 | 意味 |
 | --- | --- | --- |
 | `name` | 小文字・数字・ハイフン | 禁止の名前。`severity` のキーにもなる。同じ名前の禁止は2つ置けない |
-| `scope` | `src`（既定）・`ui`・`model`、または root からの glob | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/` |
+| `scope` | `src`（既定）・`ui`・`model`。`rules` だけの禁止は root からの glob も使える | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/`。`imports`・`globals`・`syntax`・`properties` は bugyo の禁止と1つのルールに合成するので、glob の範囲にすると断る（範囲を絞るなら `allow` で除く） |
 | `allow` | `effects`・`api`・`tests`、または root からの glob の配列 | どこでは許すか。`effects` は `effectHooksDir`、`api` は `apiClientDir`、`tests` は `src` の下の `*.test.ts(x)` |
 | `imports` | `{ paths: [{ name, importNames?, message }], patterns: [{ group, message }] }` | `no-restricted-imports` に合成する |
 | `globals` | `[{ name, message }]` | `no-restricted-globals` に合成する |
@@ -184,7 +184,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 - 禁止したものの「正しい入口」は、`allow` に書いた場所に作ります（例: `Date.now` を禁止し、`shared/lib/clock.ts` だけで使う）
 - 知らない項目、何も止めていない禁止、同じ名前の禁止は断ります
 - `no-restricted-imports` などを自分の設定ブロックで直接書くと、合成した bugyo の禁止が上書きされて消えます。必ず `defineBan` で足します
-- 1つのファイルが2つの許す場所に当たるとき（例: `shared/lib` の中のテスト）は、後ろの場所（`effects`・`api`・`tests`・glob の順）で作り直したルールが前の場所の分を上書きします。同じ種類（`imports` 同士など）の禁止を両方の場所で許していると、前の場所で許した禁止が戻ることがあります
+- 1つのファイルが2つの許す場所に当たるとき（例: `shared/lib` の中のテスト）は、後ろの場所（`effects`・`api`・`tests`・glob の順）で作り直したルールが前の場所の分を上書きします。同じ種類（`imports` 同士など）の別々の禁止を、片方は前の場所で、もう片方は後ろの場所で許していると、前の場所で許した禁止がそのファイルでは戻ります
 
 ### dependency-cruiser
 

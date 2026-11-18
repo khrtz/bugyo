@@ -46,7 +46,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, /* 
 | ほかの ESLint のルール | `rules: { '<ルール ID>': 'error' }` | `no-console` |
 | 層や feature をまたぐ依存 | `.dependency-cruiser.cjs` の `config({ forbidden: [...] })` | — |
 
-- `scope` で止める範囲を絞れる（`src`・`ui`・`model`、または glob）。既定は `src` の下すべて
+- `scope` で止める範囲を絞れる（`src`・`ui`・`model`）。既定は `src` の下すべて。glob の範囲は `rules` だけの禁止で使える
 - `allow` に、禁止したものの「正しい入口」を置く場所を書く（`effects` は `src/shared/lib`、`api` は `src/shared/api`、`tests` はテスト、または glob）。入口はそこに作る（例: `shared/lib/clock.ts` の `systemClock`）
 - `name` は小文字・数字・ハイフン。今ある禁止と同じ名前は断られる
 
