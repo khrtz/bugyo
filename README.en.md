@@ -60,7 +60,7 @@ The two lines say: the steps to check are in `docs/features/todos.md`, and the e
 ## What it does
 
 - **Structure** — `src/app`, `src/features/<id>/{ui,api,model,index.ts}`, `src/shared/{ui,lib,api}`. Other code may import a feature only through its `index.ts`. The `node-lib` template uses `src/features/<id>/{model,index.ts}` only.
-- **Lint** — parts you combine. `@bugyo/lint` has `common` (no `any`, no type assertions, no comments, no unexplained `eslint-disable`) and `structure` (feature boundaries, `fetch` only in `shared/api`, `model/` stays pure). The `react` part (`useEffect` only in `shared/lib`, no timers in feature UI, no React in `model/`) lives in a separate package, `@bugyo/lint-react`. Projects without React install `@bugyo/lint` only.
+- **Lint** — parts and bans you pick and combine. The parts are `common` (no `any`, no type assertions, no unexplained `eslint-disable`) and `structure` (feature boundaries, `model/` stays pure). Bans are added one at a time: no comments, `fetch` only in `shared/api`, `useEffect` only in `shared/lib`, no timers in feature UI. Your own bans are written in the same shape with `defineBan`. The React part and bans live in a separate package, `@bugyo/lint-react`; projects without React install `@bugyo/lint` only.
 - **Dependency rules** — no cycles, no reaching into another feature's internals, `shared` depends on nothing above it.
 - **Feature map** — one `docs/features/<id>.md` per feature with four required sections: what exists, how to get there, how to operate and check it, and where it tends to lie. Tests fail when a feature, its spec, or its map entry is missing.
 - **Verification** — `bugyo verify <id>` runs the feature's check and reports pass/fail plus where the evidence is. By default it runs the Playwright spec and keeps video, screenshots, and a trace; with `"runner": "command"` in `.bugyo/config.json` it runs any command per feature and keeps its output.
@@ -74,8 +74,8 @@ Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs
 
 | Path | Contents |
 | --- | --- |
-| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config (the common and structure parts), dependency-cruiser rules, a strict tsconfig, a no-comments rule. No React dependency |
-| [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | The React part added on top of `@bugyo/lint` (where `useEffect` may live, react-hooks, no timers in UI) |
+| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config (the common and structure parts, the comment and `fetch` bans, `defineBan` for your own bans), dependency-cruiser rules, a strict tsconfig. No React dependency |
+| [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | The React part (react-hooks) and bans (where `useEffect` may live, no timers in UI) added on top of `@bugyo/lint` |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify` / `task` / `mistake` / `gate`), feature map loader and consistency tests, Playwright config |
 | [plugin](plugin) | Claude Code plugin (five skills and a review subagent) |
 | [examples/todo-app](examples/todo-app) | A React (Vite) sample; the source of `bugyo init --template react-vite` (the default) |
@@ -97,8 +97,8 @@ Pick a template when you create the project. The default is `react-vite`.
 
 | Template | What you get | How verify works |
 | --- | --- | --- |
-| `react-vite` | A React + Vite app. Lint uses common, structure, and React (`@bugyo/lint-react`) | Drives the UI with Playwright and keeps video, screenshots, and a trace |
-| `node-lib` | A TypeScript library / CLI with no UI, run directly by Node's type stripping. Lint uses `common` and `structure` only; `@bugyo/lint-react` is not installed | Runs each feature's check script with `node` and keeps its output |
+| `react-vite` | A React + Vite app. Lint uses the common, structure, and React (`@bugyo/lint-react`) parts, plus the comment, `fetch`, `useEffect`, and UI-timer bans | Drives the UI with Playwright and keeps video, screenshots, and a trace |
+| `node-lib` | A TypeScript library / CLI with no UI, run directly by Node's type stripping. Lint uses the `common` and `structure` parts plus the comment and `fetch` bans only; `@bugyo/lint-react` is not installed | Runs each feature's check script with `node` and keeps its output |
 
 ```bash
 node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib

@@ -56,7 +56,7 @@ PASS todos  確認手順: docs/features/todos.md
 ## できること
 
 - **構成** — `src/app`、`src/features/<id>/{ui,api,model,index.ts}`、`src/shared/{ui,lib,api}`。feature は `index.ts` からだけ使える。画面のない `node-lib` では、feature は `model/` と `index.ts` だけ
-- **lint** — 部品を組み合わせる。共通（`any`、型アサーション、コメント、理由のない `eslint-disable` を止める）と構成（feature の境界、`fetch` は `shared/api` だけ、`model/` は純粋関数だけ）は `@bugyo/lint` に、React（`useEffect` は `shared/lib` だけ、UI でのタイマーを止める）は別のパッケージ `@bugyo/lint-react` にある。React を使わないプロジェクトは `@bugyo/lint` だけを入れる
+- **lint** — 部品と禁止を選んで組み合わせる。部品は共通（`any`、型アサーション、理由のない `eslint-disable` を止める）と構成（feature の境界、`model/` は純粋関数だけ）で、禁止はコメント・`fetch` は `shared/api` だけ・`useEffect` は `shared/lib` だけ・UI でのタイマー、のように1つずつ入れる。独自の禁止も `defineBan` で同じ形に書ける。React 用の部品と禁止は別のパッケージ `@bugyo/lint-react` にあり、React を使わないプロジェクトは `@bugyo/lint` だけを入れる
 - **依存ルール** — 循環依存、他の feature の内部への依存、`shared` から上の層への依存を止める
 - **feature map** — 機能ごとに `docs/features/<id>.md` を1つ置き、「何があるか・どう辿り着くか・どう操作して確かめるか・よく嘘をつくところ」を書く。機能・spec・地図の対応漏れはテストが落とす
 - **検証** — `bugyo verify <id>` がその機能を実際に動かし、合否と証拠を毎回残す。既定は Playwright（動画・スクリーンショット・トレース）。`.bugyo/config.json` で、機能ごとに任意のコマンドを実行する方式にもできる
@@ -70,8 +70,8 @@ PASS todos  確認手順: docs/features/todos.md
 
 | 場所 | 中身 |
 | --- | --- |
-| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config（共通と構成の部品）、dependency-cruiser のルール、厳しい tsconfig、コメント禁止ルール。React に依存しない |
-| [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | `@bugyo/lint` に足す React 用の部品（`useEffect` の置き場所、react-hooks、UI でのタイマー禁止） |
+| [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config（共通と構成の部品、コメントと `fetch` の禁止、独自の禁止を作る `defineBan`）、dependency-cruiser のルール、厳しい tsconfig。React に依存しない |
+| [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | `@bugyo/lint` に足す React 用の部品（react-hooks）と禁止（`useEffect` の置き場所、UI でのタイマー） |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI（`init` / `new feature` / `verify` / `task` / `mistake` / `gate`）、feature map の読み込みと整合テスト、Playwright 設定 |
 | [plugin](plugin) | Claude Code プラグイン（スキル5つとレビュー用サブエージェント） |
 | [examples/todo-app](examples/todo-app) | React（Vite）の見本。`bugyo init --template react-vite`（既定）のテンプレートの元 |
@@ -93,8 +93,8 @@ pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack && pnpm --filter @bug
 
 | テンプレート | 中身 | verify |
 | --- | --- | --- |
-| `react-vite` | React + Vite の画面。lint は共通・構成・React（`@bugyo/lint-react`） | Playwright で画面を操作し、動画・スクリーンショット・トレースを残す |
-| `node-lib` | 画面のない TypeScript のライブラリ／CLI。Node の型除去で `.ts` をそのまま動かす。lint は共通と構成だけで、`@bugyo/lint-react` は入らない | 機能ごとの確かめるスクリプトを `node` で実行し、出力を残す |
+| `react-vite` | React + Vite の画面。lint は共通・構成・React（`@bugyo/lint-react`）の部品と、コメント・`fetch`・`useEffect`・UI のタイマーの禁止 | Playwright で画面を操作し、動画・スクリーンショット・トレースを残す |
+| `node-lib` | 画面のない TypeScript のライブラリ／CLI。Node の型除去で `.ts` をそのまま動かす。lint は共通と構成の部品と、コメント・`fetch` の禁止だけで、`@bugyo/lint-react` は入らない | 機能ごとの確かめるスクリプトを `node` で実行し、出力を残す |
 
 ```bash
 node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib

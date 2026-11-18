@@ -135,6 +135,8 @@ npx bugyo task done t-001
 
 ### 1. 入れる前に数える
 
+`bugyo({ parts })` に並べた部品と禁止だけが当たります。`[common, structure]` から始め、コメント・`fetch`・`useEffect` などの禁止（[部品と禁止](foundation.md#部品と禁止)）は、チームで合意したものから1つずつ足せます。
+
 ```bash
 npx bugyo doctor --tsconfig tsconfig.json
 ```
