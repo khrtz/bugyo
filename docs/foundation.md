@@ -416,9 +416,45 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `runner` | 動き | 証拠の場所 |
 | --- | --- | --- |
 | `playwright`（既定） | 対象の spec をまとめて `playwright test`（`node_modules/.bin` のもの。パッケージマネージャーは通さない）に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
-| `command` | `verify.command` を機能ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は frontmatter の `spec` に置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力） |
+| `command` | `verify.command` を spec ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は spec のパスに置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力。1つの機能で2回以上実行したときは `<id>.1.log`・`<id>.2.log`…） |
 
 どちらもシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。pnpm・npm・yarn・bun のどれで入れても動きます（Yarn の PnP のように `node_modules/.bin` を作らない入れ方は対象外です）。
+
+### 機能ごとに確かめ方を変える
+
+確かめ方に名前を付けて `verify.runners` に書くと、機能ごと、spec ごとに使い分けられます。コマンドと環境変数は設定にだけ書き、feature map からは名前で選びます。
+
+```json
+{
+  "verify": {
+    "runner": "playwright",
+    "runners": {
+      "api": { "runner": "command", "command": "vitest run {spec}", "match": "server/tests/**" },
+      "client": { "runner": "playwright", "env": { "APP_MODE": "client" } }
+    }
+  }
+}
+```
+
+```md
+---
+id: invoices
+spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
+---
+```
+
+| 項目 | 意味 |
+| --- | --- |
+| `runner` | `playwright` か `command`。動き方は上の表と同じ |
+| `command` | `runner` が `command` のときのコマンド（必須）。`{id}` と `{spec}` が置き換わる |
+| `env` | そのときだけ足す環境変数 |
+| `match` | この確かめ方で動かす spec の glob（1つか配列） |
+
+- frontmatter の `spec` には、確かめるファイルを `,` で区切っていくつも書けます。spec のパスに使えるのは英数字と `. _ @ + / -` だけです
+- spec ごとの確かめ方は、frontmatter の `runner`（その機能のすべての spec に使う）、`match` に当たる確かめ方、`verify.runner` の順に決まります。知らない名前、2つの `match` に当たる spec は、動かす前に断ります（終了コード 2。`pnpm test` の feature map の検査でも出ます）
+- Playwright は確かめ方ごとに1回実行します。`verify.runner` の確かめ方の証拠は今までの場所に、ほかの確かめ方の証拠は `artifacts/<名前>/` の下（`test-results`・`report`・`results.json`）に置きます
+- 機能は、そのすべての spec が通ったときに `PASS` です。`artifacts/verify.json` には、spec ごとの確かめ方と合否（`runs`）も書きます
+- `playwright`・`command`・`report`・`test-results`・`verify` は名前に使えません
 
 ## 設定ファイル（`.bugyo/config.json`）
 
@@ -434,8 +470,9 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | キー | 既定 | 意味 |
 | --- | --- | --- |
 | `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
-| `verify.runner` | `playwright` | `playwright` か `command`（上の「CLI」） |
-| `verify.command` | なし | `runner` が `command` のときは必須 |
+| `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
+| `verify.command` | なし | `command` で動かすときは必須 |
+| `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |

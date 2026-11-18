@@ -5,10 +5,32 @@ import { types } from './tasks.js';
 
 export const configFile = '.bugyo/config.json';
 
+/** runners に付けられない名前。playwright と command は決まった確かめ方、残りは artifacts/ の下の証拠の置き場所 */
+const reservedRunnerNames = ['playwright', 'command', 'report', 'test-results', 'verify'];
+
+const RunnerName = z.string().regex(/^[a-z][a-z0-9-]*$/, '小文字・数字・ハイフンの名前にしてください');
+
+/** 名前を付けた確かめ方。feature map の frontmatter の runner で選ぶか、match の glob に当たる spec に使う */
+const NamedRunner = z
+  .object({
+    runner: z.enum(['playwright', 'command']),
+    command: z.string().optional(),
+    env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/, '環境変数の名前にしてください'), z.string()).optional(),
+    match: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
+  })
+  .strict();
+
 const Verify = z
   .object({
-    runner: z.enum(['playwright', 'command']).default('playwright'),
+    runner: RunnerName.default('playwright'),
     command: z.string().optional(),
+    runners: z
+      .record(RunnerName, NamedRunner)
+      .refine(
+        (runners) => !Object.keys(runners).some((name) => reservedRunnerNames.includes(name)),
+        `${reservedRunnerNames.join('・')} は決まった名前か証拠の置き場所なので、別の名前にしてください`,
+      )
+      .optional(),
   })
   .strict();
 
@@ -204,8 +226,16 @@ export function loadConfig(cwd = process.cwd()) {
   }
   const parsed = Config.safeParse(raw);
   if (!parsed.success) throw new Error(`${configFile} が不正です: ${parsed.error.message}`);
-  if (parsed.data.verify.runner === 'command' && !parsed.data.verify.command?.trim()) {
+  const { verify } = parsed.data;
+  if (verify.runner === 'command' && !verify.command?.trim()) {
     throw new Error(`${configFile}: verify.runner が "command" のときは verify.command にコマンドを書いてください（{id} と {spec} が置き換わります）`);
+  }
+  const names = ['playwright', 'command', ...Object.keys(verify.runners ?? {})];
+  if (!names.includes(verify.runner)) throw new Error(`${configFile}: verify.runner の ${verify.runner} がありません（使えるのは ${names.join(', ')}）`);
+  for (const [name, runner] of Object.entries(verify.runners ?? {})) {
+    if (runner.runner === 'command' && !runner.command?.trim()) {
+      throw new Error(`${configFile}: verify.runners.${name} は command なので、command にコマンドを書いてください（{id} と {spec} が置き換わります）`);
+    }
   }
   const { featureMap, layers } = parsed.data;
   return {

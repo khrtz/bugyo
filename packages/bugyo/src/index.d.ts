@@ -4,8 +4,12 @@ export interface Feature {
   id: string;
   /** 画面のある機能で、その機能に辿り着く URL のパス。任意 */
   route?: string;
-  /** その機能を確かめるファイル（プロジェクトのルートからの相対パス） */
+  /** その機能を確かめるファイル（プロジェクトのルートからの相対パス）。いくつもあるときは最初のもの */
   spec: string;
+  /** その機能を確かめるファイルのすべて。frontmatter の spec に `,` 区切りで書く */
+  specs: string[];
+  /** その機能を確かめる方法の名前（`playwright`・`command`・`verify.runners` の名前）。書かなければ spec ごとに決める */
+  runner?: string;
   /** docs/features/<id>.md（cwd からの相対パス） */
   file: string;
   body: string;
@@ -22,10 +26,28 @@ export interface BugyoConfig {
   /** パッケージマネージャー。書かなければ package.json の packageManager か lockfile から決める（見つからなければ pnpm）。commands の既定を選ぶ */
   packageManager: 'pnpm' | 'npm' | 'yarn' | 'bun';
   verify: {
-    /** `playwright`（既定）は JSON レポートから spec ごとの合否を読む。`command` は機能ごとに command を1回ずつ実行する */
-    runner: 'playwright' | 'command';
-    /** runner が `command` のときに機能ごとに実行するコマンド。`{id}` と `{spec}` が置き換わる */
+    /**
+     * 既定の確かめ方の名前。`playwright`（既定）は JSON レポートから spec ごとの合否を読む。`command` は spec ごとに command を1回ずつ実行する。
+     * `runners` に書いた名前も使える
+     */
+    runner: string;
+    /** `command` で spec ごとに実行するコマンド。`{id}` と `{spec}` が置き換わる */
     command?: string | undefined;
+    /**
+     * 名前を付けた確かめ方。feature map の frontmatter の `runner` で選ぶか、`match` の glob に当たる spec に使う。
+     * `env` はそのときだけ足す環境変数
+     */
+    runners?:
+      | Record<
+          string,
+          {
+            runner: 'playwright' | 'command';
+            command?: string | undefined;
+            env?: Record<string, string> | undefined;
+            match?: string | string[] | undefined;
+          }
+        >
+      | undefined;
   };
   featureMap: {
     /** spec を探すフォルダ。既定は `e2e`。null で検査を飛ばす */

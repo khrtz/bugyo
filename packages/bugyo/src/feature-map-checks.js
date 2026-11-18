@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig } from './config.js';
 import { featureDir, loadFeatures, loadSweepOrder, requiredSections } from './feature-map.js';
+import { runsOf } from './runners.js';
 
 /**
  * feature map の整合を確かめる検査の一覧を作る。テストランナーごとの登録は vitest.js と node-test.js が受け持つ。
@@ -12,7 +13,7 @@ import { featureDir, loadFeatures, loadSweepOrder, requiredSections } from './fe
  */
 export function featureMapChecks(options = {}) {
   const cwd = options.cwd ?? process.cwd();
-  const config = loadConfig(cwd).featureMap;
+  const { featureMap: config, verify } = loadConfig(cwd);
   const featuresDir =
     options.featuresDir !== undefined ? options.featuresDir : options.src !== undefined ? `${options.src}/features` : config.featuresDir;
   const specDir = options.specDir !== undefined ? options.specDir : config.specDir;
@@ -45,13 +46,22 @@ export function featureMapChecks(options = {}) {
       title: 'すべての機能の spec が実在する',
       skip: null,
       problems: () =>
-        features.filter((feature) => !existsSync(join(cwd, feature.spec))).map((feature) => `${feature.file}: ${feature.spec} がありません`),
+        features.flatMap((feature) => feature.specs.filter((spec) => !existsSync(join(cwd, spec))).map((spec) => `${feature.file}: ${spec} がありません`)),
+    },
+    {
+      title: 'すべての機能の spec の確かめ方が決まる',
+      skip: null,
+      problems: () =>
+        features.flatMap((feature) => {
+          const resolved = runsOf(feature, verify);
+          return 'error' in resolved ? [resolved.error] : [];
+        }),
     },
     {
       title: `${specDir ?? 'spec のフォルダ'} のすべての *${specSuffix} が、どれかの機能に対応している`,
       skip: missing(specDir),
       problems: () => {
-        const mapped = new Set(features.map((feature) => feature.spec));
+        const mapped = new Set(features.flatMap((feature) => feature.specs));
         return readdirSync(join(cwd, specDir ?? ''))
           .filter((name) => name.endsWith(specSuffix))
           .map((name) => `${specDir}/${name}`)
