@@ -106,7 +106,10 @@ export function resolveLayers(
 export interface BugyoOptions {
   /** eslint.config.js で `import.meta.dirname` を渡す */
   root: string;
-  /** 使う部品。既定は `[common, structure]`。common は必須。React を使うなら @bugyo/lint-react の `react` を足す。順番は結果に影響しない */
+  /**
+   * 使う部品と禁止。既定は `[common, structure]`。common は必須。React を使うなら @bugyo/lint-react の `react` を足す。
+   * 禁止（`noComments`・`fetchOnlyInApi`、@bugyo/lint-react の `noUseEffect`・`noUiTimers`、defineBan で作ったもの）も並べて渡す。順番は結果に影響しない
+   */
   parts?: readonly BugyoPart[];
   /**
    * import に拡張子を書くプロジェクト（Node の型除去で .ts を直接動かすなど）で true にする。
@@ -128,23 +131,12 @@ export interface BugyoOptions {
   /** 追加で lint 対象から外すパス */
   ignores?: string[];
   /**
-   * 禁止を warn に下げる（off にはできない）。キーは禁止の名前（`feature-internals`・`fetch`・`model-layers`、
-   * @bugyo/lint-react の `use-effect`・`ui-timers`・`model-react`）か、設定にあるルール ID。
+   * 禁止を warn に下げる（off にはできない）。キーは parts に入れた禁止の名前（`comments`・`fetch`・`feature-internals`・`model-layers`、
+   * @bugyo/lint-react の `use-effect`・`ui-timers`・`model-react`、defineBan で作った禁止の name）か、設定にあるルール ID。
    * 禁止の名前で下げたものは、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になる。
    * 知らない名前を渡すと断る。
    */
   severity?: Record<string, 'warn'>;
-  /**
-   * 追加の禁止。bugyo の禁止と同じスコープに合成される（上書きしない）。
-   * restrictedProperties と restrictedSyntax は、副作用を包む場所（effectHooksDir）とテストでは効かない。
-   * 例: Date.now を禁止し、shared/lib の clock だけで使わせる。
-   */
-  extra?: {
-    restrictedImports?: { paths?: RestrictedImportPath[]; patterns?: RestrictedImportPattern[] };
-    restrictedGlobals?: RestrictedGlobal[];
-    restrictedProperties?: RestrictedProperty[];
-    restrictedSyntax?: RestrictedSyntax[];
-  };
 }
 
 export function bugyo(options: BugyoOptions): Linter.Config[];

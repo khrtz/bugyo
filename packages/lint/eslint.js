@@ -11,8 +11,7 @@ import { noComments as noCommentsRule } from './rules/no-comments.js';
  * @typedef {import('./index.js').BugyoOptions} BugyoOptions
  * @typedef {import('./index.js').BanSpec} BanSpec
  * @typedef {{ app: string, features: string, shared: { ui: string, api: string, lib: string } }} Layers
- * @typedef {Required<Omit<BugyoOptions, 'parts' | 'extra' | 'layers' | 'severity'>> & {
- *   extra: NonNullable<BugyoOptions['extra']>,
+ * @typedef {Required<Omit<BugyoOptions, 'parts' | 'layers' | 'severity'>> & {
  *   layers: Layers,
  *   customLayers: boolean,
  *   featuresLabel: string,
@@ -283,36 +282,6 @@ export function resolveLayers(src, layers) {
 const trimSlash = (path) => path.replace(/^\.\//, '').replace(/\/+$/, '');
 
 /**
- * `extra` を、名前のない禁止にする。
- *
- * @param {Context} context
- * @returns {Ban[]}
- */
-const extraBans = (context) => {
-  const { extra } = context;
-  /** @param {Partial<Ban>} fields @returns {Ban} */
-  const ban = (fields) => ({
-    name: '',
-    scope: 'src',
-    allow: [],
-    imports: { paths: [], patterns: [] },
-    globals: [],
-    syntax: [],
-    properties: [],
-    rules: {},
-    plugins: {},
-    ...fields,
-  });
-  return [
-    ban({
-      imports: { paths: [...(extra.restrictedImports?.paths ?? [])], patterns: [...(extra.restrictedImports?.patterns ?? [])] },
-      globals: [...(extra.restrictedGlobals ?? [])],
-    }),
-    ban({ allow: ['effects', 'tests'], properties: [...(extra.restrictedProperties ?? [])], syntax: [...(extra.restrictedSyntax ?? [])] }),
-  ];
-};
-
-/**
  * 禁止を、合成するルールに入る項目に分ける。
  *
  * @param {Ban[]} bans
@@ -349,8 +318,11 @@ const lower = (value) => {
  * @returns {import('eslint').Linter.Config[]}
  */
 export function bugyo(options) {
-  const { root, src = 'src', ignores = [], extra = {}, parts = [common, structure], explicitExtensions = false } = options;
+  const { root, src = 'src', ignores = [], parts = [common, structure], explicitExtensions = false } = options;
   if (typeof root !== 'string') throw new Error('bugyo({ root }) に import.meta.dirname を渡してください');
+  if ('extra' in options) {
+    throw new Error('bugyo({ extra }) はありません。独自の禁止は defineBan({ name, ... }) で作り、parts に足してください');
+  }
   if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
   const layers = resolveLayers(src, options.layers);
   const { effectHooksDir = layers.shared.lib, apiClientDir = layers.shared.api } = options;
@@ -363,18 +335,17 @@ export function bugyo(options) {
     effectHooksDir,
     apiClientDir,
     ignores,
-    extra,
     explicitExtensions,
     layers,
     customLayers,
     featuresLabel: customLayers ? layers.features : 'features',
   };
   const built = [...new Set(parts)].sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name)).map((part) => part.build(context));
-  const bans = [...built.flatMap((contribution) => contribution.bans ?? []), ...extraBans(context)];
+  const bans = built.flatMap((contribution) => contribution.bans ?? []);
 
   /** @type {Map<string, number>} */
   const seen = new Map();
-  for (const ban of bans) if (ban.name !== '') seen.set(ban.name, (seen.get(ban.name) ?? 0) + 1);
+  for (const ban of bans) seen.set(ban.name, (seen.get(ban.name) ?? 0) + 1);
   const duplicated = [...seen].filter(([, count]) => count > 1).map(([name]) => name);
   if (duplicated.length > 0) throw new Error(`同じ名前の禁止が2つ以上あります: ${duplicated.join(', ')}。名前を変えてください`);
   const banNames = new Set(seen.keys());
