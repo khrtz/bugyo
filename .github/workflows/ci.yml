@@ -60,7 +60,7 @@ jobs:
         run: pnpm verify
 
       - name: この PR で閉じたタスクの証拠を取り直して照合する
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: pnpm recheck --base "origin/${{ github.base_ref }}"
 
       - name: Linuxの基準画像を作り直す
