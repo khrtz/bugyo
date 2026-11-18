@@ -1,4 +1,5 @@
 import reactHooks from 'eslint-plugin-react-hooks';
+import { normalizeBan } from '@bugyo/lint';
 
 /**
  * React: `useEffect` の禁止と例外の場所（effectHooksDir）、react-hooks、feature の UI でのタイマー禁止、`model` から React への依存の禁止。
@@ -14,37 +15,35 @@ export const react = {
     return {
       srcPlugins: { 'react-hooks': reactHooks },
       srcRules: { ...reactHooks.configs.recommended.rules },
-      src: {
-        paths: [{ name: 'use-effect', value: { name: 'react', importNames: ['useEffect', 'useLayoutEffect'], message: effectMessage }, exempt: ['effects'] }],
-        syntax: [
-          {
-            name: 'use-effect',
-            value:{ selector: "MemberExpression[object.name='React'][property.name=/^use(Layout)?Effect$/]", message: effectMessage },
-            exempt: ['effects', 'tests'],
-          },
-        ],
-      },
-      ui: {
-        globals: ['setTimeout', 'setInterval', 'requestAnimationFrame'].map((name) => ({
+      bans: [
+        normalizeBan({
+          name: 'use-effect',
+          allow: ['effects'],
+          imports: { paths: [{ name: 'react', importNames: ['useEffect', 'useLayoutEffect'], message: effectMessage }] },
+          syntax: [{ selector: "MemberExpression[object.name='React'][property.name=/^use(Layout)?Effect$/]", message: effectMessage }],
+        }),
+        normalizeBan({
           name: 'ui-timers',
-          value: {
+          scope: 'ui',
+          allow: ['tests'],
+          globals: ['setTimeout', 'setInterval', 'requestAnimationFrame'].map((name) => ({
             name,
             message: `UIで${name}によるタイミング合わせはできません。根本原因（状態の持ち方・データの流れ）を直してください。時間に依存する処理が本当に必要なら ${context.effectHooksDir} に専用フックを作ってください。`,
+          })),
+        }),
+        normalizeBan({
+          name: 'model-react',
+          scope: 'model',
+          imports: {
+            patterns: [
+              {
+                group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@tanstack/*'],
+                message: 'model/ は純粋関数だけです。Reactや通信に依存する処理は ui/ か api/ に置いてください。',
+              },
+            ],
           },
-          exempt: ['tests'],
-        })),
-      },
-      model: {
-        patterns: [
-          {
-            name: 'model-react',
-            value: {
-              group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@tanstack/*'],
-              message: 'model/ は純粋関数だけです。Reactや通信に依存する処理は ui/ か api/ に置いてください。',
-            },
-          },
-        ],
-      },
+        }),
+      ],
     };
   },
 };

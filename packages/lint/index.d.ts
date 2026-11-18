@@ -41,6 +41,50 @@ export const common: BugyoPart;
 /** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止、fetch は apiClientDir だけ */
 export const structure: BugyoPart;
 
+/** 禁止が、build のときに受け取る bugyo の設定 */
+export interface BugyoContext {
+  root: string;
+  src: string;
+  effectHooksDir: string;
+  apiClientDir: string;
+  layers: { app: string; features: string; shared: { ui: string; api: string; lib: string } };
+  /** エラー文に書く、機能のフォルダの名前（layers がなければ `features`） */
+  featuresLabel: string;
+}
+
+/**
+ * 禁止1つ。bugyo の禁止も、利用側で足す禁止も、この形で書く。
+ */
+export interface BanSpec {
+  /** 禁止の名前。小文字・数字・ハイフン。`severity` で warn に下げるときにも使う。同じ名前の禁止は2つ置けない */
+  name: string;
+  /**
+   * どこで止めるか。`src`（既定。src の下の .ts / .tsx）、`ui`（features の各 feature の ui/）、`model`（各 feature の model/）か、root からの glob
+   */
+  scope?: string;
+  /**
+   * どこでは許すか。`effects`（effectHooksDir）、`api`（apiClientDir）、`tests`（src の下の *.test.ts(x)）か、root からの glob
+   */
+  allow?: string[];
+  imports?: { paths?: RestrictedImportPath[]; patterns?: RestrictedImportPattern[] };
+  globals?: (string | RestrictedGlobal)[];
+  syntax?: RestrictedSyntax[];
+  properties?: RestrictedProperty[];
+  /** 合成しない ESLint のルール（例: `{ 'no-console': 'error' }`）。scope の中で当て、allow の場所では off にする */
+  rules?: Record<string, Linter.RuleEntry>;
+  /** rules で使うプラグイン */
+  plugins?: Record<string, object>;
+}
+
+/**
+ * 禁止を1つ、部品として作る。`bugyo({ parts: [common, structure, defineBan({ ... })] })` のように、bugyo の部品や禁止と並べて渡す。
+ * エラー文に effectHooksDir などを使うときは、`build(context)` で name 以外の項目を返す。
+ */
+export function defineBan(spec: BanSpec | ({ name: string; build: (context: BugyoContext) => Omit<BanSpec, 'name'> } & Omit<BanSpec, 'name'>)): BugyoPart;
+
+/** 部品の中で禁止を書くときに使う。書き方を確かめ、足りない項目を埋める */
+export function normalizeBan(spec: BanSpec): object;
+
 export interface BugyoLayers {
   /** 画面を組み立てる層。feature の index.ts だけを使える */
   app?: string;
