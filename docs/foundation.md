@@ -128,7 +128,9 @@ bugyo の禁止のメッセージは、日本語（`ja`、既定）と英語（`
 ```
 
 - メッセージの頭の禁止の名前（`[bugyo:use-effect]`）は、言語によらず同じです。`bugyo baseline` はこの名前までで数えるので、言語を変えても件数は変わりません
-- 言語が変わるのは bugyo の禁止のメッセージだけです。`defineBan` で作った禁止のメッセージは書いたとおりに出ます。言語ごとに変えたいときは、`build(context)` で `context.locale` を見ます
+- 言語が変わるのは、`@bugyo/lint` と `@bugyo/lint-react` の禁止のメッセージ（コメントの禁止を含む）だけです。設定の書き方の誤りを知らせるエラー、dependency-cruiser のルールの説明、`bugyo` の CLI の出力は日本語のままです
+- `defineBan` で作った禁止のメッセージは書いたとおりに出ます。言語ごとに変えたいときは、`build(context)` で `context.locale` を見ます
+- `.bugyo/baseline.json` が名前で数える前の形式（`version` のないもの）なら、言語を変える前に `bugyo baseline save` で作り直します。古い形式はメッセージの文で数えるので、言語を変えると件数が合わなくなります
 - `ja` と `en` のほかを渡すと断ります
 
 #### 層のフォルダ名を変える

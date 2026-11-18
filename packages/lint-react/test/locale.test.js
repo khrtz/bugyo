@@ -32,7 +32,8 @@ test('locale を en にすると、禁止のメッセージが英語になり、
     tagged(en).map((m) => [m.file, m.line, m.ruleId, upToName(m.message)]),
     tagged(ja).map((m) => [m.file, m.line, m.ruleId, upToName(m.message)]),
   );
-  for (const { message } of tagged(en)) assert.ok(!/[ぁ-んァ-ヶ一-龠]/.test(message), message);
+  for (const { message, ruleId } of en) assert.ok(!/[ぁ-んァ-ヶ一-龠]/.test(message), `${ruleId}: ${message}`);
+  assert.ok(en.some((m) => m.ruleId === 'bugyo/no-comments' && m.message.startsWith('Comments are not allowed.')), '名前のないコメントの禁止も英語になる');
   assert.ok(tagged(en).some((m) => m.message.includes('[bugyo:use-effect] useEffect is not allowed in product code.')));
   assert.ok(tagged(en).some((m) => m.message.includes('[bugyo:fetch] Do not call fetch directly.')));
   assert.ok(tagged(ja).some((m) => m.message.includes('[bugyo:use-effect] 製品コードでuseEffectは使えません。')), '既定と同じ日本語');

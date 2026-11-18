@@ -6,7 +6,7 @@ import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import { joinList, messagesFor, resolveLocale } from './messages.js';
-import { noComments as noCommentsRule } from './rules/no-comments.js';
+import { noCommentsFor } from './rules/no-comments.js';
 
 /**
  * @typedef {import('./index.js').BugyoOptions} BugyoOptions
@@ -174,7 +174,7 @@ export const common = {
     },
     plugins: {
       '@eslint-community/eslint-comments': comments,
-      bugyo: { rules: { 'no-comments': noCommentsRule } },
+      bugyo: { rules: { 'no-comments': noCommentsFor(context.locale) } },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
