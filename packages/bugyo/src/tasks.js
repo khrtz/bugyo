@@ -18,6 +18,8 @@ const idPattern = /^t-\d{3,}$/;
  * 先頭は英数字に限る（先頭の `#` はシェルでコメントに、`-` はオプションになるため）
  */
 export const issuePattern = /^[A-Za-z0-9][A-Za-z0-9#._:/-]*$/;
+/** 作業したモデルとハーネスの名前（`claude-opus-5-5`、`claude-code` など）。frontmatter の1行に収まる文字だけ */
+export const agentNamePattern = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$/;
 const count = z
   .string()
   .regex(/^\d+$/, '0 以上の整数にしてください')
@@ -41,6 +43,8 @@ const Fields = z
       )
       .refine((ids) => ids.every((id) => idPattern.test(id)), 't-001 の形の id をカンマで区切ってください'),
     assignee: z.string().default(''),
+    model: z.string().regex(agentNamePattern, '英数字で始め、英数字と . _ : / @ + - だけにしてください').optional(),
+    harness: z.string().regex(agentNamePattern, '英数字で始め、英数字と . _ : / @ + - だけにしてください').optional(),
     rework: count.default(0),
     'gate-attempts': count.default(0),
     created: z.string().default(''),
@@ -160,6 +164,8 @@ export function saveTask(cwd, task) {
     issue: task.issue,
     'blocked-by': task['blocked-by'].join(','),
     assignee: task.assignee,
+    model: task.model,
+    harness: task.harness,
     rework: task.rework,
     'gate-attempts': task['gate-attempts'],
     created: task.created,
@@ -212,6 +218,8 @@ export function taskJson(task) {
     feature: task.feature,
     ...(task.issue === undefined ? {} : { issue: task.issue }),
     assignee: task.assignee,
+    ...(task.model === undefined ? {} : { model: task.model }),
+    ...(task.harness === undefined ? {} : { harness: task.harness }),
     blockedBy: task['blocked-by'],
     rework: task.rework,
     gateAttempts: task['gate-attempts'],

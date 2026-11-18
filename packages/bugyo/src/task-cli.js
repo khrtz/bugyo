@@ -10,8 +10,10 @@ import { isMistakeKind, loadMistakes, mistakeLine, mistakeState, recordMistake, 
 import { claimTask, fetchClaims, listRecords, openClaims, reassignClaim, readRecord, releaseClaim, reserveId } from './claims.js';
 import { changedArchiveIds, duplicateIdsAgainst, notifyVerified, recheckTask } from './recheck.js';
 import { commandExists, ranNoTests, runCommand, tail } from './run.js';
+import { percent, taskStats, wideInterval, wilsonInterval } from './stats.js';
 import { lintTasks } from './task-lint.js';
 import {
+  agentNamePattern,
   evidenceDir,
   findTask,
   isTaskId,
@@ -30,10 +32,10 @@ export class UsageError extends Error {}
 
 export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]
   bugyo task ready                       未着手でブロックされていないタスク
-  bugyo task start <id> --as <名前>      作業中にする
+  bugyo task start <id> --as <名前> [--model <モデル>] [--harness <ハーネス>]  作業中にする
   bugyo task show <id>                   本文、読むもの、完了に必要なもの
   bugyo task repro <id> [--expect "<文言>"] -- <コマンド>  bugfix: 直す前に失敗することを記録する
-  bugyo task done <id>                   証拠を取り、通れば閉じる
+  bugyo task done <id> [--model <モデル>] [--harness <ハーネス>]  証拠を取り、通れば閉じる
   bugyo task rework <id> -r "<理由>" --kind <ミスの種類> [--as <名前>]
   bugyo task drop <id> -r "<理由>"
   bugyo task ls [--all]                  一覧（--all で完了・中止も）
@@ -44,6 +46,8 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo mistake ls                       ミスの種類ごとの回数とルール
   bugyo mistake rule <種類> --at <パス>  ルールに変えたことを記録する
   bugyo gate [--scope <まとまり>]        任せる範囲を広げてよいかを、作業の種類のまとまりごとに計算する
+  bugyo stats                            閉じたタスクの実績を、作業の種類・モデル・ハーネスごとに出す
+  （--model と --harness を省くと、環境変数 BUGYO_MODEL と BUGYO_HARNESS を使う）
   （どれも --json で短い JSON を出す）`;
 
 /**
@@ -62,6 +66,8 @@ function parse(args) {
         'blocked-by': { type: 'string' },
         body: { type: 'string' },
         as: { type: 'string' },
+        model: { type: 'string' },
+        harness: { type: 'string' },
         reason: { type: 'string', short: 'r' },
         kind: { type: 'string' },
         at: { type: 'string' },
@@ -194,7 +200,7 @@ function start(args, cwd) {
       throw new Error(`${id} はすでに ${claim.holder.assignee ?? '誰か'} が作業中です${where}。止まっているなら、人が bugyo task release ${id} で記録を消してください`);
     }
   }
-  const started = saveTask(cwd, { ...task, status: 'active', assignee, 'tests-hash': testsHash(cwd, config.evidence.tree) });
+  const started = saveTask(cwd, { ...task, ...agentOf(values, task), status: 'active', assignee, 'tests-hash': testsHash(cwd, config.evidence.tree) });
   print(values.json, [taskLine(started)], taskJson(started));
   return 0;
 }
@@ -271,6 +277,25 @@ function repro(args, cwd) {
 }
 
 /**
+ * 作業したモデルとハーネス。--model / --harness、環境変数 BUGYO_MODEL / BUGYO_HARNESS、タスクに記録済みの値の順に使う。
+ *
+ * @param {{ model?: string | undefined, harness?: string | undefined }} values
+ * @param {import('./tasks.js').Task} task
+ * @returns {{ model?: string, harness?: string }}
+ */
+function agentOf(values, task) {
+  /** @param {string} name @param {string | undefined} option @param {string | undefined} env @param {string | undefined} recorded */
+  const pick = (name, option, env, recorded) => {
+    const value = option?.trim() || env?.trim() || recorded;
+    if (value !== undefined && !agentNamePattern.test(value)) throw new UsageError(`${name} の "${value}" は、英数字で始め、英数字と . _ : / @ + - だけにしてください`);
+    return value;
+  };
+  const model = pick('--model', values.model, process.env.BUGYO_MODEL, task.model);
+  const harness = pick('--harness', values.harness, process.env.BUGYO_HARNESS, task.harness);
+  return { ...(model === undefined ? {} : { model }), ...(harness === undefined ? {} : { harness }) };
+}
+
+/**
  * @param {string[]} args
  * @param {string} cwd
  */
@@ -287,7 +312,7 @@ function done(args, cwd) {
       `${id} (${task.type}) の完了に要る ${missing.map((step) => `commands.${step.name}`).join(', ')} が ${configFile} にありません。証拠を取れないので done にしません`,
     );
   }
-  const attempt = saveTask(cwd, { ...task, 'gate-attempts': task['gate-attempts'] + 1 });
+  const attempt = saveTask(cwd, { ...task, ...agentOf(values, task), 'gate-attempts': task['gate-attempts'] + 1 });
   const outcome = collectEvidence(attempt, config, cwd);
   if (!outcome.ok) {
     const lines = [`FAIL ${taskLine(attempt)}  ${outcome.step.label}: ${outcome.reason}（gate-attempts: ${attempt['gate-attempts']}）`];
@@ -544,7 +569,52 @@ export function gateCommand(args, cwd = process.cwd()) {
       ),
     ]),
   ];
-  print(values.json, lines, result);
+  const warnings = gateWarnings(result.scopes);
+  print(values.json, [...lines, ...warnings.map((warning) => `warn  ${warning}`)], { ...result, warnings });
   return result.passed ? 0 : 1;
+}
+
+/**
+ * 数字だけで判断しないほうがよいときの警告。件数が判定の件数に足りないとき、1回で通った割合の 95% 区間が広いとき。
+ *
+ * @param {ReturnType<typeof evaluateGate>['scopes']} scopes
+ */
+function gateWarnings(scopes) {
+  return scopes.flatMap((scope) => {
+    const value = (/** @type {string} */ name) => scope.conditions.find((condition) => condition.name === name)?.value ?? 0;
+    const closed = value('count');
+    const done = closed - value('dropped');
+    const firstPass = value('first-pass');
+    const interval = wilsonInterval(firstPass, done);
+    /** @type {string[]} */
+    const warnings = [];
+    if (closed < scope.window) warnings.push(`[${scope.name}] 閉じたタスクが ${closed}件で、判定の ${scope.window}件に足りません。合否はまだ当てになりません`);
+    if (done > 0 && interval.high - interval.low > wideInterval) {
+      warnings.push(`[${scope.name}] 1回で通った割合 ${firstPass}/${done} の 95% 区間は ${percent(interval.low)}〜${percent(interval.high)} です。幅が広いので、件数を増やしてから判断してください`);
+    }
+    return warnings;
+  });
+}
+
+/**
+ * @param {string[]} args
+ * @param {string} [cwd]
+ */
+export function statsCommand(args, cwd = process.cwd()) {
+  const { values } = parse(args);
+  const rows = taskStats(loadTasks(cwd));
+  const rate = (/** @type {number} */ part, /** @type {number} */ whole) => (whole === 0 ? '-' : percent(part / whole));
+  const lines =
+    rows.length === 0
+      ? ['stats: 閉じたタスクはまだありません']
+      : [
+          'stats: 閉じたタスク（完了と中止）の実績。1回で通った・手直しは完了の中の割合、中止は閉じたタスクの中の割合',
+          ...rows.map((row) => {
+            const interval = row.done === 0 ? '' : `（95% 区間 ${percent(row.firstPassInterval.low)}〜${percent(row.firstPassInterval.high)}）`;
+            return `  ${row.type}  モデル: ${row.model}  ハーネス: ${row.harness}  閉じた ${row.closed}件  1回で通った ${rate(row.firstPass, row.done)}${interval}  手直し ${rate(row.reworked, row.done)}  中止 ${rate(row.dropped, row.closed)}`;
+          }),
+        ];
+  print(values.json, lines, { rows });
+  return 0;
 }
 

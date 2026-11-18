@@ -363,6 +363,59 @@ test('gate: 同じ種類の手直しを2回記録すると不合格になり、�
   assert.match(ok(cwd, 'mistake', 'ls').stdout, /^deep-import 3回 {2}ルール: scripts\/check\.js {2}← ルールが漏れている/m);
 });
 
+test('gate: 件数が判定に足りないときと、1回で通った割合の区間が広いときに警告を出す', () => {
+  const cwd = project();
+  editConfig(cwd, (config) => (config.gate = { window: 4, maxRework: 4, minFirstPass: 0, scopes: { chore: { types: ['chore'] } } }));
+  for (const title of ['a', 'b']) ok(cwd, 'task', 'add', title, '--type', 'chore');
+  for (const [id, who] of [['t-001', 'w1'], ['t-002', 'w2']]) {
+    ok(cwd, 'task', 'start', id, '--as', who);
+    ok(cwd, 'task', 'done', id);
+  }
+  const run = bugyo(cwd, 'gate', '--json');
+  const result = JSON.parse(run.stdout);
+  assert.deepEqual(result.warnings, [
+    '[chore] 閉じたタスクが 2件で、判定の 4件に足りません。合否はまだ当てになりません',
+    '[chore] 1回で通った割合 2/2 の 95% 区間は 34.2%〜100.0% です。幅が広いので、件数を増やしてから判断してください',
+  ]);
+  assert.match(bugyo(cwd, 'gate').stdout, /^warn {2}\[chore\] 閉じたタスクが 2件/m);
+});
+
+test('stats: start と done でモデルとハーネスを記録し、作業の種類・モデル・ハーネスごとに実績を出す', () => {
+  const cwd = project();
+  const as = (/** @type {Record<string, string>} */ env, /** @type {string[]} */ ...args) => {
+    const result = spawnSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf8', env: { ...process.env, ...env } });
+    assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+    return result;
+  };
+  for (const title of ['a', 'b', 'c', 'd']) ok(cwd, 'task', 'add', title, '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1', '--model', 'model-a', '--harness', 'cli');
+  ok(cwd, 'task', 'done', 't-001');
+  as({ BUGYO_MODEL: 'model-a', BUGYO_HARNESS: 'cli' }, 'task', 'start', 't-002', '--as', 'w2');
+  editConfig(cwd, (config) => (config.commands.check = 'node -e "process.exit(1)"'));
+  assert.equal(bugyo(cwd, 'task', 'done', 't-002').status, 1);
+  editConfig(cwd, (config) => (config.commands.check = 'node scripts/check.js'));
+  ok(cwd, 'task', 'done', 't-002');
+  ok(cwd, 'task', 'start', 't-003', '--as', 'w3');
+  ok(cwd, 'task', 'done', 't-003', '--model', 'model-b');
+  ok(cwd, 'task', 'drop', 't-004', '-r', 'いらなくなった');
+
+  assert.equal(field(cwd, 't-001', 'model'), 'model-a');
+  assert.equal(field(cwd, 't-002', 'harness'), 'cli');
+  assert.equal(field(cwd, 't-003', 'model'), 'model-b', 'start で記録がなくても done で記録できる');
+  const { rows } = JSON.parse(ok(cwd, 'stats', '--json').stdout);
+  assert.deepEqual(
+    rows.map((/** @type {any} */ row) => [row.type, row.model, row.harness, row.closed, row.done, row.firstPass, row.reworked, row.dropped]),
+    [
+      ['chore', '-', '-', 1, 0, 0, 0, 1],
+      ['chore', 'model-a', 'cli', 2, 2, 1, 0, 0],
+      ['chore', 'model-b', '-', 1, 1, 1, 0, 0],
+    ],
+  );
+  assert.match(ok(cwd, 'stats').stdout, /chore {2}モデル: model-a {2}ハーネス: cli {2}閉じた 2件 {2}1回で通った 50\.0%（95% 区間 9\.5%〜90\.5%） {2}手直し 0\.0% {2}中止 0\.0%/);
+  ok(cwd, 'task', 'add', 'e', '--type', 'chore');
+  assert.match(bugyo(cwd, 'task', 'start', 't-005', '--as', 'x', '--model', 'a b').all, /英数字で始め/);
+});
+
 test('rework は戻す担当が別のタスクを作業中なら断り、--as で別の担当に渡せる', () => {
   const cwd = project();
   ok(cwd, 'task', 'add', 'a', '--type', 'chore');
