@@ -10,6 +10,15 @@ const artifactsDir = 'artifacts';
 export const summaryFile = `${artifactsDir}/verify.json`;
 
 /**
+ * artifacts/ の中で verify が書くもの。実行のたびに、これだけを消してから始める（ほかのファイルには触らない）。
+ *
+ * @param {import('./index.js').BugyoConfig['verify']} verify
+ */
+function ownedArtifacts(verify) {
+  return ['verify.json', 'results.json', 'report', 'test-results', 'verify', 'playwright', 'command', ...Object.keys(verify.runners ?? {})];
+}
+
+/**
  * Playwright の証拠を置く場所。既定の確かめ方は artifacts/ の直下、ほかの確かめ方は artifacts/<名前>/ の下。
  *
  * @param {string} name
@@ -90,7 +99,7 @@ export function verify(target, cwd = process.cwd()) {
   }
   if (errors.length > 0) return { status: 2, lines: errors.map((error) => `error ${error}`), results: [], evidence: [] };
 
-  rmSync(join(cwd, artifactsDir), { recursive: true, force: true });
+  for (const name of ownedArtifacts(config.verify)) rmSync(join(cwd, artifactsDir, name), { recursive: true, force: true });
   mkdirSync(join(cwd, artifactsDir), { recursive: true });
   /** @type {Map<Planned, { ok: boolean | undefined, command: string, passed: boolean }>} */
   const outcomes = new Map();
