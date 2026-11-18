@@ -84,6 +84,7 @@ jobs:
           "
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
+          npx playwright test --update-snapshots
       - name: pnpm を PATH から外して、check・test・verify・task done
         working-directory: ${{ runner.temp }}/npm/app
         run: |
