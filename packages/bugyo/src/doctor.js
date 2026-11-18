@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import { commandEnv } from './run.js';
+import { commandEnv, runCommand } from './run.js';
 
 /** bugyo が禁止ごとに数えるファイル。禁止ごとの件数を持ち、件数が変わったら baseline save で書き直す */
 export const baselineFile = '.bugyo/baseline.json';
@@ -179,13 +179,57 @@ export function tscErrors(cwd, tsconfig) {
 }
 
 /**
- * 禁止ごとの件数の、ESLint と dependency-cruiser をまとめたもの。キーの順にそろえる。
+ * 外の lint の結果（SARIF）を、ツールとルールごとに数える（キーは `sarif: <ツール>/<ルール>`）。ファイルと行は数えない。
+ * `command` があれば、`file` を消してから実行し、書かれたものを読む（終了コードは見ない。違反があると 0 でないツールが多いため）。
+ * 抑制が認められた結果（`suppressions` の status が rejected でないもの）と、`kind` が fail でない結果は数えない。
+ *
+ * @param {string} cwd
+ * @param {SarifInput[]} inputs
+ * @returns {Map<string, number> | { error: string }}
+ */
+export function sarifCounts(cwd, inputs) {
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  for (const input of inputs) {
+    const path = join(cwd, input.file);
+    if (input.command !== undefined) {
+      rmSync(path, { force: true });
+      runCommand(input.command, cwd);
+    }
+    if (!existsSync(path)) return { error: `${input.file} がありません${input.command === undefined ? '' : `（${input.command} が書くはずのファイル）`}` };
+    /** @type {any} */
+    let log;
+    try {
+      log = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      return { error: `${input.file} を SARIF（JSON）として読めません` };
+    }
+    for (const run of Array.isArray(log?.runs) ? log.runs : []) {
+      const tool = String(run?.tool?.driver?.name ?? 'unknown');
+      for (const result of Array.isArray(run?.results) ? run.results : []) {
+        if (result?.kind !== undefined && result.kind !== 'fail') continue;
+        if ((Array.isArray(result?.suppressions) ? result.suppressions : []).some((/** @type {any} */ s) => s?.status !== 'rejected')) continue;
+        const key = `sarif: ${tool}/${String(result?.ruleId ?? result?.rule?.id ?? '?')}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
+/**
+ * @typedef {{ command?: string | undefined, file: string }} SarifInput
+ */
+
+/**
+ * 禁止ごとの件数の、ESLint と dependency-cruiser と外の lint（SARIF）をまとめたもの。キーの順にそろえる。
  *
  * @param {string} cwd
  * @param {string[]} dirs dependency-cruiser に渡すフォルダ
+ * @param {SarifInput[]} [sarif] `.bugyo/config.json` の `sarif`
  * @returns {{ counts: Record<string, number>, legacy: Record<string, number>, warned: Record<string, number>, parseErrors: ParseError[], errors: string[] }}
  */
-export function banCounts(cwd, dirs) {
+export function banCounts(cwd, dirs, sarif = []) {
   /** @type {string[]} */
   const errors = [];
   /** @type {Map<string, number>} */
@@ -213,6 +257,15 @@ export function banCounts(cwd, dirs) {
       }
     }
     else errors.push(depcruise.error);
+  }
+  if (sarif.length > 0) {
+    const external = sarifCounts(cwd, sarif);
+    if (external instanceof Map) {
+      for (const [key, value] of external) {
+        merged.set(key, value);
+        legacy.set(key, value);
+      }
+    } else errors.push(external.error);
   }
   /** @param {Map<string, number>} map */
   const sorted = (map) => Object.fromEntries([...map].sort(([a], [b]) => a.localeCompare(b)));
@@ -327,8 +380,9 @@ function parseBaseline(text) {
  *
  * @param {string} cwd
  * @param {string[]} dirs
+ * @param {SarifInput[]} [sarif]
  */
-export function saveBaseline(cwd, dirs) {
+export function saveBaseline(cwd, dirs, sarif = []) {
   rmSync(join(cwd, eslintSuppressionsFile), { force: true });
   const suppress = runTool(cwd, 'eslint', ['.', '--suppress-all']);
   if (suppress.status === 2) throw new Error(`eslint . --suppress-all が失敗しました: ${`${suppress.stdout}${suppress.stderr}`.trim().slice(0, 500)}`);
@@ -338,7 +392,7 @@ export function saveBaseline(cwd, dirs) {
     const known = runTool(cwd, 'depcruise', [...dirs, '--config', config, '--baseline', depcruiseKnownFile]);
     if (!existsSync(join(cwd, depcruiseKnownFile))) throw new Error(`depcruise の既知の違反を書けませんでした（終了コード ${known.status}）: ${known.stderr.trim().slice(0, 500)}`);
   }
-  const { counts, errors } = banCounts(cwd, dirs);
+  const { counts, errors } = banCounts(cwd, dirs, sarif);
   if (errors.length > 0) throw new Error(errors.join('\n'));
   mkdirSync(dirname(join(cwd, baselineFile)), { recursive: true });
   writeFileSync(join(cwd, baselineFile), `${JSON.stringify({ version: baselineVersion, counts }, null, 2)}\n`);

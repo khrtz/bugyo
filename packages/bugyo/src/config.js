@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { z } from 'zod';
 import { types } from './tasks.js';
 
@@ -209,6 +209,16 @@ const Config = z
   .object({
     template: z.string().min(1).optional(),
     packageManager: z.enum(packageManagers).optional(),
+    sarif: z
+      .array(
+        z
+          .object({
+            command: z.string().trim().min(1).optional(),
+            file: z.string().min(1).refine((path) => !isAbsolute(path) && !path.split(/[\\/]/).includes('..'), 'プロジェクトのルートからの相対パスを書いてください（.. と絶対パスは使えません）'),
+          })
+          .strict(),
+      )
+      .optional(),
     layers: Layers.optional(),
     sources: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/, '小文字・数字・ハイフンの名前にしてください'), Source).optional(),
     verify: Verify.prefault({}),
