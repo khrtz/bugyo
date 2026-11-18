@@ -1,6 +1,5 @@
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { relative, resolve, sep } from 'node:path';
 
 /**
  * タスクの id の予約と着手の記録を、git の ref で持つ。
@@ -26,15 +25,18 @@ function git(cwd, args, env = {}) {
 /**
  * cwd が git のリポジトリの中なら、そのプロジェクトの ref の置き場所を返す。リポジトリでなければ undefined（今までどおり手元のファイルだけで判定する）。
  * 1つのリポジトリに bugyo のプロジェクトが複数あっても混ざらないように、リポジトリのルートからの相対パスで分ける。
+ * 相対パスは git に出させる（Windows の短い名前 `RUNNER~1` やシンボリックリンクで、パスの文字列を比べると食い違うため）。
  *
  * @param {string} cwd
  * @param {string | undefined} remote
  * @returns {Claims | undefined}
  */
 export function openClaims(cwd, remote) {
-  const top = git(cwd, ['rev-parse', '--show-toplevel']);
-  if (!top.ok || top.stdout === '') return undefined;
-  const rel = relative(resolve(top.stdout), resolve(cwd)).split(sep).join('/');
+  const inside = git(cwd, ['rev-parse', '--is-inside-work-tree']);
+  if (!inside.ok || inside.stdout !== 'true') return undefined;
+  const prefix = git(cwd, ['rev-parse', '--show-prefix']);
+  if (!prefix.ok) return undefined;
+  const rel = prefix.stdout.replace(/\/+$/, '');
   const key = rel === '' ? 'root' : rel.replace(/\.\.+/g, '_').replace(/[^A-Za-z0-9._/-]/g, '_');
   return { cwd, prefix: `refs/bugyo/${key}`, remote };
 }
