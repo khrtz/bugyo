@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
+import { baselineCommand, doctorCommand, doctorUsage } from '../src/doctor-cli.js';
 import { defaultTemplate, init, newFeature, templates } from '../src/scaffold.js';
 import { UsageError, gateCommand, mistakeCommand, taskCommand, taskUsage } from '../src/task-cli.js';
 import { verify } from '../src/verify.js';
@@ -10,7 +11,8 @@ const usage = `使い方:
   bugyo new feature <id>       feature を、テンプレートに合わせた雛形・feature map・spec つきで作る
   bugyo verify <id>            その feature を実際に動かし、合否と証拠の場所だけを出す
   bugyo verify --all           feature map にあるすべての feature を確かめる
-${taskUsage}`;
+${taskUsage}
+${doctorUsage}`;
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -40,6 +42,10 @@ function main() {
       return mistakeCommand(args);
     case 'gate':
       return gateCommand(args);
+    case 'doctor':
+      return doctorCommand(args);
+    case 'baseline':
+      return baselineCommand(args);
     case 'new': {
       const [kind, id] = args;
       if (kind !== 'feature' || id === undefined) break;

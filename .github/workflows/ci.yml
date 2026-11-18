@@ -34,6 +34,71 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
+  oldest:
+    name: ESLint 9.24 と TypeScript 5.8 で lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 対応する一番古い版にそろえる
+        run: |
+          printf "\noverrides:\n  eslint: 9.24.0\n  '@eslint/js': 9.24.0\n  typescript: 5.8.3\n" >> pnpm-workspace.yaml
+          pnpm install --no-frozen-lockfile
+          test "$(pnpm --filter @bugyo/lint exec eslint --version)" = "v9.24.0"
+      - run: pnpm --filter @bugyo/lint --filter @bugyo/lint-react test
+      - run: pnpm --filter todo-app --filter node-lib exec tsc --noEmit
+      - run: pnpm --filter todo-app --filter node-lib exec eslint .
+
+  npm:
+    name: npm で入れたプロジェクト（pnpm なし）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: パッケージを作り、react-vite を npm で入れる
+        run: |
+          set -eu
+          out="$RUNNER_TEMP/npm"
+          mkdir -p "$out"
+          for p in bugyo @bugyo/lint @bugyo/lint-react; do pnpm --filter "$p" pack --pack-destination "$out"; done
+          node packages/bugyo/bin/bugyo.js init "$out/app" --template react-vite
+          cd "$out/app"
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            p.devDependencies['bugyo'] = 'file:../bugyo-0.1.0.tgz';
+            p.devDependencies['@bugyo/lint'] = 'file:../bugyo-lint-0.1.0.tgz';
+            p.devDependencies['@bugyo/lint-react'] = 'file:../bugyo-lint-react-0.1.0.tgz';
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2));
+          "
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npx playwright test --update-snapshots
+      - name: pnpm を PATH から外して、check・test・verify・task done
+        working-directory: ${{ runner.temp }}/npm/app
+        run: |
+          set -eu
+          export PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "$(dirname "$(command -v pnpm)")" | paste -sd: -)"
+          if command -v pnpm; then echo "pnpm が残っています"; exit 1; fi
+          npm run check
+          npm test
+          npx bugyo verify --all
+          npx bugyo task add "npm での確認" --type ui-flow --feature todos
+          npx bugyo task show t-001 | grep -F "npm run check"
+          npx bugyo task start t-001 --as ci
+          npx bugyo task done t-001
+
   e2e:
     name: verify（証拠つき）
     runs-on: ubuntu-latest
@@ -62,6 +127,10 @@ jobs:
       - name: この PR で閉じたタスクの証拠を取り直して照合する
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: pnpm recheck --base "origin/${{ github.base_ref }}"
+
+      - name: ベースのブランチと同じ id を振ったタスクがないか確かめる
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: pnpm --filter todo-app --filter node-lib exec bugyo task lint --base "origin/${{ github.base_ref }}"
 
       - name: Linuxの基準画像を作り直す
         if: ${{ inputs.update_snapshots }}

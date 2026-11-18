@@ -39,6 +39,8 @@ e2e/<id>.spec.ts            その機能を実際に操作するテスト
 
 ### ESLint
 
+ESLint は 9.24 以上（10 を含む）、TypeScript は 5.8 以上 6.0 まで、flat config が前提です。`@eslint/js` は peer 依存なので、使う ESLint と同じ大きな版（9 なら 9、10 なら 10）をプロジェクトに入れます。CI は ESLint 9.24・TypeScript 5.8 の組み合わせでも lint のテストを回しています。
+
 ```js
 // eslint.config.js（React を使うプロジェクト）
 import { bugyo, common, structure } from '@bugyo/lint';
@@ -50,10 +52,12 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, rea
 | 項目 | 既定 | 意味 |
 | --- | --- | --- |
 | `root` | 必須 | `import.meta.dirname` を渡す |
-| `src` | `src` | ソースの場所 |
-| `effectHooksDir` | `<src>/shared/lib` | `useEffect` を書いてよい場所 |
-| `apiClientDir` | `<src>/shared/api` | `fetch` を呼んでよい場所 |
+| `src` | `src` | ソースの場所。`layers` のフォルダはすべてこの中に置く |
+| `layers` | `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}` | 層のフォルダの場所（下の「層のフォルダ名を変える」） |
+| `effectHooksDir` | `layers.shared.lib` | `useEffect` を書いてよい場所 |
+| `apiClientDir` | `layers.shared.api` | `fetch` を呼んでよい場所 |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
+| `severity` | `{}` | 禁止を warn に下げる（下の「禁止を warn に下げる」） |
 | `extra` | `{}` | 独自の禁止を足す（下の「独自の禁止を足す」） |
 | `parts` | `[common, structure]` | 使う部品（下の「部品」）。`common` は必須 |
 | `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
@@ -90,6 +94,62 @@ export default bugyo({ root: import.meta.dirname, explicitExtensions: true });
 | `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`structure`・`react` |
 
 コメントは、公開 API の JSDoc（`/** */`）と、理由つきの `eslint-disable`（`-- 理由`）だけ書けます。`.js` / `.cjs` / `.mjs` には型を使うルールを当てません。
+
+#### 禁止を warn に下げる
+
+入れたばかりで直しきれない禁止は、`severity` で warn に下げられます。`off` にはできません。
+
+```js
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, react], severity: { 'use-effect': 'warn' } });
+```
+
+| 名前 | 禁止 | 部品 |
+| --- | --- | --- |
+| `feature-internals` | 他の feature の内部ファイルの import | `structure` |
+| `fetch` | `fetch` | `structure` |
+| `model-layers` | `model/` から `ui/`・`api/`・`shared/ui`・`shared/api` への import（`layers` を渡したときは `ui/`・`api/` だけ。下を参照） | `structure` |
+| `use-effect` | `useEffect` / `useLayoutEffect` | `react` |
+| `ui-timers` | feature の UI での `setTimeout` などのタイマー | `react` |
+| `model-react` | `model/` から React とその周辺への import | `react` |
+
+- 名前のほかに、設定にあるルール ID（例: `@typescript-eslint/no-non-null-assertion`）も渡せます。そのルールがどのファイルでも warn になります
+- 名前で下げた禁止は、同じルールの他の禁止と分けるために、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になります。`eslint-disable` のコメントで止めるときも、この ID を書きます
+- 知らない名前と、組み合わせた部品にない禁止の名前は断ります
+- 層の境界（`shared` から `features` / `app`、`features` から `app`、`layers` を渡したときの `model/` から `shared.ui` / `shared.api`）は1つのルール `import-x/no-restricted-paths` なので、1つずつは下げられません。下げるときはルール ID で、境界をまとめて下げます
+- `extra` で足した禁止には名前がないので、名前では下げられません
+- `bugyo doctor` は、warn に下げた禁止を「直す借り」として別に数えます。`bugyo baseline check` は warn に下げた禁止も数えるので、下げても件数は増やせません
+- ESLint の抑制ファイルに入っている禁止を下げると、抑制が使われなくなって `eslint .` が落ちます（抑制は error だけに効くため）。下げたら `bugyo baseline save` を実行し直します
+
+#### 層のフォルダ名を変える
+
+層のフォルダが `src/app`・`src/features`・`src/shared` でないプロジェクトでは、`layers` で場所を渡します。値は `.bugyo/config.json` の `layers` に1回だけ書き、ESLint と dependency-cruiser はそこから読みます。
+
+```json
+{
+  "layers": {
+    "app": "web/pages",
+    "features": "web/features",
+    "shared": { "ui": "web/app/ui", "api": "web/app/api", "lib": "web/app/lib" }
+  }
+}
+```
+
+```js
+// eslint.config.js
+import { readFileSync } from 'node:fs';
+import { bugyo } from '@bugyo/lint';
+
+const { layers } = JSON.parse(readFileSync(new URL('./.bugyo/config.json', import.meta.url), 'utf8'));
+export default bugyo({ root: import.meta.dirname, src: 'web', layers });
+```
+
+```js
+// .dependency-cruiser.cjs
+const { layers } = require('./.bugyo/config.json');
+module.exports = require('@bugyo/lint/depcruise').config({ src: 'web', layers });
+```
+
+`layers` を渡すと、境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` には5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
 
 ### 独自の禁止を足す
 
@@ -217,7 +277,7 @@ export default defineBugyoConfig({ port: 5173 });
 | 項目 | 既定 | 意味 |
 | --- | --- | --- |
 | `port` | `5173` | dev サーバーのポート |
-| `command` | `pnpm exec vite --port <port> --strictPort` | dev サーバーを起動するコマンド |
+| `command` | `vite --port <port> --strictPort` | dev サーバーを起動するコマンド。`node_modules/.bin` の `vite` を使うので、パッケージマネージャーを問わない |
 | `overrides` | なし | Playwright の設定を上書きする |
 
 この設定は次のように動きます。
@@ -233,6 +293,7 @@ export default defineBugyoConfig({ port: 5173 });
 | --- | --- |
 | `pnpm check / test` | `pnpm check` と `pnpm test` |
 | `verify（証拠つき）` | `pnpm verify`（todo-app は Playwright、node-lib は機能ごとのコマンド）。`artifacts/` を成果物として上げ、PR に合否と証拠のリンクを載せる |
+| `npm で入れたプロジェクト（pnpm なし）` | パッケージを作り、`react-vite` のプロジェクトを npm で入れ、pnpm を `PATH` から外して、check・test・`verify --all`・`task done` を通す |
 
 Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあります。画面を変えて作り直すときは次の手順です。
 
@@ -247,8 +308,12 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `bugyo new feature <id>` | feature を一式作る。何を作るかは `.bugyo/config.json` の `template` で決まる（ないときは `react-vite`）。同じ名前のファイルがあれば上書きせずに断る。雛形のないテンプレートでは理由を出して断り、何も作らない |
 | `bugyo verify <id>` | その機能の spec を実行し、合否と証拠の場所だけを出す |
 | `bugyo verify --all` | feature map にあるすべての機能を確かめる |
+| `bugyo doctor [--dirs <a,b>] [--tsconfig <path>] [--json]` | 何も書き換えずに、禁止ごとの違反の件数を出す。ESLint の抑制ファイルで隠れている違反も数える |
+| `bugyo baseline save [--dirs <a,b>]` | 今の違反をすべてベースラインにする（`eslint-suppressions.json`・`.dependency-cruiser-known-violations.json`・`.bugyo/baseline.json`） |
+| `bugyo baseline check [--dirs <a,b>]` | 禁止ごとの件数がベースラインと同じか確かめる。増えても減っても落ちる。`.bugyo/baseline.json` がなければ何もしない |
+| `bugyo baseline diff --base <ref>` | ベースラインの3つのファイルが `<ref>` より増えていれば落ちる。CI 用 |
 
-タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) にあります。
+タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) に、ベースラインの使い方は [adopt.md](adopt.md#lint-を段階的に入れる) にあります。
 
 `new feature <id>` が作るものは次のとおりです。どちらも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
 
@@ -274,10 +339,10 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 | `runner` | 動き | 証拠の場所 |
 | --- | --- | --- |
-| `playwright`（既定） | 対象の spec をまとめて `pnpm exec playwright test` に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
+| `playwright`（既定） | 対象の spec をまとめて `playwright test`（`node_modules/.bin` のもの。パッケージマネージャーは通さない）に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
 | `command` | `verify.command` を機能ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は frontmatter の `spec` に置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力） |
 
-`command` のコマンドはシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。
+どちらもシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。pnpm・npm・yarn・bun のどれで入れても動きます（Yarn の PnP のように `node_modules/.bin` を作らない入れ方は対象外です）。
 
 ## 設定ファイル（`.bugyo/config.json`）
 
@@ -292,11 +357,13 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 | キー | 既定 | 意味 |
 | --- | --- | --- |
+| `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
 | `verify.runner` | `playwright` | `playwright` か `command`（上の「CLI」） |
 | `verify.command` | なし | `runner` が `command` のときは必須 |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
-| `featureMap.featuresDir` | `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
+| `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
+| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared.ui`・`shared.api`・`shared.lib`）。上の「層のフォルダ名を変える」 |
 
 同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 

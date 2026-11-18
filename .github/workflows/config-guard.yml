@@ -34,3 +34,44 @@ jobs:
           fi
           echo "::error::.bugyo/config.json は done の判定を決めるファイルなので、変えるのは人だけです。人が差分を確かめてから、PR にラベル bugyo-config-approved を付けてください。"
           exit 1
+
+  baseline-guard:
+    name: ベースラインを増やすには人の承認が要る
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter bugyo
+      - name: ベースラインのファイルが増えていないか確かめる
+        env:
+          BASE: origin/${{ github.base_ref }}
+          APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'bugyo-baseline-approved') }}
+        run: |
+          dirs=$(git diff --name-only "$BASE...HEAD" \
+            | grep -E '(^|/)(\.bugyo/baseline\.json|eslint-suppressions\.json|\.dependency-cruiser-known-violations\.json)$' \
+            | sed -E 's#/?(\.bugyo/baseline\.json|eslint-suppressions\.json|\.dependency-cruiser-known-violations\.json)$##; s#^$#.#' \
+            | sort -u || true)
+          if [ -z "$dirs" ]; then
+            echo "ベースラインのファイルの変更はありません"
+            exit 0
+          fi
+          failed=0
+          while read -r dir; do
+            [ -d "$dir" ] || continue
+            echo "== $dir"
+            (cd "$dir" && node "$GITHUB_WORKSPACE/packages/bugyo/bin/bugyo.js" baseline diff --base "$BASE") || failed=1
+          done <<< "$dirs"
+          if [ "$failed" = "0" ]; then exit 0; fi
+          if [ "$APPROVED" = "true" ]; then
+            echo "ラベル bugyo-baseline-approved があるので通します"
+            exit 0
+          fi
+          echo "::error::ベースラインは減らすだけのものです。増やすのは、人が差分を確かめてから PR にラベル bugyo-baseline-approved を付けたときだけです。"
+          exit 1

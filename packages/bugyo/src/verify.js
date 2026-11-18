@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { loadConfig } from './config.js';
@@ -10,24 +9,22 @@ const reportFile = `${artifactsDir}/results.json`;
 /** verify が最後に書く、機能ごとの合否と証拠の場所の要約。task done が証拠に写す */
 export const summaryFile = `${artifactsDir}/verify.json`;
 
-/** @param {string[]} specs */
-const playwrightArgs = (specs) => ['exec', 'playwright', 'test', ...specs, '--reporter=line,json,html'];
+/**
+ * Playwright を実行するコマンド。パッケージマネージャーは通さず、node_modules/.bin の playwright を直接呼ぶ。
+ *
+ * @param {string[]} specs
+ */
+const playwrightCommand = (specs) => ['playwright', 'test', ...specs.map((spec) => `"${spec}"`), '--reporter=line,json,html'].join(' ');
 
 /**
  * @param {string} cwd
  * @param {string[]} specs
  */
 function runPlaywright(cwd, specs) {
-  return spawnSync('pnpm', playwrightArgs(specs), {
-    cwd,
-    encoding: 'utf8',
-    shell: process.platform === 'win32',
-    env: {
-      ...process.env,
-      PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
-      PLAYWRIGHT_HTML_OUTPUT_DIR: `${artifactsDir}/report`,
-      PLAYWRIGHT_HTML_OPEN: 'never',
-    },
+  return runCommand(playwrightCommand(specs), cwd, {
+    PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile,
+    PLAYWRIGHT_HTML_OUTPUT_DIR: `${artifactsDir}/report`,
+    PLAYWRIGHT_HTML_OPEN: 'never',
   });
 }
 
@@ -73,11 +70,11 @@ function viaPlaywright(cwd, targets) {
   const bySpec = resultsBySpec(cwd);
   return {
     passed,
-    output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
+    output: result.output,
     results: targets.map((feature) => ({
       id: feature.id,
       ok: bySpec.get(feature.spec),
-      command: ['pnpm', ...playwrightArgs(targets.map((target) => target.spec))].join(' '),
+      command: playwrightCommand(targets.map((target) => target.spec)),
     })),
     evidence: [`${artifactsDir}/test-results（動画・スクリーンショット・トレース）`, `${artifactsDir}/report/index.html`],
   };

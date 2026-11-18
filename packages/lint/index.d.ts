@@ -41,6 +41,20 @@ export const common: BugyoPart;
 /** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止、fetch は apiClientDir だけ */
 export const structure: BugyoPart;
 
+export interface BugyoLayers {
+  /** 画面を組み立てる層。feature の index.ts だけを使える */
+  app?: string;
+  /** feature を1つずつフォルダに置く層 */
+  features?: string;
+  /** どの feature からも使える層。features と app には依存できない */
+  shared?: { ui?: string; api?: string; lib?: string };
+}
+
+export function resolveLayers(
+  src: string,
+  layers: BugyoLayers | undefined,
+): { app: string; features: string; shared: { ui: string; api: string; lib: string } };
+
 export interface BugyoOptions {
   /** eslint.config.js で `import.meta.dirname` を渡す */
   root: string;
@@ -51,14 +65,27 @@ export interface BugyoOptions {
    * `features/<id>/index.ts` をファイル名つきで import できるようにする。既定は false
    */
   explicitExtensions?: boolean;
-  /** ソースのルート。既定は `src` */
+  /** ソースのルート。既定は `src`。`layers` のフォルダはすべてこの中に置く */
   src?: string;
-  /** useEffect を書いてよい場所。既定は `<src>/shared/lib` */
+  /**
+   * 層のフォルダの場所（root からの相対パス）。既定は `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}`。
+   * 指定すると、import の別名（`@/` など）に頼らず、解決したパスで層の境界を確かめる。
+   * 例: `{ app: 'web/pages', features: 'web/features', shared: { ui: 'web/app/ui', api: 'web/app/api', lib: 'web/app/lib' } }`
+   */
+  layers?: BugyoLayers;
+  /** useEffect を書いてよい場所。既定は `layers.shared.lib`（`<src>/shared/lib`） */
   effectHooksDir?: string;
-  /** fetch を呼んでよい場所。既定は `<src>/shared/api` */
+  /** fetch を呼んでよい場所。既定は `layers.shared.api`（`<src>/shared/api`） */
   apiClientDir?: string;
   /** 追加で lint 対象から外すパス */
   ignores?: string[];
+  /**
+   * 禁止を warn に下げる（off にはできない）。キーは禁止の名前（`feature-internals`・`fetch`・`model-layers`、
+   * @bugyo/lint-react の `use-effect`・`ui-timers`・`model-react`）か、設定にあるルール ID。
+   * 禁止の名前で下げたものは、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になる。
+   * 知らない名前を渡すと断る。
+   */
+  severity?: Record<string, 'warn'>;
   /**
    * 追加の禁止。bugyo の禁止と同じスコープに合成される（上書きしない）。
    * restrictedProperties と restrictedSyntax は、副作用を包む場所（effectHooksDir）とテストでは効かない。
@@ -73,3 +100,6 @@ export interface BugyoOptions {
 }
 
 export function bugyo(options: BugyoOptions): Linter.Config[];
+
+/** 禁止の名前で warn に下げたルールの置き場所（プラグインの名前）。`bugyo-warn` */
+export const warnPlugin: string;

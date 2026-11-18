@@ -66,6 +66,7 @@ The two lines say: the steps to check are in `docs/features/todos.md`, and the e
 - **Verification** — `bugyo verify <id>` runs the feature's check and reports pass/fail plus where the evidence is. By default it runs the Playwright spec and keeps video, screenshots, and a trace; with `"runner": "command"` in `.bugyo/config.json` it runs any command per feature and keeps its output.
 - **Task ledger and gate** — one file per task in `.bugyo/tasks/`. `bugyo task done` collects the evidence the task type needs and closes the task only when it passes. A task flipped to done by hand fails `bugyo task lint` inside `pnpm check`. `bugyo gate` decides whether to widen what agents may do, from rework, first-pass closes, and repeated mistakes.
 - **Scaffold** — `bugyo init --template <name>` and `bugyo new feature` create projects and features that already follow these rules.
+- **Gradual adoption** — `bugyo doctor` counts violations per ban before you adopt the rules, and `bugyo baseline save` records the current violations as a baseline. `bugyo baseline check` fails whenever a ban's count goes up or down, so the baseline can only shrink.
 
 Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs/tasks.md) (Japanese).
 
@@ -113,7 +114,7 @@ cd ../my-app && pnpm install
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project and every option are covered in [docs/foundation.md](docs/foundation.md).
+To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project is covered in [docs/adopt.md](docs/adopt.md), and every option in [docs/foundation.md](docs/foundation.md) (both in Japanese).
 
 ## Language
 

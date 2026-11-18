@@ -1,0 +1,7 @@
+{
+  "layers": {
+    "app": "web/pages",
+    "features": "web/features",
+    "shared": { "ui": "web/app/ui", "api": "web/app/api", "lib": "web/app/lib" }
+  }
+}

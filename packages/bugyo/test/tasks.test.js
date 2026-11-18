@@ -426,6 +426,47 @@ test('recheck: 本物の証拠は通り、閉じたあとにコードが変わ�
   assert.match(changed.stdout, /^FAIL t-001 {2}今のコードのハッシュ.*evidence-tree.*と違います/m);
 });
 
+test('issue: add --issue で課題の参照を残し、シェルで意味を持つ文字は断る', () => {
+  const cwd = project();
+  const added = JSON.parse(ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet', '--issue', 'PROJ-45', '--json').stdout);
+  assert.equal(added.issue, 'PROJ-45');
+  assert.match(readFileSync(taskFile(cwd, 't-001'), 'utf8'), /^issue: PROJ-45$/m);
+  assert.match(ok(cwd, 'task', 'ls').stdout, /課題: PROJ-45/);
+  for (const issue of ['1; rm -rf ~', '#12', '-x', '$(id)']) {
+    assert.equal(bugyo(cwd, 'task', 'add', 'x', '--type', 'chore', '--issue', issue).status, 2, issue);
+  }
+  ok(cwd, 'task', 'add', 'x', '--type', 'chore', '--issue', 'https://example.com/a/issues/12#top');
+});
+
+test('recheck --notify: 通った課題つきのタスクだけを知らせ、done では知らせず、知らせられなくても合否は変えない', () => {
+  const cwd = project();
+  const log = join(cwd, 'notified.log');
+  editConfig(cwd, (config) => (config.notify = { verified: `node -e "require('fs').appendFileSync(process.argv[1], process.argv.slice(2).join(' ') + ' ' + process.env.BUGYO_TITLE + '\\n')" "${log}" {issue} {task} {evidence}` }));
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet', '--issue', '123');
+  ok(cwd, 'task', 'add', '課題なし', '--type', 'chore');
+  for (const id of ['t-001', 't-002']) {
+    ok(cwd, 'task', 'start', id, '--as', `w-${id}`);
+    ok(cwd, 'task', 'done', id);
+  }
+  assert.ok(!existsSync(log), 'done では知らせない');
+
+  ok(cwd, 'task', 'recheck', 't-001', 't-002');
+  assert.ok(!existsSync(log), '--notify がなければ知らせない');
+
+  const run = ok(cwd, 'task', 'recheck', 't-001', 't-002', '--notify');
+  assert.match(run.stdout, /^notify t-001 を 123 に知らせました$/m);
+  assert.equal(readFileSync(log, 'utf8'), '123 t-001 .bugyo/evidence/t-001.json あいさつ\n');
+
+  writeFileSync(join(cwd, 'lib/greet/extra.js'), 'export const extra = 1;\n');
+  assert.equal(bugyo(cwd, 'task', 'recheck', 't-001', '--notify').status, 1);
+  assert.equal(readFileSync(log, 'utf8').split('\n').length, 2, '照合に落ちたタスクは知らせない');
+  rmSync(join(cwd, 'lib/greet/extra.js'));
+
+  editConfig(cwd, (config) => (config.notify = { verified: 'node -e "process.exit(3)"' }));
+  const failing = ok(cwd, 'task', 'recheck', 't-001', '--notify');
+  assert.match(failing.stdout, /^warn {3}t-001 を 123 に知らせられませんでした（終了コード 3）/m);
+});
+
 test('recheck: ハッシュまで合わせた偽の証拠は task lint を通るが、取り直すと verify で落ちる', async () => {
   const { treeHash } = await import('../src/evidence.js');
   const cwd = project();
@@ -565,4 +606,115 @@ test('repro: 終了コード・出力の末尾・テストファイルのハッ�
   assert.equal(evidence.repro.status, 1);
   assert.equal(evidence.repro.log, '.bugyo/evidence/t-001.repro.log');
   assert.equal(evidence.warnings.length, 1);
+});
+
+/**
+ * @param {string} cwd
+ * @param {...string} args
+ */
+function git(cwd, ...args) {
+  const run = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'core.autocrlf=false', ...args], { cwd, encoding: 'utf8' });
+  assert.equal(run.status, 0, `git ${args.join(' ')}\n${run.stderr}`);
+  return run.stdout.trim();
+}
+
+/** フィクスチャを git のリポジトリにして最初のコミットを作る */
+function repo() {
+  const cwd = project();
+  git(cwd, 'init', '-q', '-b', 'main');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'init');
+  return cwd;
+}
+
+test('worktree: 2つの worktree で同時に add しても別々の id になる', () => {
+  const cwd = repo();
+  const other = join(cwd, '..', 'wt2');
+  git(cwd, 'worktree', 'add', '-q', other, '-b', 'wt2');
+  assert.match(ok(cwd, 'task', 'add', 'こちら', '--type', 'chore').stdout, /^t-001 /);
+  assert.match(ok(other, 'task', 'add', 'あちら', '--type', 'chore').stdout, /^t-002 /);
+  assert.match(ok(cwd, 'task', 'add', 'こちら2', '--type', 'chore').stdout, /^t-003 /);
+});
+
+test('worktree: 別の worktree で着手したタスクは start を断り、ready にも出ない。release で消すと着手できる', () => {
+  const cwd = repo();
+  ok(cwd, 'task', 'add', '共有のタスク', '--type', 'chore');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'task');
+  const other = join(cwd, '..', 'wt2');
+  git(cwd, 'worktree', 'add', '-q', other, '-b', 'wt2');
+
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  const refused = bugyo(other, 'task', 'start', 't-001', '--as', 'w2');
+  assert.equal(refused.status, 1, refused.all);
+  assert.match(refused.stderr, /t-001 はすでに w1 が作業中です（ブランチ main）/);
+  assert.match(ok(other, 'task', 'ready').stdout, /着手できるタスクはありません/);
+
+  assert.match(ok(other, 'task', 'release', 't-001').stdout, /t-001 の着手の記録を消しました（w1、ブランチ main）/);
+  ok(other, 'task', 'start', 't-001', '--as', 'w2');
+  assert.equal(bugyo(other, 'task', 'release', 'no-such').status, 1);
+});
+
+test('worktree: やめたタスクの着手の記録は消える', () => {
+  const cwd = repo();
+  ok(cwd, 'task', 'add', 'やめる', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'drop', 't-001', '-r', '要らなくなった');
+  const release = bugyo(cwd, 'task', 'release', 't-001');
+  assert.equal(release.status, 1);
+  assert.match(release.stderr, /着手の記録はありません/);
+});
+
+test('claims.remote: 別のクローンとも id と着手を共有する', () => {
+  const base = mkdtempSync(join(tmpdir(), 'bugyo-remote-'));
+  const remote = join(base, 'remote.git');
+  git(base, 'init', '-q', '--bare', remote);
+  const a = repo();
+  editConfig(a, (config) => (config.claims = { remote: 'origin' }));
+  git(a, 'remote', 'add', 'origin', remote);
+  git(a, 'add', '-A');
+  git(a, 'commit', '-qm', 'config');
+  git(a, 'push', '-q', 'origin', 'main');
+  const b = join(base, 'b');
+  git(base, 'clone', '-q', '-b', 'main', remote, b);
+
+  assert.match(ok(a, 'task', 'add', 'A のタスク', '--type', 'chore').stdout, /^t-001 /);
+  assert.match(ok(b, 'task', 'add', 'B のタスク', '--type', 'chore').stdout, /^t-002 /);
+
+  git(a, 'add', '-A');
+  git(a, 'commit', '-qm', 't-001');
+  git(a, 'push', '-q', 'origin', 'main');
+  rmSync(join(b, '.bugyo/tasks/t-002.md'));
+  git(b, 'pull', '-q', 'origin', 'main');
+  ok(a, 'task', 'start', 't-001', '--as', 'w1');
+  const refused = bugyo(b, 'task', 'start', 't-001', '--as', 'w2');
+  assert.equal(refused.status, 1, refused.all);
+  assert.match(refused.stderr, /t-001 はすでに w1 が作業中です/);
+});
+
+test('task lint --base: 別のブランチで同じ id を振ったタスクを、マージする前に見つける', () => {
+  const cwd = repo();
+  git(cwd, 'switch', '-q', '-c', 'feature');
+
+  git(cwd, 'switch', '-q', 'main');
+  ok(cwd, 'task', 'add', 'main で作った', '--type', 'chore');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'main の t-001');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'main で閉じる');
+  ok(cwd, 'task', 'lint', '--base', 'HEAD~1');
+
+  git(cwd, 'switch', '-q', 'feature');
+  ok(cwd, 'task', 'add', 'feature で作った', '--type', 'chore');
+  const reserved = join(cwd, '.bugyo/tasks/t-002.md');
+  writeFileSync(join(cwd, '.bugyo/tasks/t-001.md'), readFileSync(reserved, 'utf8'));
+  rmSync(reserved);
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'feature の t-001');
+  ok(cwd, 'task', 'lint');
+  const run = bugyo(cwd, 'task', 'lint', '--base', 'main');
+  assert.equal(run.status, 1, run.all);
+  assert.match(run.stderr, /t-001 は main の .*archive\/t-001\.md と同じ id の別のタスクです/);
 });

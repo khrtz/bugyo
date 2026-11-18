@@ -19,6 +19,8 @@ export function loadSweepOrder(cwd?: string): string[];
 export interface BugyoConfig {
   /** bugyo init で使ったテンプレートの名前。bugyo new feature が生成物を選ぶ */
   template?: string | undefined;
+  /** パッケージマネージャー。書かなければ package.json の packageManager か lockfile から決める（見つからなければ pnpm）。commands の既定を選ぶ */
+  packageManager: 'pnpm' | 'npm' | 'yarn' | 'bun';
   verify: {
     /** `playwright`（既定）は JSON レポートから spec ごとの合否を読む。`command` は機能ごとに command を1回ずつ実行する */
     runner: 'playwright' | 'command';
@@ -30,10 +32,15 @@ export interface BugyoConfig {
     specDir: string | null;
     /** spec のファイル名の末尾。既定は `.spec.ts` */
     specSuffix: string;
-    /** 機能のフォルダを並べる場所。既定は `src/features`。null で検査を飛ばす */
+    /** 機能のフォルダを並べる場所。既定は `layers.features`、layers がなければ `src/features`。null で検査を飛ばす */
     featuresDir: string | null;
   };
-  /** bugyo task done が実行するコマンド。このキーがないときだけ既定値（pnpm check / pnpm test / bugyo verify {feature}）を使う */
+  /**
+   * 層のフォルダの場所（プロジェクトのルートからの相対パス）。書いたときは bugyo new feature が雛形を作らず断り、
+   * bugyo doctor がどの層にも入っていないファイルを出す。ESLint と dependency-cruiser には同じ値を渡す
+   */
+  layers?: { app: string; features: string; shared: { ui: string; api: string; lib: string } } | undefined;
+  /** bugyo task done が実行するコマンド。このキーがないときだけ、packageManager に合わせた既定値（pnpm なら pnpm check / pnpm test / bugyo verify {feature}）を使う */
   commands?: { check?: string | undefined; test?: string | undefined; verify?: string | undefined } | undefined;
   evidence: {
     /** evidence-tree のハッシュを取るパス。既定は `["src", "e2e"]` */
@@ -53,6 +60,17 @@ export interface BugyoConfig {
      * しきい値を省いたまとまりは、上の値を使う
      */
     scopes?: Record<string, { types: string[]; window?: number; maxRework?: number; minFirstPass?: number; maxDropped?: number }> | undefined;
+  };
+  claims: {
+    /** id の予約と着手の記録（git の ref）を共有するリモート。書かなければ、同じマシンの worktree の間だけで共有する */
+    remote?: string | undefined;
+  };
+  notify: {
+    /**
+     * bugyo task recheck --notify が、証拠を取り直して通った課題つきのタスクごとに実行するコマンド。
+     * `{issue}`・`{task}`・`{evidence}` が置き換わる。手元の bugyo task done では実行しない
+     */
+    verified?: string | undefined;
   };
 }
 
@@ -80,7 +98,7 @@ export function featureMapChecks(options?: FeatureMapOptions): FeatureMapCheck[]
 
 export interface BugyoPlaywrightOptions {
   port?: number;
-  /** dev サーバーを起動するコマンド。既定は `pnpm exec vite --port <port> --strictPort` */
+  /** dev サーバーを起動するコマンド。既定は `vite --port <port> --strictPort`（node_modules/.bin の vite を使う） */
   command?: string;
   overrides?: PlaywrightTestConfig;
 }

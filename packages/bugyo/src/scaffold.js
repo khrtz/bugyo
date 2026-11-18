@@ -241,6 +241,11 @@ export function newFeature(id, options = {}) {
   if (!/^[a-z][a-z0-9-]*$/.test(id)) throw new Error(`feature 名 "${id}" は小文字・数字・ハイフンにしてください（例: user-settings）`);
   const cwd = options.cwd ?? process.cwd();
   const config = loadConfig(cwd);
+  if (config.layers !== undefined) {
+    throw new Error(
+      `${configFile} に layers があるので、new feature は雛形を作りません（雛形は src/features の形でしか作れないため）。${config.layers.features}/${id} を手で作り、docs/features/${id}.md を足してください`,
+    );
+  }
   const template = config.template ?? defaultTemplate;
   switch (template) {
     case 'react-vite':

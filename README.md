@@ -62,6 +62,7 @@ PASS todos  確認手順: docs/features/todos.md
 - **検証** — `bugyo verify <id>` がその機能を実際に動かし、合否と証拠を毎回残す。既定は Playwright（動画・スクリーンショット・トレース）。`.bugyo/config.json` で、機能ごとに任意のコマンドを実行する方式にもできる
 - **タスク台帳と門番** — 仕事を `.bugyo/tasks/<id>.md` に1件1ファイルで残す。`bugyo task done` が種類ごとに必要な証拠を自分で取り、通ったときだけ閉じる。手で完了に書き換えたタスクは `pnpm check` の `bugyo task lint` が落とす。`bugyo gate` が、手直しの少なさ・1回で通った件数・ミスの再発から、任せる範囲を広げてよいかを計算する
 - **雛形** — `bugyo init --template <名前>` と `bugyo new feature` が、上の決まりに沿った形でプロジェクトと機能を作る
+- **段階的な導入** — `bugyo doctor` が入れる前に禁止ごとの違反を数え、`bugyo baseline save` が今の違反をベースラインにする。`bugyo baseline check` は禁止ごとの件数が増えても減っても落ちるので、ベースラインは減る方向にだけ動く
 
 くわしくは [docs/foundation.md](docs/foundation.md) と [docs/tasks.md](docs/tasks.md) にあります。
 
@@ -109,7 +110,7 @@ cd ../my-app && pnpm install
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-機能を足すときは `pnpm exec bugyo new feature <id>` を使います。作るものはテンプレートに合わせて変わります。既存のプロジェクトに入れる方法と、すべての設定項目は [docs/foundation.md](docs/foundation.md) にあります。
+機能を足すときは `pnpm exec bugyo new feature <id>` を使います。作るものはテンプレートに合わせて変わります。既存のプロジェクトに入れる方法は [docs/adopt.md](docs/adopt.md)、すべての設定項目は [docs/foundation.md](docs/foundation.md) にあります。
 
 ## このリポジトリでの開発
 

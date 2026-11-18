@@ -7,10 +7,11 @@ import { delimiter, join } from 'node:path';
  *
  * @param {string} command
  * @param {string} cwd
+ * @param {Record<string, string>} [extraEnv] 足す環境変数
  * @returns {{ status: number, output: string, ms: number }}
  */
-export function runCommand(command, cwd) {
-  const env = commandEnv(cwd);
+export function runCommand(command, cwd, extraEnv = {}) {
+  const env = { ...commandEnv(cwd), ...extraEnv };
   const started = Date.now();
   const result = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return {
@@ -25,7 +26,7 @@ export function runCommand(command, cwd) {
  *
  * @param {string} cwd
  */
-function commandEnv(cwd) {
+export function commandEnv(cwd) {
   const env = { ...process.env };
   const pathKey = Object.keys(env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
   env[pathKey] = [join(cwd, 'node_modules', '.bin'), env[pathKey] ?? ''].join(delimiter);
