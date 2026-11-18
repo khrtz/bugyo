@@ -85,6 +85,10 @@ const useLayoutEffect = violation('no-restricted-imports', "'useLayoutEffect' im
 test('no-restricted-* はメッセージごとに、それ以外はルールごとに数える', () => {
   assert.equal(banOf(useEffect), `no-restricted-imports: ${useEffect.message}`);
   assert.equal(banOf(violation('no-console', 'Unexpected console statement.')), 'no-console');
+  assert.equal(
+    banOf(violation('import-x/no-restricted-paths', 'Unexpected path "~/app/ui/x" imported in restricted zone. model/ が使えるのは自分のmodelと web/app/lib だけです。')),
+    'import-x/no-restricted-paths: model/ が使えるのは自分のmodelと web/app/lib だけです。',
+  );
   assert.deepEqual(compareCounts({ a: 2, b: 1 }, { a: 1, c: 1 }), {
     grew: [{ key: 'c', from: 0, to: 1 }],
     shrank: [

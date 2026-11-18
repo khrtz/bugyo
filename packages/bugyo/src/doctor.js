@@ -32,12 +32,16 @@ function runTool(cwd, command, args) {
 
 /**
  * ESLint の1件の違反を、禁止の名前にする。no-restricted-* はメッセージで分ける（useEffect と useLayoutEffect を別に数えるため）。
+ * no-restricted-paths は、import したパスを除いた、境界ごとのメッセージで分ける。
  *
  * @param {{ ruleId: string | null, message: string }} message
  */
 export function banOf(message) {
   if (message.ruleId === null) return 'eslint: 構文エラー';
   const ruleId = message.ruleId.replace(warnedPrefix, '');
+  if (ruleId === 'import-x/no-restricted-paths' || ruleId === 'import/no-restricted-paths') {
+    return `${ruleId}: ${message.message.replace(/^Unexpected path ".*?" imported in restricted zone\.\s*/, '')}`;
+  }
   return combinedRules.has(ruleId) ? `${ruleId}: ${message.message}` : ruleId;
 }
 
