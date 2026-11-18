@@ -35,7 +35,7 @@ jobs:
       - run: pnpm test
 
   e2e:
-    name: e2e（証拠つき）
+    name: verify（証拠つき）
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -43,6 +43,8 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -52,39 +54,29 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
         working-directory: examples/todo-app
 
-      - name: Linuxの基準画像があるか確かめる
-        id: baseline
-        working-directory: examples/todo-app
-        env:
-          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots }}
-        run: |
-          if [ "$UPDATE_SNAPSHOTS" = "true" ] || [ -d e2e/__screenshots__/linux ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Linux用の基準画像がまだないので e2e を飛ばしました。Actions から update_snapshots を有効にして実行し、できた linux-screenshots を examples/todo-app/e2e/__screenshots__/linux に置いてコミットしてください。"
-          fi
-
-      - name: Playwright
+      - name: verify（todo-app は Playwright、node-lib はコマンド）
         id: e2e
-        if: ${{ steps.baseline.outputs.ready == 'true' }}
+        if: ${{ !inputs.update_snapshots }}
+        run: pnpm verify
+
+      - name: この PR で閉じたタスクの証拠を取り直して照合する
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: pnpm recheck --base "origin/${{ github.base_ref }}"
+
+      - name: Linuxの基準画像を作り直す
+        if: ${{ inputs.update_snapshots }}
         working-directory: examples/todo-app
-        env:
-          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots }}
-        run: |
-          if [ "$UPDATE_SNAPSHOTS" = "true" ]; then
-            pnpm e2e --update-snapshots
-          else
-            pnpm e2e
-          fi
+        run: pnpm e2e --update-snapshots=all
 
       - name: 証拠をアップロード
         id: evidence
-        if: ${{ !cancelled() && steps.baseline.outputs.ready == 'true' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: evidence
-          path: examples/todo-app/artifacts/
+          path: |
+            examples/todo-app/artifacts/
+            examples/node-lib/artifacts/
           retention-days: 14
 
       - name: Linuxの基準画像をアップロード
@@ -95,7 +87,7 @@ jobs:
           path: examples/todo-app/e2e/__screenshots__/linux/
 
       - name: PRに証拠のリンクを載せる
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.baseline.outputs.ready == 'true' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && !inputs.update_snapshots }}
         continue-on-error: true
         uses: actions/github-script@v7
         env:
@@ -108,7 +100,7 @@ jobs:
             const passed = process.env.OUTCOME === 'success';
             const body = [
               marker,
-              `### e2e: ${passed ? '✅ PASS' : '❌ FAIL'}`,
+              `### verify: ${passed ? '✅ PASS' : '❌ FAIL'}`,
               '',
               `- 証拠（動画・スクリーンショット・トレース・HTMLレポート）: ${process.env.ARTIFACT_URL || process.env.RUN_URL}`,
               `- 実行ログ: ${process.env.RUN_URL}`,

@@ -332,12 +332,13 @@ test('mistake rule は実在しないファイルを断る', () => {
 test('gate: 完了が足りない間は件数不足で不合格', () => {
   const run = bugyo(project(), 'gate');
   assert.equal(run.status, 1);
-  assert.match(run.stdout, /NG 完了タスク: 0件（20件以上）/);
+  assert.match(run.stdout, /\[ui\] 不合格（feature, ui-flow, ui-look の直近 20件）/);
+  assert.match(run.stdout, /NG 閉じたタスク（完了と中止）: 0件（20件以上）/);
 });
 
 test('gate: 同じ種類の手直しを2回記録すると不合格になり、ルール化を記録すると戻る', () => {
   const cwd = project();
-  editConfig(cwd, (config) => (config.gate = { window: 3, maxRework: 2, minFirstPass: 1 }));
+  editConfig(cwd, (config) => (config.gate = { window: 3, maxRework: 2, minFirstPass: 1, scopes: { chore: { types: ['chore'] } } }));
   for (const title of ['a', 'b', 'c']) ok(cwd, 'task', 'add', title, '--type', 'chore');
   for (const [id, who] of [['t-001', 'w1'], ['t-002', 'w2'], ['t-003', 'w3']]) {
     ok(cwd, 'task', 'start', id, '--as', who);
@@ -410,4 +411,158 @@ test('task lint: feature map にない機能、証拠と食い違う evidence-tr
   assert.match(run.stderr, /t-001\.md: feature の gone が docs\/features にありません/);
   assert.match(run.stderr, /t-002\.md: evidence-tree が \.bugyo\/evidence\/t-002\.json と合いません/);
   assert.match(run.stderr, /同じ id のタスクが \.bugyo\/tasks\/t-001\.md にもあります/);
+});
+
+test('recheck: 本物の証拠は通り、閉じたあとにコードが変わるとハッシュの不一致で落ちる', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  assert.match(ok(cwd, 'task', 'recheck', 't-001').stdout, /^OK {3}t-001 {2}手順が通り、ハッシュが一致しました$/m);
+
+  writeFileSync(join(cwd, 'lib/greet/extra.js'), 'export const extra = 1;\n');
+  const changed = bugyo(cwd, 'task', 'recheck', 't-001');
+  assert.equal(changed.status, 1, changed.all);
+  assert.match(changed.stdout, /^FAIL t-001 {2}今のコードのハッシュ.*evidence-tree.*と違います/m);
+});
+
+test('recheck: ハッシュまで合わせた偽の証拠は task lint を通るが、取り直すと verify で落ちる', async () => {
+  const { treeHash } = await import('../src/evidence.js');
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  breakGreet(cwd);
+  const forged = treeHash(cwd, ['lib', 'checks']);
+  setField(cwd, 't-001', 'evidence-tree', forged);
+  const evidencePath = join(cwd, '.bugyo/evidence/t-001.json');
+  const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
+  evidence.tree.hash = forged;
+  writeFileSync(evidencePath, JSON.stringify(evidence));
+
+  ok(cwd, 'task', 'lint');
+  const run = bugyo(cwd, 'task', 'recheck', 't-001');
+  assert.equal(run.status, 1, run.all);
+  assert.match(run.stdout, /^FAIL t-001 {2}取り直すと .*verify greet が通りません/m);
+});
+
+test('recheck: 証拠のコマンドが今の設定と違うと落ちる', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', '文書', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  editConfig(cwd, (config) => (config.commands.check = 'node -e "process.exit(0)"'));
+  const run = bugyo(cwd, 'task', 'recheck', 't-001');
+  assert.equal(run.status, 1, run.all);
+  assert.match(run.stdout, /証拠に記録されたコマンド（node scripts\/check\.js）が、今の設定で必要なコマンド/);
+});
+
+test('recheck --base: その範囲で閉じたタスクだけを照合し、引数がなければ断る', () => {
+  const cwd = project();
+  const git = (...args) => {
+    const run = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'core.autocrlf=false', ...args], { cwd, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+  };
+  git('init', '-q');
+  ok(cwd, 'task', 'add', '前からある', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-001');
+  git('add', '-A');
+  git('commit', '-qm', 'base');
+  git('tag', 'base');
+  ok(cwd, 'task', 'add', 'この PR で閉じる', '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-002', '--as', 'w1');
+  ok(cwd, 'task', 'done', 't-002');
+  git('add', '-A');
+  git('commit', '-qm', 'pr');
+
+  const run = ok(cwd, 'task', 'recheck', '--base', 'base', '--json');
+  assert.deepEqual(JSON.parse(run.stdout).results.map((result) => result.id), ['t-002']);
+  assert.equal(bugyo(cwd, 'task', 'recheck').status, 2);
+});
+
+test('gate: chore だけを通しても、画面やコードの作業を任せる判定は合格にならない', () => {
+  const cwd = project();
+  editConfig(cwd, (config) => (config.gate = { window: 2, maxRework: 0, minFirstPass: 2 }));
+  for (const [id, who] of [['t-001', 'w1'], ['t-002', 'w2']]) {
+    ok(cwd, 'task', 'add', id, '--type', 'chore');
+    ok(cwd, 'task', 'start', id, '--as', who);
+    ok(cwd, 'task', 'done', id);
+  }
+  assert.match(ok(cwd, 'gate', '--scope', 'chore').stdout, /^gate: 合格/);
+  const ui = bugyo(cwd, 'gate', '--scope', 'ui');
+  assert.equal(ui.status, 1, ui.all);
+  assert.match(ui.stdout, /NG 閉じたタスク（完了と中止）: 0件（2件以上）/);
+  const all = bugyo(cwd, 'gate', '--json');
+  assert.equal(all.status, 1);
+  assert.deepEqual(JSON.parse(all.stdout).scopes.map((scope) => [scope.name, scope.passed]), [['ui', false], ['code', false], ['chore', true]]);
+  assert.equal(bugyo(cwd, 'gate', '--scope', 'nope').status, 1);
+});
+
+test('gate: 中止したタスクも閉じたタスクに数え、上限を超えると不合格', () => {
+  const cwd = project();
+  editConfig(cwd, (config) => (config.gate = { window: 3, maxRework: 0, minFirstPass: 2, maxDropped: 0, scopes: { chore: { types: ['chore'] } } }));
+  for (const [id, who] of [['t-001', 'w1'], ['t-002', 'w2']]) {
+    ok(cwd, 'task', 'add', id, '--type', 'chore');
+    ok(cwd, 'task', 'start', id, '--as', who);
+    ok(cwd, 'task', 'done', id);
+  }
+  ok(cwd, 'task', 'add', '難しかった', '--type', 'chore');
+  ok(cwd, 'task', 'drop', 't-003', '-r', '通らなかった');
+  assert.match(field(cwd, 't-003', 'dropped-at') ?? '', /^\d{4}-/);
+  const run = bugyo(cwd, 'gate');
+  assert.equal(run.status, 1, run.all);
+  assert.match(run.stdout, /OK 閉じたタスク（完了と中止）: 3件（3件以上）/);
+  assert.match(run.stdout, /NG 中止したタスク: 1件（0件以下）/);
+});
+
+test('gate: scopes に知らない作業の種類を書くと設定の誤りとして断る', () => {
+  const cwd = project();
+  editConfig(cwd, (config) => (config.gate = { scopes: { web: { types: ['page'] } } }));
+  const run = bugyo(cwd, 'gate');
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /config\.json が不正です/);
+});
+
+test('repro: コマンドが見つからないとき、テストを1件も実行していないとき、--expect の文言が出ないときは記録しない', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつが違う', '--type', 'bugfix', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  breakGreet(cwd);
+
+  const missing = bugyo(cwd, 'task', 'repro', 't-001', '--', 'no-such-test-runner-xyz', 'checks/greet.js');
+  assert.equal(missing.status, 1, missing.all);
+  assert.match(missing.stderr, /最初のコマンドが見つかりません/);
+
+  writeFileSync(join(cwd, 'no-tests.js'), "console.log('Error: No tests found');\nprocess.exit(1);\n");
+  const empty = bugyo(cwd, 'task', 'repro', 't-001', '--', 'node', 'no-tests.js');
+  assert.equal(empty.status, 1, empty.all);
+  assert.match(empty.stderr, /テストを1件も実行していません/);
+
+  const wrong = bugyo(cwd, 'task', 'repro', 't-001', '--expect', 'TypeError', '--', 'node', 'checks/greet.js');
+  assert.equal(wrong.status, 1, wrong.all);
+  assert.match(wrong.stderr, /出力に「TypeError」がありません/);
+  assert.equal(field(cwd, 't-001', 'repro'), undefined);
+});
+
+test('repro: 終了コード・出力の末尾・テストファイルのハッシュを記録し、あとでテストを変えると done が警告する', () => {
+  const cwd = project();
+  ok(cwd, 'task', 'add', 'あいさつが違う', '--type', 'bugfix', '--feature', 'greet');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  breakGreet(cwd);
+  const recorded = ok(cwd, 'task', 'repro', 't-001', '--expect', 'のはずが', '--', 'node', 'checks/greet.js');
+  assert.match(recorded.stdout, /終了コード 1、出力: \.bugyo\/evidence\/t-001\.repro\.log/);
+  assert.equal(field(cwd, 't-001', 'repro-status'), '1');
+  assert.equal(field(cwd, 't-001', 'repro-expect'), 'のはずが');
+  assert.match(field(cwd, 't-001', 'repro-tests-hash') ?? '', /^sha256:/);
+  assert.match(readFileSync(join(cwd, '.bugyo/evidence/t-001.repro.log'), 'utf8'), /"hi bugyo"/);
+
+  fixGreet(cwd);
+  writeFileSync(join(cwd, 'lib/greet/model/greet.test.js'), "import { test } from 'node:test';\ntest('弱めた', () => {});\n");
+  const closed = ok(cwd, 'task', 'done', 't-001');
+  assert.match(closed.stdout, /^warn {2}repro のあとにテストファイルが変わっています/m);
+  const evidence = JSON.parse(readFileSync(join(cwd, '.bugyo/evidence/t-001.json'), 'utf8'));
+  assert.equal(evidence.repro.status, 1);
+  assert.equal(evidence.repro.log, '.bugyo/evidence/t-001.repro.log');
+  assert.equal(evidence.warnings.length, 1);
 });

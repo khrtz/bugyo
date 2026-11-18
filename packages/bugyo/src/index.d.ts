@@ -46,6 +46,13 @@ export interface BugyoConfig {
     maxRework: number;
     /** そのうち1回の done で閉じたタスクの下限。既定は 16 */
     minFirstPass: number;
+    /** そのうち中止したタスクの上限。既定は 2 */
+    maxDropped: number;
+    /**
+     * 作業の種類のまとまりごとの判定。ないときは ui（feature・ui-flow・ui-look）、code（logic・bugfix・refactor）、chore（chore）。
+     * しきい値を省いたまとまりは、上の値を使う
+     */
+    scopes?: Record<string, { types: string[]; window?: number; maxRework?: number; minFirstPass?: number; maxDropped?: number }> | undefined;
   };
 }
 

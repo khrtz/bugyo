@@ -1,0 +1,63 @@
+import { spawnSync } from 'node:child_process';
+import { collectEvidence, readEvidence, requirements } from './evidence.js';
+import { archiveDir } from './tasks.js';
+
+/**
+ * `base...HEAD` で追加・変更された完了タスクのファイルから、タスクの id を返す。
+ * cwd より下のファイルだけを見る。
+ *
+ * @param {string} cwd
+ * @param {string} base
+ * @returns {string[]}
+ */
+export function changedArchiveIds(cwd, base) {
+  const run = spawnSync('git', ['diff', '--name-only', '--relative', '--diff-filter=AM', `${base}...HEAD`, '--', archiveDir], {
+    cwd,
+    encoding: 'utf8',
+  });
+  if (run.status !== 0) throw new Error(`git diff ${base}...HEAD が失敗しました: ${(run.stderr ?? '').trim()}`);
+  return run.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.endsWith('.md'))
+    .map((line) => line.split('/').pop()?.replace(/\.md$/, '') ?? '')
+    .sort();
+}
+
+/**
+ * @typedef {{ id: string, ok: boolean, reason: string, output: string }} RecheckResult
+ */
+
+/**
+ * 完了タスクの証拠を取り直し、手順が今も通ることと、ツリーのハッシュが台帳と一致することを確かめる。
+ * 証拠ファイルは書き換えない。
+ *
+ * @param {import('./tasks.js').Task} task
+ * @param {import('./index.js').BugyoConfig} config
+ * @param {string} cwd
+ * @returns {RecheckResult}
+ */
+export function recheckTask(task, config, cwd) {
+  const fail = (/** @type {string} */ reason, output = '') => ({ id: task.id, ok: false, reason, output });
+  if (task.status !== 'done') return { id: task.id, ok: true, reason: `${task.status} なので照合しません`, output: '' };
+  const file = task['evidence-file'];
+  const evidence = file === undefined ? undefined : readEvidence(cwd, file);
+  if (file === undefined || evidence === undefined) return fail('証拠ファイルがありません');
+
+  const recorded = Array.isArray(evidence['steps'])
+    ? evidence['steps'].map((/** @type {{ command?: unknown }} */ step) => String(step.command))
+    : [];
+  const expected = requirements(task, config)
+    .filter((step) => step.kind === 'command')
+    .map((step) => step.command ?? '');
+  if (JSON.stringify(recorded) !== JSON.stringify(expected)) {
+    return fail(`証拠に記録されたコマンド（${recorded.join(' → ') || 'なし'}）が、今の設定で必要なコマンド（${expected.join(' → ')}）と違います`);
+  }
+
+  const outcome = collectEvidence(task, config, cwd, { write: false });
+  if (!outcome.ok) return fail(`取り直すと ${outcome.step.label} が通りません: ${outcome.reason}`, outcome.output);
+  if (outcome.tree !== task['evidence-tree']) {
+    return fail(`今のコードのハッシュ（${outcome.tree}）が evidence-tree（${task['evidence-tree'] ?? 'なし'}）と違います。閉じたあとにコードが変わったか、証拠が手で書かれています`);
+  }
+  return { id: task.id, ok: true, reason: '手順が通り、ハッシュが一致しました', output: '' };
+}
