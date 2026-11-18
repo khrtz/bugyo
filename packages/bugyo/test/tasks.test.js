@@ -803,7 +803,12 @@ test('task lint --base: 別のブランチで同じ id を振ったタスクを�
   assert.match(run.stderr, /t-001 は main の .*archive\/t-001\.md と同じ id の別のタスクです/);
 });
 
-test('task pr-check: task/<id> のブランチか台帳の差分で紐づきを確かめ、allowBranches は通す', () => {
+test('task pr-check: task/<id> のブランチか台帳の差分で紐づきを確かめ、allowBranches は通す', (t) => {
+  const headRef = process.env['GITHUB_HEAD_REF'];
+  delete process.env['GITHUB_HEAD_REF'];
+  t.after(() => {
+    if (headRef !== undefined) process.env['GITHUB_HEAD_REF'] = headRef;
+  });
   const cwd = repo();
   ok(cwd, 'task', 'add', 'a', '--type', 'chore');
   ok(cwd, 'task', 'add', 'b', '--type', 'chore');
