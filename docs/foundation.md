@@ -4,7 +4,7 @@
 
 土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
 
-feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提です。React 用の禁止は別のパッケージ `@bugyo/lint-react` に分かれていて、React を使うプロジェクトだけが入れます（下の「部品」）。
+feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提です。React 用の部品と禁止は別のパッケージ `@bugyo/lint-react` に分かれていて、React を使うプロジェクトだけが入れます（下の「部品と禁止」）。
 
 雛形（`bugyo init --template <名前>`）は2つです。
 
@@ -25,8 +25,8 @@ src/
     index.ts                外に見せる窓口。外からはここだけを import する
   shared/
     ui/                     共通の部品
-    lib/                    useEffect を書いてよい唯一の場所
-    api/                    fetch を呼んでよい唯一の場所
+    lib/                    useEffect を書いてよい唯一の場所（noUseEffect を入れたとき）
+    api/                    fetch を呼んでよい唯一の場所（fetchOnlyInApi を入れたとき）
 docs/features/<id>.md       feature map（機能ごとの確かめ方）
 e2e/<id>.spec.ts            その機能を実際に操作するテスト
 ```
@@ -42,11 +42,14 @@ e2e/<id>.spec.ts            その機能を実際に操作するテスト
 ESLint は 9.24 以上（10 を含む）、TypeScript は 5.8 以上 6.0 まで、flat config が前提です。`@eslint/js` は peer 依存なので、使う ESLint と同じ大きな版（9 なら 9、10 なら 10）をプロジェクトに入れます。CI は ESLint 9.24・TypeScript 5.8 の組み合わせでも lint のテストを回しています。
 
 ```js
-// eslint.config.js（React を使うプロジェクト）
-import { bugyo, common, structure } from '@bugyo/lint';
-import { react } from '@bugyo/lint-react';
+// eslint.config.js（React を使うプロジェクト。react-vite のテンプレートと同じ）
+import { bugyo, common, fetchOnlyInApi, noComments, structure } from '@bugyo/lint';
+import { noUiTimers, noUseEffect, react } from '@bugyo/lint-react';
 
-export default bugyo({ root: import.meta.dirname, parts: [common, structure, react] });
+export default bugyo({
+  root: import.meta.dirname,
+  parts: [common, structure, react, noComments, fetchOnlyInApi, noUseEffect, noUiTimers],
+});
 ```
 
 | 項目 | 既定 | 意味 |
@@ -54,69 +57,60 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, rea
 | `root` | 必須 | `import.meta.dirname` を渡す |
 | `src` | `src` | ソースの場所。`layers` のフォルダはすべてこの中に置く |
 | `layers` | `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}` | 層のフォルダの場所（下の「層のフォルダ名を変える」） |
-| `effectHooksDir` | `layers.shared.lib` | `useEffect` を書いてよい場所 |
-| `apiClientDir` | `layers.shared.api` | `fetch` を呼んでよい場所 |
+| `effectHooksDir` | `layers.shared.lib` | 禁止の `allow` に書く `effects` の場所（`noUseEffect` を入れたときに `useEffect` を書いてよい場所） |
+| `apiClientDir` | `layers.shared.api` | 禁止の `allow` に書く `api` の場所（`fetchOnlyInApi` を入れたときに `fetch` を呼んでよい場所） |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `severity` | `{}` | 禁止を warn に下げる（下の「禁止を warn に下げる」） |
-| `extra` | `{}` | 独自の禁止を足す（下の「独自の禁止を足す」） |
-| `parts` | `[common, structure]` | 使う部品（下の「部品」）。`common` は必須 |
+| `parts` | `[common, structure]` | 使う部品と禁止（下の「部品と禁止」）。`common` は必須 |
 | `explicitExtensions` | `false` | import に拡張子を書くプロジェクト（Node の型除去で `.ts` を直接動かすなど）で `true` にする。`features/<id>/index.ts` をファイル名つきで import できるようになる |
 
-#### 部品
+#### 部品と禁止
 
-設定は部品の組み合わせです。`common` と `structure` は `@bugyo/lint` に、`react` は `@bugyo/lint-react` にあります。React を使わないプロジェクトは `@bugyo/lint-react` を入れず、`common` と `structure` だけを使います（`parts` を省いたときと同じ）。同じ範囲の禁止（`no-restricted-imports` など）は、部品をまたいで1つのルールに合成されます。部品の順番は結果に影響しません。
+設定は、部品と禁止の組み合わせです。部品は型の検査と層の境界を、禁止は書き方の決まりを1つずつ持ちます。`parts` に並べたものだけが当たり、順番は結果に影響しません。同じ範囲の禁止（`no-restricted-imports` など）は、部品と禁止をまたいで1つのルールに合成されます。
 
 ```js
-// eslint.config.js（React を使わないプロジェクト）
-import { bugyo } from '@bugyo/lint';
+// eslint.config.js（React を使わないプロジェクト。node-lib のテンプレートと同じ）
+import { bugyo, common, fetchOnlyInApi, noComments, structure } from '@bugyo/lint';
 
-export default bugyo({ root: import.meta.dirname, explicitExtensions: true });
+export default bugyo({ root: import.meta.dirname, explicitExtensions: true, parts: [common, structure, noComments, fetchOnlyInApi] });
 ```
+
+`parts` を省くと `[common, structure]` で、書き方の禁止は1つも入りません。
 
 | 部品 | 範囲 | 止めるもの |
 | --- | --- | --- |
-| `common` | すべてのファイル | `any`、型アサーション（`as`）、非 null アサーション（`!`）、待っていない Promise、`switch` の分岐漏れ、理由のない `eslint-disable`、対象を絞らない `eslint-disable`。加えて typescript-eslint の `strictTypeChecked` |
-| `common` | `src` の下 | コメント。`extra` で足した禁止 |
-| `structure` | `src` の下 | 他の feature の内部ファイルの import、`shared` から `features` / `app` への依存、`features` から `app` への依存、`fetch` |
-| `structure` | `src/features/*/model` | 同じ feature の `ui` と `api`、`shared/ui`、`shared/api` |
-| `react`（`@bugyo/lint-react`） | `src` の下 | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形。加えて react-hooks の推奨ルール |
-| `react` | `src/features/*/ui` | `setTimeout`、`setInterval`、`requestAnimationFrame` |
-| `react` | `src/features/*/model` | `react`、`react-dom`、`@tanstack/*` |
+| `common` | すべてのファイル | `any`、型アサーション（`as`）、非 null アサーション（`!`）、待っていない Promise、`switch` の分岐漏れ、理由のない `eslint-disable`、対象を絞らない `eslint-disable`。加えて typescript-eslint の `strictTypeChecked`。必須 |
+| `structure` | `src` の下 | 他の feature の内部ファイルの import（禁止の名前は `feature-internals`）、`shared` から `features` / `app` への依存、`features` から `app` への依存 |
+| `structure` | `src/features/*/model` | 同じ feature の `ui` と `api`、`shared/ui`、`shared/api`（`model-layers`） |
+| `react`（`@bugyo/lint-react`） | `src` の下 | react-hooks の推奨ルール |
+| `react` | `src/features/*/model` | `react`、`react-dom`、`@tanstack/*`（`model-react`） |
 
-エラー文には、代わりに何を使うかが入っています。他の feature の内部ファイルの import は、パスに `features/` を含む書き方（`@/features/<id>/...` や `../features/<id>/...`）を ESLint が止め、相対パスで feature の間をまたぐ書き方も含めて dependency-cruiser が止めます。
+| 禁止 | パッケージ | 名前 | 止めるもの | 許す場所 |
+| --- | --- | --- | --- | --- |
+| `noComments` | `@bugyo/lint` | `comments` | `src` の下のコメント。公開 API の JSDoc（`/** */`）と、理由つきの `eslint-disable`（`-- 理由`）だけ書ける | なし |
+| `fetchOnlyInApi` | `@bugyo/lint` | `fetch` | `fetch` | `apiClientDir`、テスト |
+| `noUseEffect` | `@bugyo/lint-react` | `use-effect` | `react` からの `useEffect` / `useLayoutEffect` の import と `React.useEffect` の形 | `effectHooksDir` |
+| `noUiTimers` | `@bugyo/lint-react` | `ui-timers` | feature の UI での `setTimeout`、`setInterval`、`requestAnimationFrame` | テスト |
 
-場所による例外は次の3つだけです。
-
-| 場所 | 許されること | 例外を持つ部品 |
-| --- | --- | --- |
-| `effectHooksDir` | `useEffect` / `useLayoutEffect`、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`react` |
-| `apiClientDir` | `fetch` | `structure` |
-| `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`structure`・`react` |
-
-コメントは、公開 API の JSDoc（`/** */`）と、理由つきの `eslint-disable`（`-- 理由`）だけ書けます。`.js` / `.cjs` / `.mjs` には型を使うルールを当てません。
+エラー文には、代わりに何を使うかが入っています。他の feature の内部ファイルの import は、パスに `features/` を含む書き方（`@/features/<id>/...` や `../features/<id>/...`）を ESLint が止め、相対パスで feature の間をまたぐ書き方も含めて dependency-cruiser が止めます。`.js` / `.cjs` / `.mjs` には型を使うルールを当てません。
 
 #### 禁止を warn に下げる
 
 入れたばかりで直しきれない禁止は、`severity` で warn に下げられます。`off` にはできません。
 
 ```js
-export default bugyo({ root: import.meta.dirname, parts: [common, structure, react], severity: { 'use-effect': 'warn' } });
+export default bugyo({
+  root: import.meta.dirname,
+  parts: [common, structure, react, noComments, fetchOnlyInApi, noUseEffect, noUiTimers],
+  severity: { 'use-effect': 'warn' },
+});
 ```
 
-| 名前 | 禁止 | 部品 |
-| --- | --- | --- |
-| `feature-internals` | 他の feature の内部ファイルの import | `structure` |
-| `fetch` | `fetch` | `structure` |
-| `model-layers` | `model/` から `ui/`・`api/`・`shared/ui`・`shared/api` への import（`layers` を渡したときは `ui/`・`api/` だけ。下を参照） | `structure` |
-| `use-effect` | `useEffect` / `useLayoutEffect` | `react` |
-| `ui-timers` | feature の UI での `setTimeout` などのタイマー | `react` |
-| `model-react` | `model/` から React とその周辺への import | `react` |
-
+- キーは、`parts` に入れた禁止の名前です。上の表の名前（`feature-internals`・`model-layers`・`model-react`・`comments`・`fetch`・`use-effect`・`ui-timers`）と、`defineBan` で作った禁止の `name` が使えます。`model-layers` は、`layers` を渡したときは `ui/`・`api/` への import だけです（下を参照）
 - 名前のほかに、設定にあるルール ID（例: `@typescript-eslint/no-non-null-assertion`）も渡せます。そのルールがどのファイルでも warn になります
-- 名前で下げた禁止は、同じルールの他の禁止と分けるために、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になります。`eslint-disable` のコメントで止めるときも、この ID を書きます
-- 知らない名前と、組み合わせた部品にない禁止の名前は断ります
+- 名前で下げた禁止は、同じルールの他の禁止と分けるために、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になります。`eslint-disable` のコメントで止めるときも、この ID を書きます。`rules` で書いた禁止（`comments` など）は、ルール ID はそのままで warn になります
+- 知らない名前と、`parts` に入れていない禁止の名前は断ります
 - 層の境界（`shared` から `features` / `app`、`features` から `app`、`layers` を渡したときの `model/` から `shared.ui` / `shared.api`）は1つのルール `import-x/no-restricted-paths` なので、1つずつは下げられません。下げるときはルール ID で、境界をまとめて下げます
-- `extra` で足した禁止には名前がないので、名前では下げられません
 - `bugyo doctor` は、warn に下げた禁止を「直す借り」として別に数えます。`bugyo baseline check` は warn に下げた禁止も数えるので、下げても件数は増やせません
 - ESLint の抑制ファイルに入っている禁止を下げると、抑制が使われなくなって `eslint .` が落ちます（抑制は error だけに効くため）。下げたら `bugyo baseline save` を実行し直します
 
@@ -137,10 +131,10 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, rea
 ```js
 // eslint.config.js
 import { readFileSync } from 'node:fs';
-import { bugyo } from '@bugyo/lint';
+import { bugyo, common, fetchOnlyInApi, structure } from '@bugyo/lint';
 
 const { layers } = JSON.parse(readFileSync(new URL('./.bugyo/config.json', import.meta.url), 'utf8'));
-export default bugyo({ root: import.meta.dirname, src: 'web', layers });
+export default bugyo({ root: import.meta.dirname, src: 'web', layers, parts: [common, structure, fetchOnlyInApi] });
 ```
 
 ```js
@@ -149,33 +143,48 @@ const { layers } = require('./.bugyo/config.json');
 module.exports = require('@bugyo/lint/depcruise').config({ src: 'web', layers });
 ```
 
-`layers` を渡すと、境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` には5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
+`layers` を渡すと、`effectHooksDir` と `apiClientDir` の既定も `layers.shared.lib` と `layers.shared.api` になります（例では `fetch` は `web/app/api` でだけ呼べる）。境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` には5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
 
 ### 独自の禁止を足す
 
-`no-restricted-imports` などを自分の設定ブロックで書くと、bugyo の禁止が上書きされて消えます。足すときは `extra` に渡してください。bugyo の禁止と合成されます。
+独自の禁止は `defineBan` で作り、`parts` に bugyo の禁止と並べて渡します。bugyo の禁止も同じ形で書かれていて、名前・止める範囲・許す場所の決まりも、`severity` で warn に下げられることも同じです。
 
 ```js
-export default bugyo({
-  root: import.meta.dirname,
-  extra: {
-    restrictedProperties: [{ object: 'Date', property: 'now', message: 'shared/lib の systemClock を使ってください' }],
-    restrictedSyntax: [
-      { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: 'shared/lib の systemClock を使ってください' },
-    ],
-    restrictedGlobals: [{ name: 'localStorage', message: 'shared/lib の storage を使ってください' }],
-  },
+import { bugyo, common, defineBan, structure } from '@bugyo/lint';
+
+const clock = defineBan({
+  name: 'clock',
+  allow: ['effects', 'tests'],
+  properties: [{ object: 'Date', property: 'now', message: 'shared/lib の systemClock を使ってください' }],
+  syntax: [{ selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: 'shared/lib の systemClock を使ってください' }],
 });
+
+const noConsoleInApi = defineBan({
+  name: 'no-console-in-api',
+  scope: 'src/features/*/api/**/*.ts',
+  rules: { 'no-console': 'error' },
+});
+
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, clock, noConsoleInApi] });
 ```
 
-| 項目 | 形 | 効かない場所 |
+| 項目 | 形 | 意味 |
 | --- | --- | --- |
-| `restrictedImports` | `{ paths: [{ name, importNames?, message }], patterns: [{ group, message }] }` | なし |
-| `restrictedGlobals` | `[{ name, message }]` | なし |
-| `restrictedProperties` | `[{ object?, property?, message }]` | `effectHooksDir` とテスト |
-| `restrictedSyntax` | `[{ selector, message }]` | `effectHooksDir` とテスト |
+| `name` | 小文字・数字・ハイフン | 禁止の名前。`severity` のキーにもなる。同じ名前の禁止は2つ置けない |
+| `scope` | `src`（既定）・`ui`・`model`。`rules` だけの禁止は root からの glob も使える | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/`。`imports`・`globals`・`syntax`・`properties` は bugyo の禁止と1つのルールに合成するので、glob の範囲にすると断る（範囲を絞るなら `allow` で除く） |
+| `allow` | `effects`・`api`・`tests`、または root からの glob の配列 | どこでは許すか。`effects` は `effectHooksDir`、`api` は `apiClientDir`、`tests` は `src` の下の `*.test.ts(x)` |
+| `imports` | `{ paths: [{ name, importNames?, message }], patterns: [{ group, message }] }` | `no-restricted-imports` に合成する |
+| `globals` | `[{ name, message }]` | `no-restricted-globals` に合成する |
+| `properties` | `[{ object?, property?, message }]` | `no-restricted-properties` に合成する |
+| `syntax` | `[{ selector, message }]` | `no-restricted-syntax` に合成する |
+| `rules` | `{ '<ルール ID>': <設定> }` | 合成しない ESLint のルール。`scope` の中で当て、`allow` の場所では off にする |
+| `plugins` | `{ '<名前>': <プラグイン> }` | `rules` で使うプラグイン |
 
-`restrictedProperties` と `restrictedSyntax` で禁止したものの「正しい入口」は `effectHooksDir` に作ります（例: `Date.now` を禁止し、`shared/lib/clock.ts` だけで使う）。
+- エラー文に `effectHooksDir` などの場所を入れたいときは、`build(context)` で `name` 以外の項目を返します（`defineBan({ name, allow, build: (context) => ({ globals: [...] }) })`）。`context` には `src`・`effectHooksDir`・`apiClientDir`・`layers`・`featuresLabel` が入っています
+- 禁止したものの「正しい入口」は、`allow` に書いた場所に作ります（例: `Date.now` を禁止し、`shared/lib/clock.ts` だけで使う）
+- 知らない項目、何も止めていない禁止、同じ名前の禁止は断ります
+- `no-restricted-imports` などを自分の設定ブロックで直接書くと、合成した bugyo の禁止が上書きされて消えます。必ず `defineBan` で足します
+- 1つのファイルが2つの許す場所に当たるとき（例: `shared/lib` の中のテスト）は、後ろの場所（`effects`・`api`・`tests`・glob の順）で作り直したルールが前の場所の分を上書きします。同じ種類（`imports` 同士など）の別々の禁止を、片方は前の場所で、もう片方は後ろの場所で許していると、前の場所で許した禁止がそのファイルでは戻ります
 
 ### dependency-cruiser
 
@@ -377,7 +386,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `pnpm test` | `vitest run`（ユニットテストと feature map の整合） | `node --test "src/**/*.test.ts" "test/**/*.test.ts"`（ユニットテストと feature map の整合） | 変更のたび |
 | `pnpm verify <id>` | `bugyo verify <id>`（Playwright） | `bugyo verify <id>`（`node checks/<id>.ts`） | 完了を名乗る前 |
 
-`node-lib` の `.bugyo/config.json` は、`verify` を `command` 方式（`node {spec}`）にし、spec のフォルダを `checks`、`evidence.tree` を `src`・`checks`・`test` にしています。lint は `parts` を省いた既定（`common` と `structure`）と `explicitExtensions: true`、dependency-cruiser は `config()` です。`@bugyo/lint-react` は依存に入れません。`react-vite` は `parts: [common, structure, react]` と `config({ react: true })` です。
+`node-lib` の `.bugyo/config.json` は、`verify` を `command` 方式（`node {spec}`）にし、spec のフォルダを `checks`、`evidence.tree` を `src`・`checks`・`test` にしています。lint は `parts: [common, structure, noComments, fetchOnlyInApi]` と `explicitExtensions: true`、dependency-cruiser は `config()` です。`@bugyo/lint-react` は依存に入れません。`react-vite` は `parts: [common, structure, react, noComments, fetchOnlyInApi, noUseEffect, noUiTimers]` と `config({ react: true })` です。
 
 `pnpm check` が通るだけでは完了ではありません。変更の種類ごとに必要な証拠は、見本の [docs/土台設計.md](../examples/todo-app/docs/土台設計.md) にあります。
 

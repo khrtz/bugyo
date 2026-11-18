@@ -23,20 +23,35 @@ description: エージェント（自分や他のエージェント）や人が�
 
 ## 3. lint か依存ルールで止める
 
-何を止めたいかで、`eslint.config.js` の `bugyo({ extra: { ... } })` のどこに足すかが決まる。
+lint の禁止は、`eslint.config.js` で `defineBan` を使って1つ作り、`bugyo({ parts })` に足す。何を止めたいかで、どの項目に書くかが決まる。
 
-| 止めたいもの | 足す場所 | 例 |
+```js
+import { bugyo, common, defineBan, structure } from '@bugyo/lint';
+
+const clock = defineBan({
+  name: 'clock',
+  allow: ['effects', 'tests'],
+  properties: [{ object: 'Date', property: 'now', message: '製品コードで Date.now() は使えません。shared/lib の useClock() を使ってください。' }],
+});
+
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, /* 今ある禁止 */ clock] });
+```
+
+| 止めたいもの | 書く項目 | 例 |
 | --- | --- | --- |
-| モジュールの import | `restrictedImports: { paths, patterns }` | `import moment from 'moment'` |
-| グローバル変数 | `restrictedGlobals` | `localStorage`、`alert` |
-| オブジェクトのプロパティ参照 | `restrictedProperties: [{ object, property, message }]` | `Date.now`、`Math.random`、`console.log` |
-| 構文の形 | `restrictedSyntax: [{ selector, message }]` | 引数なしの `new Date()` は `"NewExpression[callee.name='Date'][arguments.length=0]"` |
+| モジュールの import | `imports: { paths, patterns }` | `import moment from 'moment'` |
+| グローバル変数 | `globals: [{ name, message }]` | `localStorage`、`alert` |
+| オブジェクトのプロパティ参照 | `properties: [{ object, property, message }]` | `Date.now`、`Math.random`、`console.log` |
+| 構文の形 | `syntax: [{ selector, message }]` | 引数なしの `new Date()` は `"NewExpression[callee.name='Date'][arguments.length=0]"` |
+| ほかの ESLint のルール | `rules: { '<ルール ID>': 'error' }` | `no-console` |
 | 層や feature をまたぐ依存 | `.dependency-cruiser.cjs` の `config({ forbidden: [...] })` | — |
 
-`restrictedProperties` と `restrictedSyntax` は、副作用を包む場所（`src/shared/lib`）とテストでは効かない。だから禁止したものの「正しい入口」は `shared/lib` に作る（例: `shared/lib/clock.ts` の `systemClock`）。
+- `scope` で止める範囲を絞れる（`src`・`ui`・`model`）。既定は `src` の下すべて。glob の範囲は `rules` だけの禁止で使える
+- `allow` に、禁止したものの「正しい入口」を置く場所を書く（`effects` は `src/shared/lib`、`api` は `src/shared/api`、`tests` はテスト、または glob）。入口はそこに作る（例: `shared/lib/clock.ts` の `systemClock`）
+- `name` は小文字・数字・ハイフン。今ある禁止と同じ名前は断られる
 
-`no-restricted-imports`・`no-restricted-globals`・`no-restricted-properties`・`no-restricted-syntax` を自分のブロックで直接設定しないこと。bugyo の禁止が上書きされて黙って消える。必ず `extra` に足す。
-`extra` で表せない禁止が必要なら、それは bugyo 側に拡張口が足りないということなので、ユーザーにそう伝える（自分のブロックで回避しない）。
+`no-restricted-imports`・`no-restricted-globals`・`no-restricted-properties`・`no-restricted-syntax` を自分のブロックで直接設定しないこと。bugyo の禁止が上書きされて黙って消える。必ず `defineBan` で足す。
+`defineBan` で表せない禁止が必要なら、それは bugyo 側に拡張口が足りないということなので、ユーザーにそう伝える（自分のブロックで回避しない）。
 
 **エラー文には「代わりに何を使うか」まで書く。** エージェントはエラー文を読んで直すので、禁止だけだと抜け道を探される。
 

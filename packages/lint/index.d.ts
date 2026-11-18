@@ -36,10 +36,59 @@ export interface BugyoPart {
   readonly rank: number;
 }
 
-/** 共通: 厳しい型検査、any・型アサーション・非 null アサーション・待っていない Promise・switch の漏れ、理由のない eslint-disable、コメント、extra の合成。必須 */
+/** 共通: 厳しい型検査、any・型アサーション・非 null アサーション・待っていない Promise・switch の漏れ、理由のない eslint-disable。必須 */
 export const common: BugyoPart;
-/** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止、fetch は apiClientDir だけ */
+/** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止 */
 export const structure: BugyoPart;
+/** 禁止 `comments`: コメントは公開 API の JSDoc と理由つきの eslint-disable だけ */
+export const noComments: BugyoPart;
+/** 禁止 `fetch`: fetch は apiClientDir とテストでだけ呼べる */
+export const fetchOnlyInApi: BugyoPart;
+
+/** 禁止が、build のときに受け取る bugyo の設定 */
+export interface BugyoContext {
+  root: string;
+  src: string;
+  effectHooksDir: string;
+  apiClientDir: string;
+  layers: { app: string; features: string; shared: { ui: string; api: string; lib: string } };
+  /** エラー文に書く、機能のフォルダの名前（layers がなければ `features`） */
+  featuresLabel: string;
+}
+
+/**
+ * 禁止1つ。bugyo の禁止も、利用側で足す禁止も、この形で書く。
+ */
+export interface BanSpec {
+  /** 禁止の名前。小文字・数字・ハイフン。`severity` で warn に下げるときにも使う。同じ名前の禁止は2つ置けない */
+  name: string;
+  /**
+   * どこで止めるか。`src`（既定。src の下の .ts / .tsx）、`ui`（features の各 feature の ui/）、`model`（各 feature の model/）。
+   * root からの glob は、`rules` だけの禁止で使える（imports・globals・syntax・properties があると断る）
+   */
+  scope?: string;
+  /**
+   * どこでは許すか。`effects`（effectHooksDir）、`api`（apiClientDir）、`tests`（src の下の *.test.ts(x)）か、root からの glob
+   */
+  allow?: string[];
+  imports?: { paths?: RestrictedImportPath[]; patterns?: RestrictedImportPattern[] };
+  globals?: (string | RestrictedGlobal)[];
+  syntax?: RestrictedSyntax[];
+  properties?: RestrictedProperty[];
+  /** 合成しない ESLint のルール（例: `{ 'no-console': 'error' }`）。scope の中で当て、allow の場所では off にする */
+  rules?: Record<string, Linter.RuleEntry>;
+  /** rules で使うプラグイン */
+  plugins?: Record<string, object>;
+}
+
+/**
+ * 禁止を1つ、部品として作る。`bugyo({ parts: [common, structure, defineBan({ ... })] })` のように、bugyo の部品や禁止と並べて渡す。
+ * エラー文に effectHooksDir などを使うときは、`build(context)` で name 以外の項目を返す。
+ */
+export function defineBan(spec: BanSpec | ({ name: string; build: (context: BugyoContext) => Omit<BanSpec, 'name'> } & Omit<BanSpec, 'name'>)): BugyoPart;
+
+/** 部品の中で禁止を書くときに使う。書き方を確かめ、足りない項目を埋める */
+export function normalizeBan(spec: BanSpec): object;
 
 export interface BugyoLayers {
   /** 画面を組み立てる層。feature の index.ts だけを使える */
@@ -58,7 +107,10 @@ export function resolveLayers(
 export interface BugyoOptions {
   /** eslint.config.js で `import.meta.dirname` を渡す */
   root: string;
-  /** 使う部品。既定は `[common, structure]`。common は必須。React を使うなら @bugyo/lint-react の `react` を足す。順番は結果に影響しない */
+  /**
+   * 使う部品と禁止。既定は `[common, structure]`。common は必須。React を使うなら @bugyo/lint-react の `react` を足す。
+   * 禁止（`noComments`・`fetchOnlyInApi`、@bugyo/lint-react の `noUseEffect`・`noUiTimers`、defineBan で作ったもの）も並べて渡す。順番は結果に影響しない
+   */
   parts?: readonly BugyoPart[];
   /**
    * import に拡張子を書くプロジェクト（Node の型除去で .ts を直接動かすなど）で true にする。
@@ -80,23 +132,12 @@ export interface BugyoOptions {
   /** 追加で lint 対象から外すパス */
   ignores?: string[];
   /**
-   * 禁止を warn に下げる（off にはできない）。キーは禁止の名前（`feature-internals`・`fetch`・`model-layers`、
-   * @bugyo/lint-react の `use-effect`・`ui-timers`・`model-react`）か、設定にあるルール ID。
+   * 禁止を warn に下げる（off にはできない）。キーは parts に入れた禁止の名前（`comments`・`fetch`・`feature-internals`・`model-layers`、
+   * @bugyo/lint-react の `use-effect`・`ui-timers`・`model-react`、defineBan で作った禁止の name）か、設定にあるルール ID。
    * 禁止の名前で下げたものは、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になる。
    * 知らない名前を渡すと断る。
    */
   severity?: Record<string, 'warn'>;
-  /**
-   * 追加の禁止。bugyo の禁止と同じスコープに合成される（上書きしない）。
-   * restrictedProperties と restrictedSyntax は、副作用を包む場所（effectHooksDir）とテストでは効かない。
-   * 例: Date.now を禁止し、shared/lib の clock だけで使わせる。
-   */
-  extra?: {
-    restrictedImports?: { paths?: RestrictedImportPath[]; patterns?: RestrictedImportPattern[] };
-    restrictedGlobals?: RestrictedGlobal[];
-    restrictedProperties?: RestrictedProperty[];
-    restrictedSyntax?: RestrictedSyntax[];
-  };
 }
 
 export function bugyo(options: BugyoOptions): Linter.Config[];

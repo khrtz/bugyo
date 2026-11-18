@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { join, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
-import { bugyo, common, structure } from '@bugyo/lint';
-import { react } from '../eslint.js';
+import { bugyo, common, fetchOnlyInApi, noComments, structure } from '@bugyo/lint';
+import { noUiTimers, noUseEffect, react } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture');
-const parts = [common, structure, react];
+const parts = [common, structure, react, noComments, fetchOnlyInApi, noUseEffect, noUiTimers];
 
 /** @param {Record<string, 'warn'>} severity */
 async function lint(severity) {
@@ -38,7 +38,7 @@ test('warn に下げた禁止も、例外の場所では止めない', async () 
   const api = await eslint.calculateConfigForFile(join(root, 'src/shared/api/client.ts'));
   assert.equal(api.rules['bugyo-warn/no-restricted-globals'][0], 0);
   const test = await eslint.calculateConfigForFile(join(root, 'src/features/a/ui/Bad.test.tsx'));
-  assert.equal(test.rules['bugyo-warn/no-restricted-syntax'][0], 0);
+  assert.equal(test.rules['bugyo-warn/no-restricted-globals'][0], 0);
 });
 
 test('UI の範囲だけの禁止も warn に下げられる', async () => {
@@ -54,7 +54,7 @@ test('ルール ID で指定すると、そのルールが warn になる', asyn
 });
 
 test('知らない名前と、warn 以外の値は断る', () => {
-  assert.throws(() => bugyo({ root, parts, severity: { 'no-such-ban': 'warn' } }), /no-such-ban は、禁止の名前（feature-internals, fetch, model-layers, model-react, ui-timers, use-effect）/);
+  assert.throws(() => bugyo({ root, parts, severity: { 'no-such-ban': 'warn' } }), /no-such-ban は、禁止の名前（comments, feature-internals, fetch, model-layers, model-react, ui-timers, use-effect）/);
   // @ts-expect-error off には下げられない
   assert.throws(() => bugyo({ root, parts, severity: { fetch: 'off' } }), /'warn' だけです/);
 });

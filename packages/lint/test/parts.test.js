@@ -5,7 +5,7 @@ import { join, relative, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
 import { config } from '../depcruise.cjs';
-import { bugyo, common, structure } from '../eslint.js';
+import { bugyo, common, fetchOnlyInApi, noComments, structure } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture-node');
 const parts = bugyo({ root, parts: [common, structure], explicitExtensions: true });
@@ -31,13 +31,25 @@ const serialize = (value) => {
   });
 };
 
-test('共通: React のない .ts でも any・アサーション・非 null・浮いた Promise・コメントを止める', () => {
+test('共通: React のない .ts でも any・アサーション・非 null・浮いた Promise を止める', () => {
   const rules = rulesFor('src/features/report/model/bad.ts');
   assert.ok(count(rules, '@typescript-eslint/no-explicit-any') >= 1, rules.join(', '));
   assert.ok(count(rules, '@typescript-eslint/consistent-type-assertions') >= 1, rules.join(', '));
   assert.equal(count(rules, '@typescript-eslint/no-non-null-assertion'), 1, rules.join(', '));
   assert.equal(count(rules, '@typescript-eslint/no-floating-promises'), 1, rules.join(', '));
-  assert.equal(count(rules, 'bugyo/no-comments'), 1, rules.join(', '));
+});
+
+test('既定（共通と構成）は、コメントと fetch の禁止を入れない。noComments と fetchOnlyInApi を足すと止める', async () => {
+  assert.equal(count(rulesFor('src/features/report/model/bad.ts'), 'bugyo/no-comments'), 0);
+  const text = serialize(parts.map((block) => block.rules ?? {}));
+  assert.ok(!/"bugyo\/no-comments"/.test(text), 'コメントの禁止');
+  assert.ok(!/fetchを直接呼ばないでください/.test(text), 'fetch の禁止');
+
+  const opted = new ESLint({ cwd: root, overrideConfigFile: true, baseConfig: bugyo({ root, explicitExtensions: true, parts: [common, structure, noComments, fetchOnlyInApi] }) });
+  const [result] = await opted.lintFiles(['src/features/report/model/bad.ts']);
+  assert.equal(count(result?.messages.map((m) => m.ruleId) ?? [], 'bugyo/no-comments'), 1);
+  const calculated = await opted.calculateConfigForFile(join(root, 'src/features/report/model/bad.ts'));
+  assert.equal(calculated.rules['no-restricted-globals'][1].name, 'fetch');
 });
 
 test('構成: feature の内部への import と、shared から features への依存を止める', () => {
