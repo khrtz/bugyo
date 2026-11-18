@@ -217,13 +217,13 @@ export const structure = {
           {
             target: sharedDirs.map((dir) => `./${dir}`),
             from: [`./${features}`, `./${app}`],
-            message: `${sharedDirs.join('・')} は ${features} や ${app} に依存できません。`,
+            message: tagged('shared-is-leaf', `${sharedDirs.join('・')} は ${features} や ${app} に依存できません。`),
           },
-          { target: `./${features}`, from: `./${app}`, message: `${features} は ${app} に依存できません。` },
+          { target: `./${features}`, from: `./${app}`, message: tagged('features-not-to-app', `${features} は ${app} に依存できません。`) },
           {
             target: featureParts.model.map((name) => `./${features}/*/${name}/**/*`),
             from: [...shared.ui, ...shared.api, ...shared.other].map((dir) => `./${dir}`),
-            message: `${roleLabel(featureParts.model)} が使えるのは自分の${roleLabel(featureParts.model)}と ${pureDirs} だけです。`,
+            message: tagged('model-is-pure', `${roleLabel(featureParts.model)} が使えるのは自分の${roleLabel(featureParts.model)}と ${pureDirs} だけです。`),
           },
           ...(shared.model.length === 0
             ? []
@@ -231,7 +231,7 @@ export const structure = {
                 {
                   target: shared.model.map((dir) => `./${dir}`),
                   from: [...shared.ui, ...shared.api, ...shared.other].map((dir) => `./${dir}`),
-                  message: `${shared.model.join('・')} が使えるのは ${pureDirs} だけです。`,
+                  message: tagged('shared-model-is-pure', `${shared.model.join('・')} が使えるのは ${pureDirs} だけです。`),
                 },
               ]),
         ]
@@ -239,9 +239,9 @@ export const structure = {
           {
             target: `./${src}/shared`,
             from: [`./${src}/features`, `./${src}/app`],
-            message: 'shared は features や app に依存できません。',
+            message: tagged('shared-is-leaf', 'shared は features や app に依存できません。'),
           },
-          { target: `./${src}/features`, from: `./${src}/app`, message: 'features は app に依存できません。' },
+          { target: `./${src}/features`, from: `./${src}/app`, message: tagged('features-not-to-app', 'features は app に依存できません。') },
         ];
     return {
       plugins: { 'import-x': importX },
@@ -353,6 +353,24 @@ const trimSlash = (path) => path.replace(/^\.\//, '').replace(/\/+$/, '');
 const pathGlobs = (path) => (/[*?[\]{}!]/.test(path) ? [path] : [trimSlash(path), `${trimSlash(path)}/**`]);
 
 /**
+ * メッセージの頭に、言語や言い回しによらない名前（`[bugyo:<名前>]`）を付ける。
+ * bugyo doctor と baseline は、メッセージの文ではなくこの名前で禁止を数える。
+ *
+ * @param {string} id
+ * @param {string} text
+ */
+const tagged = (id, text) => `[bugyo:${id}] ${text}`;
+
+/**
+ * 項目にメッセージがあれば、禁止の名前を付ける。メッセージのない項目は ESLint の既定の英語のメッセージのまま。
+ *
+ * @param {string} name
+ * @param {unknown} value
+ */
+const withName = (name, value) =>
+  typeof value === 'object' && value !== null && 'message' in value && typeof value.message === 'string' ? { ...value, message: tagged(name, value.message) } : value;
+
+/**
  * 禁止を、合成するルールに入る項目に分ける。
  *
  * @param {Ban[]} bans
@@ -366,7 +384,7 @@ const entriesOf = (bans) =>
       ['globals', ban.globals],
       ['syntax', ban.syntax],
       ['properties', ban.properties],
-    ]).flatMap(([kind, list]) => list.map((value) => ({ name: ban.name, scope: ban.scope, allow: ban.allow, kind, value }))),
+    ]).flatMap(([kind, list]) => list.map((value) => ({ name: ban.name, scope: ban.scope, allow: ban.allow, kind, value: withName(ban.name, value) }))),
   );
 
 /** @param {Contribution[]} list @param {'plugins' | 'settings' | 'rules' | 'srcPlugins' | 'srcRules'} key */

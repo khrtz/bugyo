@@ -62,8 +62,8 @@ Three things happen when you delegate to agents. bugyo stops each of them with t
 **Every block comes with what to use instead.** In a project that turns on the `useEffect` and `fetch` bans (the `react-vite` template does), an agent that writes them gets this back (rule messages are in Japanese for now):
 
 ```
- 1:17  error  'useEffect' import from 'react' is restricted. 製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは src/shared/lib の専用フックを使ってください。該当するフックがなければ src/shared/lib に追加してください。  no-restricted-imports
-10:3   error  Unexpected use of 'fetch'. fetchを直接呼ばないでください。src/shared/api のクライアントを使い、スキーマで応答を検証してください。  no-restricted-globals
+ 1:17  error  'useEffect' import from 'react' is restricted. [bugyo:use-effect] 製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは src/shared/lib の専用フックを使ってください。該当するフックがなければ src/shared/lib に追加してください。  no-restricted-imports
+10:3   error  Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。src/shared/api のクライアントを使い、スキーマで応答を検証してください。  no-restricted-globals
 ```
 
 (Two entries taken from the output for the deliberately broken test file `packages/lint-react/test/fixture/src/features/a/ui/Bad.tsx`.)
