@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { commonDir, layerDirs, loadConfig } from './config.js';
+import { commonDir, featureParts, layerDirs, loadConfig } from './config.js';
 import {
   baselineFile,
   baselineGrowth,
@@ -10,6 +10,7 @@ import {
   depcruiseConfig,
   depcruiseKnownFile,
   eslintSuppressionsFile,
+  featurePartsReport,
   filesOutsideLayers,
   readBaseline,
   saveBaseline,
@@ -61,13 +62,15 @@ const countLines = (counts) =>
 export function doctorCommand(args, cwd = process.cwd()) {
   const { values } = parse(args);
   const dirs = dirsOf(cwd, values.dirs);
-  const { counts, warned, errors } = banCounts(cwd, dirs);
+  const { counts, warned, parseErrors, errors } = banCounts(cwd, dirs);
   const tsc = values.tsconfig === undefined ? undefined : tscErrors(cwd, values.tsconfig);
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const config = loadConfig(cwd);
   const outside = config.layers === undefined ? undefined : filesOutsideLayers(cwd, layerDirs(config), commonDir(layerDirs(config)));
+  const featuresDir = config.featureMap.featuresDir;
+  const parts = featuresDir === null ? undefined : featurePartsReport(cwd, featuresDir, featureParts(config));
   if (values.json) {
-    console.log(JSON.stringify({ total, counts, warned, tsc, outsideLayers: outside, errors }));
+    console.log(JSON.stringify({ total, counts, warned, parseErrors, tsc, outsideLayers: outside, featureParts: parts, errors }));
   } else {
     console.log(`doctor: 違反 ${total}件（禁止ごと、多い順。ESLint の抑制ファイルで隠れているものも数える）`);
     for (const line of countLines(counts)) console.log(line);
@@ -82,6 +85,23 @@ export function doctorCommand(args, cwd = process.cwd()) {
       console.log(`どの層にも入っていないファイル ${outside.length}件（層の境界のルールが当たりません）`);
       for (const path of outside.slice(0, 20)) console.log(`  ${path}`);
       if (outside.length > 20) console.log(`  ほか ${outside.length - 20}件（--json ですべて出ます）`);
+    }
+    if (parseErrors.length > 0) {
+      console.log(`構文エラー ${parseErrors.length}件（ESLint がこのファイルを読めず、ほかの禁止も当たっていません。パーサーか files の設定を確かめてください）`);
+      for (const { file, line, message } of parseErrors.slice(0, 20)) console.log(`  ${file}:${line}  ${message}`);
+      if (parseErrors.length > 20) console.log(`  ほか ${parseErrors.length - 20}件（--json ですべて出ます）`);
+    }
+    if (parts !== undefined && parts.features > 0) {
+      const roles = featureParts(config);
+      console.log(`feature の中: ui の禁止が当たるファイル ${parts.ui}件（${roles.ui.join('・')}）、model の禁止が当たるファイル ${parts.model}件（${roles.model.join('・')}）`);
+      const hint = parts.unassigned.length > 0;
+      if (hint && parts.ui === 0) console.log('  ui の禁止が何にも当たっていません。下のフォルダが ui なら、layers.featureParts.ui に名前を書いてください');
+      if (hint && parts.model === 0) console.log('  model の禁止が何にも当たっていません。下のフォルダが model なら、layers.featureParts.model に名前を書いてください');
+      if (parts.unassigned.length > 0) {
+        console.log(`どの役割（layers.featureParts）にも入っていないフォルダ ${parts.unassigned.length}件（ui・model の禁止が当たりません）`);
+        for (const path of parts.unassigned.slice(0, 20)) console.log(`  ${path}`);
+        if (parts.unassigned.length > 20) console.log(`  ほか ${parts.unassigned.length - 20}件（--json ですべて出ます）`);
+      }
     }
     for (const error of errors) console.error(`error ${error}`);
   }

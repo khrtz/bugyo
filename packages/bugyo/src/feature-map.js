@@ -13,10 +13,17 @@ const relativePath = z
     message: 'プロジェクトのルートからの相対パスを / 区切りで書いてください（.. と絶対パスは使えません）',
   });
 
+/** spec はコマンドの {spec} にそのまま入るので、パスに使う文字だけにする */
+const specPath = relativePath.pipe(z.string().regex(/^[A-Za-z0-9._@+/-]+$/, 'spec のパスは英数字と . _ @ + / - だけにしてください'));
+
 const Frontmatter = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   route: z.string().startsWith('/').optional(),
-  spec: relativePath,
+  spec: z
+    .string()
+    .transform((value) => value.split(',').map((item) => item.trim()))
+    .pipe(z.array(specPath).min(1)),
+  runner: z.string().regex(/^[a-z][a-z0-9-]*$/).optional(),
 });
 
 /**
@@ -28,8 +35,9 @@ function parse(file, text) {
   const { fields, body } = parseFrontmatter(file, text);
   const parsed = Frontmatter.safeParse(fields);
   if (!parsed.success) throw new Error(`${file}: frontmatter が不正です: ${parsed.error.message}`);
-  const { id, route, spec } = parsed.data;
-  return route === undefined ? { id, spec, file, body } : { id, route, spec, file, body };
+  const { id, route, spec: specs, runner } = parsed.data;
+  const spec = /** @type {string} */ (specs[0]);
+  return { id, ...(route === undefined ? {} : { route }), spec, specs, ...(runner === undefined ? {} : { runner }), file, body };
 }
 
 /** @param {string} [cwd] */

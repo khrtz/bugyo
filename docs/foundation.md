@@ -57,8 +57,8 @@ export default bugyo({
 | `root` | 必須 | `import.meta.dirname` を渡す |
 | `src` | `src` | ソースの場所。`layers` のフォルダはすべてこの中に置く |
 | `layers` | `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}` | 層のフォルダの場所（下の「層のフォルダ名を変える」） |
-| `effectHooksDir` | `layers.shared.lib` | 禁止の `allow` に書く `effects` の場所（`noUseEffect` を入れたときに `useEffect` を書いてよい場所） |
-| `apiClientDir` | `layers.shared.api` | 禁止の `allow` に書く `api` の場所（`fetchOnlyInApi` を入れたときに `fetch` を呼んでよい場所） |
+| `effectHooksDir` | `layers.shared.lib`（いくつもあればそのすべて） | 禁止の `allow` に書く `effects` の場所（`noUseEffect` を入れたときに `useEffect` を書いてよい場所） |
+| `apiClientDir` | `layers.shared.api`（いくつもあればそのすべて） | 禁止の `allow` に書く `api` の場所（`fetchOnlyInApi` を入れたときに `fetch` を呼んでよい場所） |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `severity` | `{}` | 禁止を warn に下げる（下の「禁止を warn に下げる」） |
 | `parts` | `[common, structure]` | 使う部品と禁止（下の「部品と禁止」）。`common` は必須 |
@@ -106,7 +106,7 @@ export default bugyo({
 });
 ```
 
-- キーは、`parts` に入れた禁止の名前です。上の表の名前（`feature-internals`・`model-layers`・`model-react`・`comments`・`fetch`・`use-effect`・`ui-timers`）と、`defineBan` で作った禁止の `name` が使えます。`model-layers` は、`layers` を渡したときは `ui/`・`api/` への import だけです（下を参照）
+- キーは、`parts` に入れた禁止の名前です。上の表の名前（`feature-internals`・`model-layers`・`model-react`・`comments`・`fetch`・`use-effect`・`ui-timers`）と、`defineBan` で作った禁止の `name` が使えます。`model-layers` は、`layers` を渡したときは同じ feature の `ui/`・`api/`（`layers.featureParts` に書いたフォルダ）への import だけです（下を参照）
 - 名前のほかに、設定にあるルール ID（例: `@typescript-eslint/no-non-null-assertion`）も渡せます。そのルールがどのファイルでも warn になります
 - 名前で下げた禁止は、同じルールの他の禁止と分けるために、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になります。`eslint-disable` のコメントで止めるときも、この ID を書きます。`rules` で書いた禁止（`comments` など）は、ルール ID はそのままで warn になります
 - 知らない名前と、`parts` に入れていない禁止の名前は断ります
@@ -143,7 +143,52 @@ const { layers } = require('./.bugyo/config.json');
 module.exports = require('@bugyo/lint/depcruise').config({ src: 'web', layers });
 ```
 
-`layers` を渡すと、`effectHooksDir` と `apiClientDir` の既定も `layers.shared.lib` と `layers.shared.api` になります（例では `fetch` は `web/app/api` でだけ呼べる）。境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` には5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
+`layers` を渡すと、`effectHooksDir` と `apiClientDir` の既定も `layers.shared.lib` と `layers.shared.api` になります（例では `fetch` は `web/app/api` でだけ呼べる）。境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` で書かなかった場所は `src/app` などの既定で埋まります。ESLint と dependency-cruiser では `<src>/app` などで埋まるので、`src` が `src` でなければ5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
+
+#### shared にフォルダをいくつも置く
+
+`shared` の `ui`・`api`・`lib` は、フォルダ1つの文字列か、フォルダの配列で書けます。役割の違う共有のフォルダは、`model` と `other` に書きます。
+
+```json
+{
+  "layers": {
+    "shared": {
+      "ui": "web/app/ui",
+      "api": "web/app/api",
+      "lib": ["web/app/lib", "web/lib"],
+      "model": "web/app/domain",
+      "other": ["web/app/stores"]
+    }
+  }
+}
+```
+
+| キー | 置くもの | 当たるルール |
+| --- | --- | --- |
+| `ui`・`api`・`lib` | 共有の部品・API のクライアント・フック | features と app に依存できない。`allow` の `effects` は `lib` のすべて、`api` は `api` のすべて |
+| `model` | 共有の純粋なロジック | features と app に加えて、shared の `ui`・`api`・`other` にも依存できない（使えるのは shared の `lib` と `model` だけ）。`scope: 'model'` の禁止が当たる（`model-react` など）。dependency-cruiser では `shared-model-is-pure` |
+| `other` | 役割を持たない共有のフォルダ（状態管理など） | features と app に依存できないことだけ。feature の model と shared の `model` からは使えない |
+
+feature の model が使えるのは、自分の model と、shared の `lib` と `model` です。
+
+#### feature の中のフォルダ名を変える
+
+feature の中のフォルダが `ui/`・`api/`・`model/` でないプロジェクトでは、`layers.featureParts` に役割ごとのフォルダ名を書きます。書かなかった役割は `ui`・`api`・`model` のままです。
+
+```json
+{
+  "layers": {
+    "featureParts": { "ui": ["components", "hooks"], "api": ["api"], "model": ["lib"] }
+  }
+}
+```
+
+- `ui` に書いたフォルダには、`scope: 'ui'` の禁止（`noUseEffect`・`noUiTimers` など）が当たります
+- `model` に書いたフォルダには、`scope: 'model'` の禁止（`model-layers`・`model-react` など）が当たります。`model-layers` は、同じ feature の `ui` と `api` に書いたフォルダへの import を止めます（例では `../components`・`../hooks`・`../api`）。dependency-cruiser の `model-is-pure` も同じフォルダを見ます
+- `logic` タスクの「model にテストがある」は、`model` に書いたフォルダのどれかにテストがあれば通ります
+- 名前は feature の中のフォルダ名だけです（`/` を含まない）。1つの名前は1つの役割にだけ書けます
+
+`bugyo doctor` は、feature の中のどの役割にも入っていないフォルダと、`ui` と `model` の禁止が当たるファイルの数を出します。数が0なら、フォルダ名が役割と合っておらず、その禁止は何にも効いていません。
 
 ### 独自の禁止を足す
 
@@ -171,8 +216,8 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 | 項目 | 形 | 意味 |
 | --- | --- | --- |
 | `name` | 小文字・数字・ハイフン | 禁止の名前。`severity` のキーにもなる。同じ名前の禁止は2つ置けない |
-| `scope` | `src`（既定）・`ui`・`model`。`rules` だけの禁止は root からの glob も使える | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/`。`imports`・`globals`・`syntax`・`properties` は bugyo の禁止と1つのルールに合成するので、glob の範囲にすると断る（範囲を絞るなら `allow` で除く） |
-| `allow` | `effects`・`api`・`tests`、または root からの glob の配列 | どこでは許すか。`effects` は `effectHooksDir`、`api` は `apiClientDir`、`tests` は `src` の下の `*.test.ts(x)` |
+| `scope` | `src`（既定）・`ui`・`model`。`rules` だけの禁止は root からの glob も使える | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/`（`layers.featureParts` で変えられる）。`imports`・`globals`・`syntax`・`properties` は bugyo の禁止と1つのルールに合成するので、glob の範囲にすると断る（範囲を絞るなら `allow` で除く） |
+| `allow` | `effects`・`api`・`tests`、または root からのパスか glob の配列 | どこでは許すか。`effects` は `effectHooksDir`、`api` は `apiClientDir`、`tests` は `src` の下の `*.test.ts(x)`。glob の記号（`*?[]{}!`）のないパスは、そのファイルか、そのフォルダの下のすべて（`scope` の glob も同じ） |
 | `imports` | `{ paths: [{ name, importNames?, message }], patterns: [{ group, message }] }` | `no-restricted-imports` に合成する |
 | `globals` | `[{ name, message }]` | `no-restricted-globals` に合成する |
 | `properties` | `[{ object?, property?, message }]` | `no-restricted-properties` に合成する |
@@ -180,10 +225,32 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 | `rules` | `{ '<ルール ID>': <設定> }` | 合成しない ESLint のルール。`scope` の中で当て、`allow` の場所では off にする |
 | `plugins` | `{ '<名前>': <プラグイン> }` | `rules` で使うプラグイン |
 
-- エラー文に `effectHooksDir` などの場所を入れたいときは、`build(context)` で `name` 以外の項目を返します（`defineBan({ name, allow, build: (context) => ({ globals: [...] }) })`）。`context` には `src`・`effectHooksDir`・`apiClientDir`・`layers`・`featuresLabel` が入っています
+- エラー文に `effectHooksDir` などの場所を入れたいときは、`build(context)` で `name` 以外の項目を返します（`defineBan({ name, allow, build: (context) => ({ globals: [...] }) })`）。`context` には `src`・`effectHooksDir`・`apiClientDir`・`layers`・`featuresLabel` が入っています（`effectHooksDir` と `apiClientDir` は、場所がいくつもあれば `・` でつないだ文字列。`layers.shared` の各値は配列）
 - 禁止したものの「正しい入口」は、`allow` に書いた場所に作ります（例: `Date.now` を禁止し、`shared/lib/clock.ts` だけで使う）
 - 知らない項目、何も止めていない禁止、同じ名前の禁止は断ります
 - `no-restricted-imports` などを自分の設定ブロックで直接書くと、合成した bugyo の禁止が上書きされて消えます。必ず `defineBan` で足します
+
+#### 決めた入口だけで使える import
+
+`fetchOnlyInApi` と同じ形で、ほかの import も決めた場所でだけ使えるようにできます。IPC の呼び出し、データベースのクライアント、OS の API などです。
+
+```js
+const processOnlyInSystem = defineBan({
+  name: 'child-process',
+  allow: ['src/shared/system', 'tests'],
+  imports: {
+    paths: [
+      { name: 'node:child_process', message: '子プロセスは src/shared/system のクライアントから起動してください' },
+      { name: 'node:fs', importNames: ['writeFileSync'], message: 'ファイルの書き込みは src/shared/system から行ってください' },
+    ],
+    patterns: [{ group: ['child_process'], message: '子プロセスは src/shared/system のクライアントから起動してください' }],
+  },
+});
+
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, processOnlyInSystem] });
+```
+
+入口を `layers.shared.api` に置くなら、`allow` は `['api', 'tests']` です。
 - 1つのファイルが2つの許す場所に当たるとき（例: `shared/lib` の中のテスト）は、後ろの場所（`effects`・`api`・`tests`・glob の順）で作り直したルールが前の場所の分を上書きします。同じ種類（`imports` 同士など）の別々の禁止を、片方は前の場所で、もう片方は後ろの場所で許していると、前の場所で許した禁止がそのファイルでは戻ります
 
 ### dependency-cruiser
@@ -349,9 +416,45 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `runner` | 動き | 証拠の場所 |
 | --- | --- | --- |
 | `playwright`（既定） | 対象の spec をまとめて `playwright test`（`node_modules/.bin` のもの。パッケージマネージャーは通さない）に渡し、JSON レポートから spec ごとの合否を読む | `artifacts/test-results`（動画・スクリーンショット・トレース）、`artifacts/report/index.html` |
-| `command` | `verify.command` を機能ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は frontmatter の `spec` に置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力） |
+| `command` | `verify.command` を spec ごとに1回ずつ実行し、終了コードが 0 なら通ったとする。コマンドの中の `{id}` は機能の id に、`{spec}` は spec のパスに置き換わる | `artifacts/verify/<id>.log`（実行したコマンドと出力。1つの機能で2回以上実行したときは `<id>.1.log`・`<id>.2.log`…） |
 
 どちらもシェルで実行し、`node_modules/.bin` を `PATH` の先頭に足します。pnpm・npm・yarn・bun のどれで入れても動きます（Yarn の PnP のように `node_modules/.bin` を作らない入れ方は対象外です）。
+
+### 機能ごとに確かめ方を変える
+
+確かめ方に名前を付けて `verify.runners` に書くと、機能ごと、spec ごとに使い分けられます。コマンドと環境変数は設定にだけ書き、feature map からは名前で選びます。
+
+```json
+{
+  "verify": {
+    "runner": "playwright",
+    "runners": {
+      "api": { "runner": "command", "command": "vitest run {spec}", "match": "server/tests/**" },
+      "client": { "runner": "playwright", "env": { "APP_MODE": "client" } }
+    }
+  }
+}
+```
+
+```md
+---
+id: invoices
+spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
+---
+```
+
+| 項目 | 意味 |
+| --- | --- |
+| `runner` | `playwright` か `command`。動き方は上の表と同じ |
+| `command` | `runner` が `command` のときのコマンド（必須）。`{id}` と `{spec}` が置き換わる |
+| `env` | そのときだけ足す環境変数 |
+| `match` | この確かめ方で動かす spec の glob（1つか配列） |
+
+- frontmatter の `spec` には、確かめるファイルを `,` で区切っていくつも書けます。spec のパスに使えるのは英数字と `. _ @ + / -` だけです
+- spec ごとの確かめ方は、frontmatter の `runner`（その機能のすべての spec に使う）、`match` に当たる確かめ方、`verify.runner` の順に決まります。知らない名前、2つの `match` に当たる spec は、動かす前に断ります（終了コード 2。`pnpm test` の feature map の検査でも出ます）
+- Playwright は確かめ方ごとに1回実行します。`verify.runner` の確かめ方の証拠は今までの場所に、ほかの確かめ方の証拠は `artifacts/<名前>/` の下（`test-results`・`report`・`results.json`）に置きます
+- 機能は、そのすべての spec が通ったときに `PASS` です。`artifacts/verify.json` には、spec ごとの確かめ方と合否（`runs`）も書きます
+- `playwright`・`command`・`report`・`test-results`・`verify` は名前に使えません
 
 ## 設定ファイル（`.bugyo/config.json`）
 
@@ -367,12 +470,13 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | キー | 既定 | 意味 |
 | --- | --- | --- |
 | `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
-| `verify.runner` | `playwright` | `playwright` か `command`（上の「CLI」） |
-| `verify.command` | なし | `runner` が `command` のときは必須 |
+| `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
+| `verify.command` | なし | `command` で動かすときは必須 |
+| `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
-| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared.ui`・`shared.api`・`shared.lib`）。上の「層のフォルダ名を変える」 |
+| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared` の `ui`・`api`・`lib`・`model`・`other`）と、feature の中のフォルダ名（`featureParts`）。上の「層のフォルダ名を変える」 |
 
 同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 

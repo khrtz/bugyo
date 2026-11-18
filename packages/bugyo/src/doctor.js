@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { commandEnv } from './run.js';
 
 /** bugyo が禁止ごとに数えるファイル。禁止ごとの件数を持ち、件数が変わったら baseline save で書き直す */
@@ -51,8 +51,10 @@ const warnedPrefix = /^bugyo-warn\//;
 /**
  * ESLint の違反を、抑制ファイルで隠れているものも含めて、禁止ごとに数える。`eslint-disable`（理由つきのコメント）で止めたものは数えない。
  *
+ * 構文エラー（ルールのない違反）は、ファイルと場所とメッセージも返す。ESLint がそのファイルを読めておらず、ほかの禁止が当たっていないため。
+ *
  * @param {string} cwd
- * @returns {{ counts: Map<string, number>, warned: Map<string, number>, files: Map<string, Set<string>> } | { error: string }}
+ * @returns {{ counts: Map<string, number>, warned: Map<string, number>, files: Map<string, Set<string>>, parseErrors: ParseError[] } | { error: string }}
  */
 export function eslintCounts(cwd) {
   const run = runTool(cwd, 'eslint', ['.', '--format', 'json']);
@@ -68,6 +70,8 @@ export function eslintCounts(cwd) {
   const files = new Map();
   /** @type {Map<string, number>} warn に下げた禁止の件数（counts にも入っている） */
   const warned = new Map();
+  /** @type {ParseError[]} */
+  const parseErrors = [];
   for (const result of results) {
     const all = [
       ...(result.messages ?? []),
@@ -78,9 +82,25 @@ export function eslintCounts(cwd) {
       counts.set(ban, (counts.get(ban) ?? 0) + 1);
       if (message.severity === 1) warned.set(ban, (warned.get(ban) ?? 0) + 1);
       files.set(ban, (files.get(ban) ?? new Set()).add(result.filePath));
+      if (message.ruleId === null) {
+        parseErrors.push({ file: relativePath(cwd, result.filePath), line: message.line ?? 0, message: message.message });
+      }
     }
   }
-  return { counts, warned, files };
+  return { counts, warned, files, parseErrors };
+}
+
+/**
+ * @typedef {{ file: string, line: number, message: string }} ParseError
+ */
+
+/**
+ * @param {string} cwd
+ * @param {string} path
+ */
+function relativePath(cwd, path) {
+  const rel = relative(cwd, resolve(cwd, path)).replaceAll('\\', '/');
+  return rel === '' || rel.startsWith('..') ? path : rel;
 }
 
 /** @param {string} cwd */
@@ -129,7 +149,7 @@ export function tscErrors(cwd, tsconfig) {
  *
  * @param {string} cwd
  * @param {string[]} dirs dependency-cruiser に渡すフォルダ
- * @returns {{ counts: Record<string, number>, warned: Record<string, number>, errors: string[] }}
+ * @returns {{ counts: Record<string, number>, warned: Record<string, number>, parseErrors: ParseError[], errors: string[] }}
  */
 export function banCounts(cwd, dirs) {
   /** @type {string[]} */
@@ -138,21 +158,74 @@ export function banCounts(cwd, dirs) {
   const merged = new Map();
   /** @type {Record<string, number>} */
   let warned = {};
+  /** @type {ParseError[]} */
+  let parseErrors = [];
   const eslint = eslintCounts(cwd);
   if ('error' in eslint) errors.push(eslint.error);
   else {
     for (const [key, value] of eslint.counts) merged.set(key, value);
     warned = Object.fromEntries(eslint.warned);
+    parseErrors = eslint.parseErrors;
   }
   const depcruise = depcruiseCounts(cwd, dirs);
   if (depcruise !== undefined) {
     if (depcruise instanceof Map) for (const [key, value] of depcruise) merged.set(key, value);
     else errors.push(depcruise.error);
   }
-  return { counts: Object.fromEntries([...merged].sort(([a], [b]) => a.localeCompare(b))), warned, errors };
+  return { counts: Object.fromEntries([...merged].sort(([a], [b]) => a.localeCompare(b))), warned, parseErrors, errors };
 }
 
 const codeFile = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
+
+/**
+ * @param {string} cwd
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function filesUnder(cwd, dir) {
+  if (!existsSync(join(cwd, dir))) return [];
+  return readdirSync(join(cwd, dir), { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === 'node_modules') return [];
+    const path = `${dir}/${entry.name}`;
+    return entry.isDirectory() ? filesUnder(cwd, path) : entry.isFile() ? [path] : [];
+  });
+}
+
+/**
+ * feature の中のフォルダを、役割（`layers.featureParts`）と照らし合わせる。
+ * ui と model の禁止が当たるファイルの数と、どの役割にも入っていないフォルダを返す。
+ * 当たるファイルが0件なら、フォルダ名が役割と合っておらず、その禁止が何にも効いていない。
+ *
+ * @param {string} cwd
+ * @param {string} featuresDir
+ * @param {{ ui: string[], api: string[], model: string[] }} parts
+ * @returns {{ features: number, ui: number, model: number, unassigned: string[] } | undefined} 機能のフォルダがなければ undefined
+ */
+export function featurePartsReport(cwd, featuresDir, parts) {
+  if (!existsSync(join(cwd, featuresDir))) return undefined;
+  const roles = new Set([...parts.ui, ...parts.api, ...parts.model]);
+  let features = 0;
+  let ui = 0;
+  let model = 0;
+  /** @type {string[]} */
+  const unassigned = [];
+  for (const feature of readdirSync(join(cwd, featuresDir), { withFileTypes: true })) {
+    if (!feature.isDirectory() || feature.name.startsWith('.')) continue;
+    features += 1;
+    for (const entry of readdirSync(join(cwd, featuresDir, feature.name), { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const path = `${featuresDir}/${feature.name}/${entry.name}`;
+      if (!roles.has(entry.name)) {
+        unassigned.push(path);
+        continue;
+      }
+      const files = filesUnder(cwd, path);
+      if (parts.ui.includes(entry.name)) ui += files.filter((file) => /\.tsx?$/.test(file)).length;
+      if (parts.model.includes(entry.name)) model += files.filter((file) => /\.ts$/.test(file)).length;
+    }
+  }
+  return { features, ui, model, unassigned: unassigned.sort() };
+}
 
 /**
  * 層のフォルダをまとめたフォルダ（`web` など）の中で、どの層にも入っていないコードのファイル。

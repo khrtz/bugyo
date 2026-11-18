@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -52,6 +52,142 @@ test('command 方式: feature map にない機能は終了コード 2 で候補�
   const run = bugyo(plainProject(), 'verify', 'nope');
   assert.equal(run.status, 2);
   assert.match(run.stderr, /候補: greet/);
+});
+
+/**
+ * @param {string} cwd
+ * @param {object} verify
+ */
+function setVerify(cwd, verify) {
+  const path = join(cwd, '.bugyo/config.json');
+  writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), verify }));
+}
+
+/**
+ * @param {string} cwd
+ * @param {string} from
+ * @param {string} to
+ */
+function editFeature(cwd, from, to) {
+  const file = join(cwd, 'docs/features/greet.md');
+  writeFileSync(file, readFileSync(file, 'utf8').replace(from, to));
+}
+
+const modeCheck = `if (process.env.MODE !== 'api') { console.error('MODE=' + process.env.MODE); process.exit(1); }\nconsole.log('api: ' + process.argv[2]);\n`;
+
+test('runners: spec を , で並べると spec ごとに動かし、match の glob に当たる spec はその確かめ方と env で動かす', () => {
+  const cwd = plainProject();
+  mkdirSync(join(cwd, 'checks/api'));
+  writeFileSync(join(cwd, 'checks/api/greet.js'), modeCheck);
+  setVerify(cwd, { runner: 'command', command: 'node {spec}', runners: { api: { runner: 'command', command: 'node {spec} {id}', env: { MODE: 'api' }, match: 'checks/api/**' } } });
+  editFeature(cwd, 'spec: checks/greet.js', 'spec: checks/greet.js, checks/api/greet.js');
+  const run = bugyo(cwd, 'verify', 'greet');
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.match(run.stdout, /^PASS greet/);
+  assert.match(run.stdout, /証拠: artifacts\/verify\/greet\.1\.log, artifacts\/verify\/greet\.2\.log/);
+  assert.match(readFileSync(join(cwd, 'artifacts/verify/greet.2.log'), 'utf8'), /api: greet/);
+  const summary = JSON.parse(readFileSync(join(cwd, 'artifacts/verify.json'), 'utf8'));
+  assert.deepEqual(summary.features[0].runs, [
+    { spec: 'checks/greet.js', runner: 'command', ok: true, command: 'node checks/greet.js' },
+    { spec: 'checks/api/greet.js', runner: 'api', ok: true, command: 'node checks/api/greet.js greet' },
+  ]);
+  assert.deepEqual(featureMapChecks({ cwd }).flatMap((check) => check.problems()), []);
+
+  writeFileSync(join(cwd, 'checks/api/greet.js'), 'process.exit(1);\n');
+  const failed = bugyo(cwd, 'verify', 'greet');
+  assert.equal(failed.status, 1);
+  assert.match(failed.stdout, /^FAIL greet/, '1つでも落ちれば機能は FAIL');
+});
+
+test('runners: frontmatter の runner は、その機能のすべての spec をその確かめ方で動かす', () => {
+  const cwd = plainProject();
+  writeFileSync(join(cwd, 'checks/greet.js'), modeCheck);
+  setVerify(cwd, { runner: 'command', command: 'node {spec}', runners: { api: { runner: 'command', command: 'node {spec} {id}', env: { MODE: 'api' } } } });
+  editFeature(cwd, 'spec: checks/greet.js', 'spec: checks/greet.js\nrunner: api');
+  const run = bugyo(cwd, 'verify', 'greet');
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.match(readFileSync(join(cwd, 'artifacts/verify/greet.log'), 'utf8'), /^\$ node checks\/greet\.js greet\napi: greet/);
+});
+
+test('runners: 決められない確かめ方は、動かす前に終了コード 2 で断り、feature map の検査でも出す', () => {
+  const cwd = plainProject();
+  setVerify(cwd, { runner: 'command', command: 'node {spec}', runners: { a: { runner: 'command', command: 'node {spec}', match: 'checks/**' }, b: { runner: 'command', command: 'node {spec}', match: '**/*.js' } } });
+  const both = bugyo(cwd, 'verify', 'greet');
+  assert.equal(both.status, 2);
+  assert.match(both.stderr, /checks\/greet\.js が a と b の match の両方に当たります/);
+  assert.ok(!existsSync(join(cwd, 'artifacts/verify.json')));
+
+  setVerify(cwd, { runner: 'command', command: 'node {spec}' });
+  editFeature(cwd, 'spec: checks/greet.js', 'spec: checks/greet.js\nrunner: nope');
+  const unknown = bugyo(cwd, 'verify', 'greet');
+  assert.equal(unknown.status, 2);
+  assert.match(unknown.stderr, /runner の nope がありません/);
+  assert.ok(featureMapChecks({ cwd }).flatMap((check) => check.problems()).some((problem) => /runner の nope がありません/.test(problem)));
+});
+
+test('runners: 設定の誤りは読むときに断る', () => {
+  const cwd = plainProject();
+  for (const verify of [
+    { runner: 'nope' },
+    { runner: 'playwright', runners: { report: { runner: 'playwright' } } },
+    { runner: 'playwright', runners: { playwright: { runner: 'playwright' } } },
+    { runner: 'playwright', runners: { api: { runner: 'command' } } },
+    { runner: 'playwright', runners: { api: { runner: 'playwright', env: { 'BAD-NAME': '1' } } } },
+  ]) {
+    setVerify(cwd, verify);
+    assert.throws(() => loadConfig(cwd), /config\.json/, JSON.stringify(verify));
+  }
+});
+
+test('spec にはコマンドに入れて困る文字を書けない', () => {
+  const cwd = plainProject();
+  editFeature(cwd, 'spec: checks/greet.js', 'spec: checks/greet.js; rm -rf x');
+  assert.throws(() => loadFeatures(cwd), /英数字/);
+});
+
+/** playwright の代わり。JSON レポートを書き、--output の場所に MODE を書く */
+const fakePlaywright = `
+const { mkdirSync, writeFileSync } = require('node:fs');
+const { dirname, join } = require('node:path');
+const args = process.argv.slice(3);
+const at = args.indexOf('--output');
+const output = at < 0 ? 'artifacts/test-results' : args[at + 1];
+const specs = args.filter((arg, index) => !arg.startsWith('--') && (at < 0 || index !== at + 1));
+mkdirSync(output, { recursive: true });
+writeFileSync(join(output, 'mode.txt'), process.env.MODE ?? '');
+const report = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME;
+mkdirSync(dirname(report), { recursive: true });
+writeFileSync(report, JSON.stringify({ config: { rootDir: process.cwd() }, suites: specs.map((file) => ({ file, specs: [{ ok: true }] })) }));
+`;
+
+test('runners: Playwright の確かめ方が2つあると、それぞれを env 付きで動かし、証拠の場所を分ける', () => {
+  const cwd = plainProject();
+  const binDir = join(cwd, 'node_modules', '.bin');
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(join(cwd, 'fake-playwright.cjs'), fakePlaywright);
+  writeFileSync(join(binDir, 'playwright'), `#!/bin/sh\nexec node "$(dirname "$0")/../../fake-playwright.cjs" "$@"\n`, { mode: 0o755 });
+  writeFileSync(join(binDir, 'playwright.cmd'), '@node "%~dp0\\..\\..\\fake-playwright.cjs" %*\r\n');
+  setVerify(cwd, { runner: 'playwright', runners: { client: { runner: 'playwright', env: { MODE: 'client' }, match: 'checks/client/**' } } });
+  mkdirSync(join(cwd, 'checks/client'));
+  writeFileSync(join(cwd, 'checks/client/greet.js'), '');
+  editFeature(cwd, 'spec: checks/greet.js', 'spec: checks/greet.js, checks/client/greet.js');
+  const run = bugyo(cwd, 'verify', 'greet');
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.match(run.stdout, /^PASS greet/);
+  assert.match(
+    run.stdout,
+    /証拠: artifacts\/test-results（動画・スクリーンショット・トレース）, artifacts\/report\/index\.html, artifacts\/client\/test-results（動画・スクリーンショット・トレース）, artifacts\/client\/report\/index\.html/,
+  );
+  assert.equal(readFileSync(join(cwd, 'artifacts/test-results/mode.txt'), 'utf8'), '');
+  assert.equal(readFileSync(join(cwd, 'artifacts/client/test-results/mode.txt'), 'utf8'), 'client');
+  const runs = JSON.parse(readFileSync(join(cwd, 'artifacts/verify.json'), 'utf8')).features[0].runs;
+  assert.deepEqual(
+    runs.map((/** @type {any} */ entry) => [entry.spec, entry.runner, entry.ok]),
+    [
+      ['checks/greet.js', 'playwright', true],
+      ['checks/client/greet.js', 'client', true],
+    ],
+  );
 });
 
 test('verify は実行のたびに artifacts を消してから始める', () => {

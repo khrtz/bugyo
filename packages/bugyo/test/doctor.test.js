@@ -185,6 +185,97 @@ test('layers: doctor は、どの層にも入っていないコードのファ�
   assert.deepEqual(JSON.parse(run.all).outsideLayers, ['web/legacy/old.js', 'web/main.tsx']);
 });
 
+test('layers: shared の各値は配列でも書け、model と other の場所も層に入る', async () => {
+  const cwd = project();
+  withLayers(cwd);
+  const shared = { ui: 'web/app/ui', api: ['web/app/api'], lib: ['web/app/lib', 'web/lib'], model: 'web/app/domain', other: ['web/legacy'] };
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ layers: { ...layers, shared } }));
+  for (const file of ['web/lib/format.ts', 'web/app/domain/price.ts']) {
+    mkdirSync(join(cwd, file, '..'), { recursive: true });
+    writeFileSync(join(cwd, file), '');
+  }
+  setResults(cwd, {});
+  const run = bugyo(cwd, 'doctor', '--json');
+  assert.equal(run.status, 0, run.all);
+  assert.deepEqual(JSON.parse(run.all).outsideLayers, ['web/main.tsx']);
+  const { loadConfig } = await import('../src/config.js');
+  assert.deepEqual(loadConfig(cwd).layers?.shared, { ui: ['web/app/ui'], api: ['web/app/api'], lib: ['web/app/lib', 'web/lib'], model: ['web/app/domain'], other: ['web/legacy'] });
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ layers: { ...layers, shared: { ...shared, lib: [] } } }));
+  assert.throws(() => loadConfig(cwd), /config\.json が不正です/);
+});
+
+test('doctor は構文エラーのファイルと場所とメッセージを出す', () => {
+  const cwd = project();
+  setResults(cwd, { [join(cwd, 'src', 'broken.ts')]: [{ ruleId: null, message: 'Parsing error: Unexpected token', line: 3 }] });
+  const run = bugyo(cwd, 'doctor', '--json');
+  assert.equal(run.status, 0, run.all);
+  assert.deepEqual(JSON.parse(run.all).parseErrors, [{ file: 'src/broken.ts', line: 3, message: 'Parsing error: Unexpected token' }]);
+  assert.match(bugyo(cwd, 'doctor').all, /構文エラー 1件[\s\S]*src\/broken\.ts:3 {2}Parsing error: Unexpected token/);
+});
+
+/**
+ * @param {string} cwd
+ * @param {object} config
+ * @param {string[]} files
+ */
+function withFiles(cwd, config, files) {
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify(config));
+  for (const file of files) {
+    mkdirSync(join(cwd, file, '..'), { recursive: true });
+    writeFileSync(join(cwd, file), '');
+  }
+}
+
+const featureFiles = ['src/features/billing/components/Invoice.tsx', 'src/features/billing/hooks/useInvoice.ts', 'src/features/billing/lib/total.ts', 'src/features/billing/index.ts'];
+
+test('featureParts: doctor は、どの役割にも入っていないフォルダと、ui・model の禁止が当たるファイルの数を出す', () => {
+  const cwd = project();
+  setResults(cwd, {});
+  withFiles(cwd, {}, featureFiles);
+  const before = bugyo(cwd, 'doctor', '--json');
+  assert.equal(before.status, 0, before.all);
+  assert.deepEqual(JSON.parse(before.all).featureParts, {
+    features: 1,
+    ui: 0,
+    model: 0,
+    unassigned: ['src/features/billing/components', 'src/features/billing/hooks', 'src/features/billing/lib'],
+  });
+  assert.match(bugyo(cwd, 'doctor').all, /ui の禁止が何にも当たっていません/);
+
+  withFiles(cwd, { layers: { featureParts: { ui: ['components', 'hooks'], model: ['lib'] } } }, []);
+  const after = JSON.parse(bugyo(cwd, 'doctor', '--json').all);
+  assert.deepEqual(after.featureParts, { features: 1, ui: 2, model: 1, unassigned: [] });
+});
+
+test('featureParts: ui のない構成（model だけの feature）では、0件の注意を出さない', () => {
+  const cwd = project();
+  setResults(cwd, {});
+  withFiles(cwd, {}, ['src/features/slug/model/slug.ts', 'src/features/slug/index.ts']);
+  const run = bugyo(cwd, 'doctor');
+  assert.equal(run.status, 0, run.all);
+  assert.doesNotMatch(run.all, /何にも当たっていません/);
+});
+
+test('featureParts: フォルダ名は / を含まない名前の、空でない配列でなければ断る', async () => {
+  const { loadConfig } = await import('../src/config.js');
+  for (const featureParts of [{ ui: [] }, { ui: ['a/b'] }, { ui: ['..'] }, { ui: 'components' }, { view: ['components'] }, { model: ['ui'] }]) {
+    const cwd = project();
+    withFiles(cwd, { layers: { featureParts } }, []);
+    assert.throws(() => loadConfig(cwd), /config\.json が不正です/, JSON.stringify(featureParts));
+  }
+});
+
+test('featureParts: logic タスクのテストは、model の役割のどのフォルダにあってもよい', async () => {
+  const { requirements } = await import('../src/evidence.js');
+  const { loadConfig } = await import('../src/config.js');
+  const cwd = project();
+  withFiles(cwd, { layers: { featureParts: { model: ['lib', 'domain'] } } }, []);
+  const config = loadConfig(cwd);
+  const task = /** @type {any} */ ({ id: 't1', type: 'logic', feature: 'billing' });
+  assert.equal(requirements(task, config)[0]?.label, 'src/features/billing/lib/ か domain/ にテストがある');
+});
+
 test('layers: 機能のフォルダの既定は layers.features になり、new feature は雛形を作らず断る', async () => {
   const cwd = project();
   withLayers(cwd);

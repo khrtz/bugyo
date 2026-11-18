@@ -43,11 +43,11 @@ module.exports = require('@bugyo/lint/depcruise').config(); // React を使う�
 { "extends": "@bugyo/lint/tsconfig.json" }
 ```
 
-層のフォルダが `src/app`・`src/features`・`src/shared` でないプロジェクトは、`bugyo({ root, src, layers })` と `config({ src, layers })` に場所を渡します（[層のフォルダ名を変える](../../docs/foundation.md#層のフォルダ名を変える)）。
+層のフォルダが `src/app`・`src/features`・`src/shared` でないプロジェクトは、`bugyo({ root, src, layers })` と `config({ src, layers })` に場所を渡します（[層のフォルダ名を変える](../../docs/foundation.md#層のフォルダ名を変える)）。feature の中のフォルダが `ui/`・`api/`・`model/` でなければ、`layers.featureParts` に役割ごとのフォルダ名を書きます。
 
 部品と禁止ごとに止めるものの一覧、設定項目、`defineBan` の書き方は [docs/foundation.md](../../docs/foundation.md) にあります。
 
-テストは、わざと違反した `.ts` だけのファイル（`test/fixture-node`）に対して共通と構成のルールと禁止がエラーを出すこと、既定の組み合わせに書き方の禁止と React 用のルールが入らないこと、`defineBan` の禁止が bugyo の禁止と同じ決まりで当たることを確かめます。`test/fixture-layers` は、層のフォルダ名と import の別名が既定と違うプロジェクトです。
+テストは、わざと違反した `.ts` だけのファイル（`test/fixture-node`）に対して共通と構成のルールと禁止がエラーを出すこと、既定の組み合わせに書き方の禁止と React 用のルールが入らないこと、`defineBan` の禁止が bugyo の禁止と同じ決まりで当たることを確かめます。`test/fixture-layers` は、層のフォルダ名、feature の中のフォルダ名、import の別名が既定と違うプロジェクトです。
 
 ```bash
 pnpm test
