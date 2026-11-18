@@ -38,7 +38,7 @@ function Workspace({ initial }: { initial: Asset[] }) {
       return;
     }
     commit({ ...store, reviews: { ...store.reviews, [selected.id]: { decision, note: note.trim() } } });
-    setMessage(`${selected.name} を${decision === 'approved' ? '承認' : '差し戻し'}ました。`);
+    setMessage(`${selected.name} を${decision === 'approved' ? '承認し' : '差し戻し'}ました。`);
   }
 
   function add(event: SubmitEvent<HTMLFormElement>) {

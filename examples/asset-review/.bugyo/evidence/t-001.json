@@ -2,9 +2,9 @@
   "task": "t-001",
   "type": "feature",
   "feature": "asset-review",
-  "closedAt": "2026-11-18T00:35:18.857Z",
-  "attempt": 2,
-  "rework": 1,
+  "closedAt": "2026-11-18T00:51:51.218Z",
+  "attempt": 3,
+  "rework": 2,
   "conditions": [
     "docs/features/asset-review.md の4見出しを埋める"
   ],
@@ -13,19 +13,19 @@
       "name": "check",
       "command": "pnpm check",
       "status": 0,
-      "ms": 8191
+      "ms": 9090
     },
     {
       "name": "test",
       "command": "pnpm test",
       "status": 0,
-      "ms": 2195
+      "ms": 2349
     },
     {
       "name": "verify",
       "command": "bugyo verify asset-review",
       "status": 0,
-      "ms": 2357,
+      "ms": 2843,
       "results": {
         "file": "artifacts/verify.json",
         "runner": "command",
@@ -49,6 +49,6 @@
       "checks",
       "e2e"
     ],
-    "hash": "sha256:8d768396c44004583ca1b35268cde362bb10b1733f7acb0ee244225106a21a22"
+    "hash": "sha256:d16b0bdfb9621af4552f980d6cacfec6ef3a1976b7ea9ef8acee197a8c596c99"
   }
 }

@@ -19,6 +19,7 @@ it('基準を検査し、承認・登録・差し戻しを保存して復元す�
   const view = render(<AssetReviewView />);
   const detail = within(screen.getByRole('region', { name: 'アセット詳細' }));
   await user.click(screen.getByRole('button', { name: /承認する/ }));
+  expect(screen.getByRole('status').textContent).toBe('CHR_HERO_A.fbx を承認しました。');
   expect(detail.getByText('承認済み')).toBeTruthy();
   await user.click(screen.getByRole('button', { name: /chr_npc draft.fbx/ }));
   expect(detail.getAllByRole('listitem')).toHaveLength(3);
