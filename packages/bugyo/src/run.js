@@ -26,7 +26,7 @@ export function runCommand(command, cwd, extraEnv = {}) {
  *
  * @param {string} cwd
  */
-function commandEnv(cwd) {
+export function commandEnv(cwd) {
   const env = { ...process.env };
   const pathKey = Object.keys(env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
   env[pathKey] = [join(cwd, 'node_modules', '.bin'), env[pathKey] ?? ''].join(delimiter);

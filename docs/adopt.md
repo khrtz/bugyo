@@ -125,6 +125,57 @@ npx bugyo task done t-001
 
 `.bugyo/config.json` を変えた PR に人の確認を求める仕組みは、このリポジトリの [config guard](../.github/workflows/config-guard.yml) を写して使えます。
 
+## lint を段階的に入れる
+
+`@bugyo/lint` を入れると、既存のコードの違反がまとめて出ます。今ある違反はベースラインとして止めずに残し、新しい違反だけを止め、ベースラインは減らす方向にだけ動かします。
+
+### 1. 入れる前に数える
+
+```bash
+npx bugyo doctor --tsconfig tsconfig.json
+```
+
+何も書き換えずに、禁止ごとの違反の件数を多い順に出します。ESLint の設定に `@bugyo/lint` を足してから実行すると、入れたあとの件数の見積もりになります。`--tsconfig` を付けると、その tsconfig での `tsc` のエラーの件数も出します（`@bugyo/lint/tsconfig` の厳しさを足したときの見積もり）。dependency-cruiser の設定があれば、依存のルールの違反も数えます。数えるフォルダは `--dirs web,server` で変えられます（既定は `src`）。理由を書いた `eslint-disable` のコメントで止めた違反は数えません。
+
+### 2. 今の違反をベースラインにする
+
+```bash
+npx bugyo baseline save
+```
+
+3つのファイルを書きます。
+
+| ファイル | 中身 |
+| --- | --- |
+| `eslint-suppressions.json` | ESLint の抑制（ファイルとルールごとの件数）。ESLint 9.24 からの機能で、ここにある違反は `eslint .` で出ない |
+| `.dependency-cruiser-known-violations.json` | dependency-cruiser の既知の違反。dependency-cruiser の設定があるときだけ |
+| `.bugyo/baseline.json` | 禁止ごとの件数 |
+
+ESLint の抑制はファイルとルールごとの件数なので、同じファイルで `useEffect` を `useLayoutEffect` に替えるような、同じルールの中の入れ替えは `eslint .` を通ってしまいます。`.bugyo/baseline.json` は `no-restricted-imports` などをメッセージごとに数えるので、この入れ替えも見つけます。
+
+### 3. `check` で件数を確かめる
+
+```json
+{ "scripts": { "check": "tsc --noEmit && eslint . && depcruise src --ignore-known && bugyo baseline check && bugyo task lint" } }
+```
+
+`bugyo baseline check` は、禁止ごとの件数がベースラインと同じでなければ落ちます。
+
+- 増えたとき: 新しい違反です。ベースラインに足さずに直します
+- 減ったとき: 直した違反がベースラインに残っています。`bugyo baseline save` で縮めて、一緒にコミットします
+
+### 4. CI でベースラインが増えていないか確かめる
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+- run: npm ci
+- run: npx bugyo baseline diff --base "origin/${{ github.base_ref }}"
+```
+
+`baseline diff` は、3つのファイルのどれかが base より増えていれば落ちます。減らすのと、ファイルを消すのは通ります。どうしても増やすときは、人が差分を確かめてから通す仕組みにします。このリポジトリの [config guard](../.github/workflows/config-guard.yml) は、ラベル `bugyo-baseline-approved` が付いた PR だけを通します。
+
 ## 確かめられないこと
 
 `bugyo verify` が確かめるのは、spec に書いた手順が今の環境で通るかだけです。外の環境の状態（本番のデータ、別のサービスの設定など）についての「確認しました」は止められません。

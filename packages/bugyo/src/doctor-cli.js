@@ -1,0 +1,111 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseArgs } from 'node:util';
+import { baselineFile, baselineGrowth, banCounts, compareCounts, depcruiseConfig, readBaseline, saveBaseline, tscErrors } from './doctor.js';
+import { UsageError } from './task-cli.js';
+
+export const doctorUsage = `  bugyo doctor [--dirs <a,b>] [--tsconfig <path>]  何も変えずに、禁止ごとの違反の件数を出す（入れる前の見積もり）
+  bugyo baseline save [--dirs <a,b>]  今の違反をすべてベースラインにする（ESLint の抑制・dependency-cruiser の既知の違反・禁止ごとの件数）
+  bugyo baseline check [--dirs <a,b>] 禁止ごとの件数がベースラインと同じか確かめる（pnpm check に入れる）
+  bugyo baseline diff --base <ref>    ベースラインのファイルが <ref> より増えていないか確かめる（CI 用）`;
+
+/** @param {string[]} args */
+function parse(args) {
+  try {
+    return parseArgs({
+      args,
+      allowPositionals: true,
+      options: { dirs: { type: 'string' }, tsconfig: { type: 'string' }, base: { type: 'string' }, json: { type: 'boolean' } },
+    });
+  } catch (error) {
+    throw new UsageError(error instanceof Error ? error.message : String(error));
+  }
+}
+
+/**
+ * dependency-cruiser に渡すフォルダ。指定がなければ src（なければ渡さない）。
+ *
+ * @param {string} cwd
+ * @param {string | undefined} option
+ */
+function dirsOf(cwd, option) {
+  if (option !== undefined) return option.split(',').map((dir) => dir.trim()).filter((dir) => dir !== '');
+  return existsSync(join(cwd, 'src')) ? ['src'] : [];
+}
+
+/** @param {Record<string, number>} counts */
+const countLines = (counts) =>
+  Object.entries(counts)
+    .sort(([, a], [, b]) => b - a)
+    .map(([key, count]) => `  ${String(count).padStart(5)}  ${key}`);
+
+/**
+ * @param {string[]} args
+ * @param {string} [cwd]
+ */
+export function doctorCommand(args, cwd = process.cwd()) {
+  const { values } = parse(args);
+  const dirs = dirsOf(cwd, values.dirs);
+  const { counts, errors } = banCounts(cwd, dirs);
+  const tsc = values.tsconfig === undefined ? undefined : tscErrors(cwd, values.tsconfig);
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  if (values.json) {
+    console.log(JSON.stringify({ total, counts, tsc, errors }));
+  } else {
+    console.log(`doctor: 違反 ${total}件（禁止ごと、多い順。ESLint の抑制ファイルで隠れているものも数える）`);
+    for (const line of countLines(counts)) console.log(line);
+    if (depcruiseConfig(cwd) === undefined) console.log('  dependency-cruiser の設定がないので、依存の違反は数えていません');
+    if (tsc !== undefined) console.log(`tsc（${values.tsconfig}）: エラー ${tsc}件`);
+    for (const error of errors) console.error(`error ${error}`);
+  }
+  return errors.length > 0 ? 1 : 0;
+}
+
+/**
+ * @param {string[]} args
+ * @param {string} [cwd]
+ */
+export function baselineCommand(args, cwd = process.cwd()) {
+  const [sub, ...rest] = args;
+  const { values } = parse(rest);
+  const dirs = dirsOf(cwd, values.dirs);
+  switch (sub) {
+    case 'save': {
+      const counts = saveBaseline(cwd, dirs);
+      const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+      console.log(`baseline: ${total}件をベースラインにしました（${baselineFile}）`);
+      return 0;
+    }
+    case 'check': {
+      const baseline = readBaseline(cwd);
+      if (baseline === undefined) {
+        console.log(`baseline: ${baselineFile} がないので、確かめるものはありません`);
+        return 0;
+      }
+      const { counts, errors } = banCounts(cwd, dirs);
+      if (errors.length > 0) {
+        for (const error of errors) console.error(`error ${error}`);
+        return 1;
+      }
+      const { grew, shrank } = compareCounts(baseline, counts);
+      for (const { key, from, to } of grew) console.error(`error 増えた: ${key} ${from} → ${to}。ベースラインに足さず、直してください`);
+      for (const { key, from, to } of shrank) console.error(`error 減った: ${key} ${from} → ${to}。bugyo baseline save でベースラインを縮めてください`);
+      const ok = grew.length === 0 && shrank.length === 0;
+      (ok ? console.log : console.error)(`baseline: 増えた禁止 ${grew.length}件、減った禁止 ${shrank.length}件`);
+      return ok ? 0 : 1;
+    }
+    case 'diff': {
+      if (values.base === undefined) throw new UsageError('使い方: bugyo baseline diff --base <ref>');
+      const grown = baselineGrowth(cwd, values.base);
+      for (const line of grown) console.error(`error 増えた: ${line}`);
+      if (grown.length > 0) {
+        console.error(`baseline: ${values.base} よりベースラインが ${grown.length}か所増えています。増やすのは人が確かめてからです（CI ではラベル bugyo-baseline-approved）`);
+        return 1;
+      }
+      console.log(`baseline: ${values.base} より増えたところはありません`);
+      return 0;
+    }
+    default:
+      throw new UsageError('bugyo baseline のサブコマンドは save / check / diff です');
+  }
+}

@@ -250,8 +250,12 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `bugyo new feature <id>` | feature を一式作る。何を作るかは `.bugyo/config.json` の `template` で決まる（ないときは `react-vite`）。同じ名前のファイルがあれば上書きせずに断る。雛形のないテンプレートでは理由を出して断り、何も作らない |
 | `bugyo verify <id>` | その機能の spec を実行し、合否と証拠の場所だけを出す |
 | `bugyo verify --all` | feature map にあるすべての機能を確かめる |
+| `bugyo doctor [--dirs <a,b>] [--tsconfig <path>] [--json]` | 何も書き換えずに、禁止ごとの違反の件数を出す。ESLint の抑制ファイルで隠れている違反も数える |
+| `bugyo baseline save [--dirs <a,b>]` | 今の違反をすべてベースラインにする（`eslint-suppressions.json`・`.dependency-cruiser-known-violations.json`・`.bugyo/baseline.json`） |
+| `bugyo baseline check [--dirs <a,b>]` | 禁止ごとの件数がベースラインと同じか確かめる。増えても減っても落ちる。`.bugyo/baseline.json` がなければ何もしない |
+| `bugyo baseline diff --base <ref>` | ベースラインの3つのファイルが `<ref>` より増えていれば落ちる。CI 用 |
 
-タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) にあります。
+タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) に、ベースラインの使い方は [adopt.md](adopt.md#lint-を段階的に入れる) にあります。
 
 `new feature <id>` が作るものは次のとおりです。どちらも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
 
