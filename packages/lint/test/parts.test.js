@@ -5,7 +5,7 @@ import { join, relative, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
 import { config } from '../depcruise.cjs';
-import { bugyo, common, fetchOnlyInApi, noComments, structure } from '../eslint.js';
+import { bugyo, common, defineBan, fetchOnlyInApi, noComments, structure } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture-node');
 const parts = bugyo({ root, parts: [common, structure], explicitExtensions: true });
@@ -110,12 +110,40 @@ test('layers: 層のフォルダ名と import の別名が既定と違っても�
   assert.deepEqual(found.sort(), [
     'web/app/lib/leak.ts:1 import-x/no-restricted-paths',
     'web/app/lib/leak.ts:2 import-x/no-restricted-paths',
+    'web/features/billing/domain/total.ts:1 import-x/no-restricted-paths',
+    'web/features/billing/domain/total.ts:2 no-restricted-imports',
+    'web/features/billing/domain/total.ts:3 no-restricted-imports',
     'web/features/report/api/fetchReport.ts:1 no-restricted-globals',
     'web/features/report/model/bad.ts:1 import-x/no-restricted-paths',
     'web/features/report/model/bad.ts:2 import-x/no-restricted-paths',
     'web/features/report/model/bad.ts:3 no-restricted-imports',
     'web/pages/main.ts:2 no-restricted-imports',
   ]);
+});
+
+test('featureParts: ui・model の範囲は、役割に書いたフォルダ名のどれにも当たる', async () => {
+  const alert = defineBan({ name: 'no-alert-in-ui', scope: 'ui', globals: [{ name: 'alert', message: 'ui では alert を使わない' }] });
+  const pure = defineBan({ name: 'no-date-in-model', scope: 'model', globals: [{ name: 'Date', message: 'model では Date を使わない' }] });
+  const linter = new ESLint({
+    cwd: layersRoot,
+    overrideConfigFile: true,
+    baseConfig: bugyo({ root: layersRoot, src: 'web', layers, parts: [common, structure, alert, pure] }),
+  });
+  const globalsFor = async (file) => {
+    const rule = (await linter.calculateConfigForFile(join(layersRoot, file))).rules['no-restricted-globals'];
+    return (rule?.slice(1) ?? []).map((entry) => entry.name);
+  };
+  assert.deepEqual(await globalsFor('web/features/billing/components/view.ts'), ['alert']);
+  assert.deepEqual(await globalsFor('web/features/report/ui/view.ts'), ['alert']);
+  assert.deepEqual(await globalsFor('web/features/billing/domain/total.ts'), ['Date']);
+  assert.deepEqual(await globalsFor('web/features/calc/model/add.ts'), ['Date']);
+  assert.deepEqual(await globalsFor('web/features/billing/services/amount.ts'), []);
+});
+
+test('featureParts: フォルダ名に / を含むか、空の配列なら断る', () => {
+  for (const featureParts of [{ ui: ['a/b'] }, { ui: ['..'] }, { model: [] }, { api: 'services' }, { ui: ['ui', 'lib'], model: ['lib'] }]) {
+    assert.throws(() => bugyo({ root: layersRoot, src: 'web', layers: { ...layers, featureParts } }), /featureParts/, JSON.stringify(featureParts));
+  }
 });
 
 test('layers: src の外にある層は断る', () => {
@@ -128,6 +156,9 @@ test('depcruise: layers の場所で構成の境界を止める', () => {
   assert.deepEqual(violations.sort(), [
     'app-only-via-feature-index web/pages/main.ts -> web/features/calc/model/add.ts',
     'feature-internals-only-via-index web/features/report/model/bad.ts -> web/features/calc/model/add.ts',
+    'model-is-pure web/features/billing/domain/total.ts -> web/app/ui/label.ts',
+    'model-is-pure web/features/billing/domain/total.ts -> web/features/billing/components/view.ts',
+    'model-is-pure web/features/billing/domain/total.ts -> web/features/billing/services/amount.ts',
     'model-is-pure web/features/report/model/bad.ts -> web/app/api/client.ts',
     'model-is-pure web/features/report/model/bad.ts -> web/app/ui/label.ts',
     'model-is-pure web/features/report/model/bad.ts -> web/features/calc/model/add.ts',

@@ -2,6 +2,7 @@
   "layers": {
     "app": "web/pages",
     "features": "web/features",
-    "shared": { "ui": "web/app/ui", "api": "web/app/api", "lib": "web/app/lib" }
+    "shared": { "ui": "web/app/ui", "api": "web/app/api", "lib": "web/app/lib" },
+    "featureParts": { "ui": ["ui", "components"], "api": ["api", "services"], "model": ["model", "domain"] }
   }
 }

@@ -106,7 +106,7 @@ export default bugyo({
 });
 ```
 
-- キーは、`parts` に入れた禁止の名前です。上の表の名前（`feature-internals`・`model-layers`・`model-react`・`comments`・`fetch`・`use-effect`・`ui-timers`）と、`defineBan` で作った禁止の `name` が使えます。`model-layers` は、`layers` を渡したときは `ui/`・`api/` への import だけです（下を参照）
+- キーは、`parts` に入れた禁止の名前です。上の表の名前（`feature-internals`・`model-layers`・`model-react`・`comments`・`fetch`・`use-effect`・`ui-timers`）と、`defineBan` で作った禁止の `name` が使えます。`model-layers` は、`layers` を渡したときは同じ feature の `ui/`・`api/`（`layers.featureParts` に書いたフォルダ）への import だけです（下を参照）
 - 名前のほかに、設定にあるルール ID（例: `@typescript-eslint/no-non-null-assertion`）も渡せます。そのルールがどのファイルでも warn になります
 - 名前で下げた禁止は、同じルールの他の禁止と分けるために、ルール ID が `bugyo-warn/<元のルール>`（例: `bugyo-warn/no-restricted-imports`）になります。`eslint-disable` のコメントで止めるときも、この ID を書きます。`rules` で書いた禁止（`comments` など）は、ルール ID はそのままで warn になります
 - 知らない名前と、`parts` に入れていない禁止の名前は断ります
@@ -143,7 +143,26 @@ const { layers } = require('./.bugyo/config.json');
 module.exports = require('@bugyo/lint/depcruise').config({ src: 'web', layers });
 ```
 
-`layers` を渡すと、`effectHooksDir` と `apiClientDir` の既定も `layers.shared.lib` と `layers.shared.api` になります（例では `fetch` は `web/app/api` でだけ呼べる）。境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` には5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
+`layers` を渡すと、`effectHooksDir` と `apiClientDir` の既定も `layers.shared.lib` と `layers.shared.api` になります（例では `fetch` は `web/app/api` でだけ呼べる）。境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` で書かなかった場所は `src/app` などの既定で埋まります。ESLint と dependency-cruiser では `<src>/app` などで埋まるので、`src` が `src` でなければ5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
+
+#### feature の中のフォルダ名を変える
+
+feature の中のフォルダが `ui/`・`api/`・`model/` でないプロジェクトでは、`layers.featureParts` に役割ごとのフォルダ名を書きます。書かなかった役割は `ui`・`api`・`model` のままです。
+
+```json
+{
+  "layers": {
+    "featureParts": { "ui": ["components", "hooks"], "api": ["api"], "model": ["lib"] }
+  }
+}
+```
+
+- `ui` に書いたフォルダには、`scope: 'ui'` の禁止（`noUseEffect`・`noUiTimers` など）が当たります
+- `model` に書いたフォルダには、`scope: 'model'` の禁止（`model-layers`・`model-react` など）が当たります。`model-layers` は、同じ feature の `ui` と `api` に書いたフォルダへの import を止めます（例では `../components`・`../hooks`・`../api`）。dependency-cruiser の `model-is-pure` も同じフォルダを見ます
+- `logic` タスクの「model にテストがある」は、`model` に書いたフォルダのどれかにテストがあれば通ります
+- 名前は feature の中のフォルダ名だけです（`/` を含まない）。1つの名前は1つの役割にだけ書けます
+
+`bugyo doctor` は、feature の中のどの役割にも入っていないフォルダと、`ui` と `model` の禁止が当たるファイルの数を出します。数が0なら、フォルダ名が役割と合っておらず、その禁止は何にも効いていません。
 
 ### 独自の禁止を足す
 
@@ -171,7 +190,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 | 項目 | 形 | 意味 |
 | --- | --- | --- |
 | `name` | 小文字・数字・ハイフン | 禁止の名前。`severity` のキーにもなる。同じ名前の禁止は2つ置けない |
-| `scope` | `src`（既定）・`ui`・`model`。`rules` だけの禁止は root からの glob も使える | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/`。`imports`・`globals`・`syntax`・`properties` は bugyo の禁止と1つのルールに合成するので、glob の範囲にすると断る（範囲を絞るなら `allow` で除く） |
+| `scope` | `src`（既定）・`ui`・`model`。`rules` だけの禁止は root からの glob も使える | どこで止めるか。`ui` と `model` は、`layers.features` の各 feature の `ui/` と `model/`（`layers.featureParts` で変えられる）。`imports`・`globals`・`syntax`・`properties` は bugyo の禁止と1つのルールに合成するので、glob の範囲にすると断る（範囲を絞るなら `allow` で除く） |
 | `allow` | `effects`・`api`・`tests`、または root からの glob の配列 | どこでは許すか。`effects` は `effectHooksDir`、`api` は `apiClientDir`、`tests` は `src` の下の `*.test.ts(x)` |
 | `imports` | `{ paths: [{ name, importNames?, message }], patterns: [{ group, message }] }` | `no-restricted-imports` に合成する |
 | `globals` | `[{ name, message }]` | `no-restricted-globals` に合成する |
@@ -372,7 +391,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
-| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared.ui`・`shared.api`・`shared.lib`）。上の「層のフォルダ名を変える」 |
+| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared.ui`・`shared.api`・`shared.lib`）と、feature の中のフォルダ名（`featureParts`）。上の「層のフォルダ名を変える」 |
 
 同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 

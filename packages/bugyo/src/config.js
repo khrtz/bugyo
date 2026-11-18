@@ -25,13 +25,49 @@ const LayerDir = z
   .min(1)
   .regex(/^(?!\.{1,2}(\/|$))(?!\/)[^\\]*[^/\\]$/,'プロジェクトのルートからの相対パス（先頭の ./ や末尾の / なし、区切りは /）にしてください');
 
+const PartName = z
+  .string()
+  .regex(/^[A-Za-z0-9._-]+$/, 'feature の中のフォルダ名（/ を含まない）にしてください')
+  .refine((name) => name !== '.' && name !== '..', 'feature の中のフォルダ名（/ を含まない）にしてください');
+const PartNames = z.array(PartName).min(1);
+
+/** 層の既定の場所。layers で書かなかったところはこれで埋める */
+export const defaultLayers = Object.freeze({
+  app: 'src/app',
+  features: 'src/features',
+  shared: Object.freeze({ ui: 'src/shared/ui', api: 'src/shared/api', lib: 'src/shared/lib' }),
+  featureParts: Object.freeze({ ui: ['ui'], api: ['api'], model: ['model'] }),
+});
+
 const Layers = z
   .object({
-    app: LayerDir,
-    features: LayerDir,
-    shared: z.object({ ui: LayerDir, api: LayerDir, lib: LayerDir }).strict(),
+    app: LayerDir.optional(),
+    features: LayerDir.optional(),
+    shared: z.object({ ui: LayerDir.optional(), api: LayerDir.optional(), lib: LayerDir.optional() }).strict().optional(),
+    featureParts: z
+      .object({ ui: PartNames.optional(), api: PartNames.optional(), model: PartNames.optional() })
+      .strict()
+      .refine((parts) => {
+        const all = [...(parts.ui ?? ['ui']), ...(parts.api ?? ['api']), ...(parts.model ?? ['model'])];
+        return new Set(all).size === all.length;
+      }, '1つのフォルダ名は1つの役割（ui・api・model）にしてください')
+      .optional(),
   })
-  .strict();
+  .strict()
+  .transform((layers) => ({
+    app: layers.app ?? defaultLayers.app,
+    features: layers.features ?? defaultLayers.features,
+    shared: {
+      ui: layers.shared?.ui ?? defaultLayers.shared.ui,
+      api: layers.shared?.api ?? defaultLayers.shared.api,
+      lib: layers.shared?.lib ?? defaultLayers.shared.lib,
+    },
+    featureParts: {
+      ui: layers.featureParts?.ui ?? [...defaultLayers.featureParts.ui],
+      api: layers.featureParts?.api ?? [...defaultLayers.featureParts.api],
+      model: layers.featureParts?.model ?? [...defaultLayers.featureParts.model],
+    },
+  }));
 
 const Commands = z
   .object({
@@ -176,8 +212,19 @@ export function loadConfig(cwd = process.cwd()) {
  * @param {import('./index.js').BugyoConfig} config
  */
 export function layerDirs(config) {
-  const layers = config.layers ?? { app: 'src/app', features: 'src/features', shared: { ui: 'src/shared/ui', api: 'src/shared/api', lib: 'src/shared/lib' } };
+  const layers = config.layers ?? defaultLayers;
   return [layers.app, layers.features, layers.shared.ui, layers.shared.api, layers.shared.lib];
+}
+
+/**
+ * feature の中の役割ごとのフォルダ名（ui・api・model）。`layers.featureParts` がなければ ui・api・model。
+ *
+ * @param {import('./index.js').BugyoConfig} config
+ * @returns {{ ui: string[], api: string[], model: string[] }}
+ */
+export function featureParts(config) {
+  const parts = config.layers?.featureParts ?? defaultLayers.featureParts;
+  return { ui: [...parts.ui], api: [...parts.api], model: [...parts.model] };
 }
 
 /**

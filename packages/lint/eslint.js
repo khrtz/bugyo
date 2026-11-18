@@ -10,7 +10,12 @@ import { noComments as noCommentsRule } from './rules/no-comments.js';
 /**
  * @typedef {import('./index.js').BugyoOptions} BugyoOptions
  * @typedef {import('./index.js').BanSpec} BanSpec
- * @typedef {{ app: string, features: string, shared: { ui: string, api: string, lib: string } }} Layers
+ * @typedef {{
+ *   app: string,
+ *   features: string,
+ *   shared: { ui: string, api: string, lib: string },
+ *   featureParts: { ui: string[], api: string[], model: string[] },
+ * }} Layers
  * @typedef {Required<Omit<BugyoOptions, 'parts' | 'layers' | 'severity'>> & {
  *   layers: Layers,
  *   customLayers: boolean,
@@ -192,8 +197,10 @@ export const structure = {
   rank: 2,
   build: (context) => {
     const { root, src, layers, customLayers } = context;
-    const { app, features, shared } = layers;
+    const { app, features, shared, featureParts } = layers;
     const featuresName = features.split('/').at(-1) ?? features;
+    const outerParts = [...featureParts.ui, ...featureParts.api];
+    const roleLabel = (/** @type {string[]} */ list) => list.map((name) => `${name}/`).join('・');
     const internals = customLayers ? [`**/${featuresName}/*/*`] : ['@/features/*/*', '**/features/*/*'];
     const indexes = customLayers ? [`!**/${featuresName}/*/index.ts`] : ['!@/features/*/index.ts', '!**/features/*/index.ts'];
     const sharedDirs = [shared.ui, shared.api, shared.lib];
@@ -206,9 +213,9 @@ export const structure = {
           },
           { target: `./${features}`, from: `./${app}`, message: `${features} は ${app} に依存できません。` },
           {
-            target: `./${features}/*/model/**/*`,
+            target: featureParts.model.map((name) => `./${features}/*/${name}/**/*`),
             from: [`./${shared.ui}`, `./${shared.api}`],
-            message: `model/ が使えるのは自分のmodelと ${shared.lib} だけです。`,
+            message: `${roleLabel(featureParts.model)} が使えるのは自分の${roleLabel(featureParts.model)}と ${shared.lib} だけです。`,
           },
         ]
       : [
@@ -240,10 +247,15 @@ export const structure = {
           scope: 'model',
           imports: {
             patterns: [
-              {
-                group: ['../ui', '../ui/*', '../api', '../api/*'],
-                message: 'model/ から ui/ や api/ はimportできません。依存の向きは ui → api → model です。',
-              },
+              customLayers
+                ? {
+                    group: outerParts.flatMap((name) => [`../${name}`, `../${name}/*`]),
+                    message: `${roleLabel(featureParts.model)} から ${roleLabel(outerParts)} はimportできません。依存の向きは ${roleLabel(featureParts.ui)} → ${roleLabel(featureParts.api)} → ${roleLabel(featureParts.model)} です。`,
+                  }
+                : {
+                    group: ['../ui', '../ui/*', '../api', '../api/*'],
+                    message: 'model/ から ui/ や api/ はimportできません。依存の向きは ui → api → model です。',
+                  },
               ...(customLayers
                 ? []
                 : [
@@ -269,6 +281,18 @@ export const structure = {
  * @returns {Layers}
  */
 export function resolveLayers(src, layers) {
+  const parts = layers?.featureParts;
+  const names = (/** @type {string} */ role, /** @type {string[] | undefined} */ value) => {
+    const list = value ?? [role];
+    if (!Array.isArray(list) || list.length === 0 || list.some((name) => typeof name !== 'string' || !/^[A-Za-z0-9._-]+$/.test(name) || /^\.{1,2}$/.test(name))) {
+      throw new Error(`bugyo({ layers }) の featureParts.${role} は、feature の中のフォルダ名（/ を含まない）の配列にしてください`);
+    }
+    return [...list];
+  };
+  const featureParts = { ui: names('ui', parts?.ui), api: names('api', parts?.api), model: names('model', parts?.model) };
+  const all = [...featureParts.ui, ...featureParts.api, ...featureParts.model];
+  const twice = all.filter((name, index) => all.indexOf(name) !== index);
+  if (twice.length > 0) throw new Error(`bugyo({ layers }) の featureParts で ${[...new Set(twice)].join(', ')} が2つの役割に入っています。1つのフォルダは1つの役割にしてください`);
   const resolved = {
     app: trimSlash(layers?.app ?? `${src}/app`),
     features: trimSlash(layers?.features ?? `${src}/features`),
@@ -277,6 +301,7 @@ export function resolveLayers(src, layers) {
       api: trimSlash(layers?.shared?.api ?? `${src}/shared/api`),
       lib: trimSlash(layers?.shared?.lib ?? `${src}/shared/lib`),
     },
+    featureParts,
   };
   const outside = [resolved.app, resolved.features, ...Object.values(resolved.shared)].filter((dir) => !dir.startsWith(`${src}/`));
   if (outside.length > 0) throw new Error(`bugyo({ layers }) の ${outside.join(', ')} が src（${src}）の中にありません。src に層をまとめて入れるフォルダを渡してください`);
@@ -408,9 +433,9 @@ export function bugyo(options) {
       case 'src':
         return [`${src}/**/*.{ts,tsx}`];
       case 'ui':
-        return [`${layers.features}/*/ui/**/*.{ts,tsx}`];
+        return layers.featureParts.ui.map((name) => `${layers.features}/*/${name}/**/*.{ts,tsx}`);
       case 'model':
-        return [`${layers.features}/*/model/**/*.ts`];
+        return layers.featureParts.model.map((name) => `${layers.features}/*/${name}/**/*.ts`);
       default:
         return [scope];
     }

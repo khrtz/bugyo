@@ -39,7 +39,15 @@ export interface BugyoConfig {
    * 層のフォルダの場所（プロジェクトのルートからの相対パス）。書いたときは bugyo new feature が雛形を作らず断り、
    * bugyo doctor がどの層にも入っていないファイルを出す。ESLint と dependency-cruiser には同じ値を渡す
    */
-  layers?: { app: string; features: string; shared: { ui: string; api: string; lib: string } } | undefined;
+  layers?:
+    | {
+        app: string;
+        features: string;
+        shared: { ui: string; api: string; lib: string };
+        /** feature の中のフォルダ名を役割ごとに。書かなかった役割は ui・api・model */
+        featureParts: { ui: string[]; api: string[]; model: string[] };
+      }
+    | undefined;
   /** bugyo task done が実行するコマンド。このキーがないときだけ、packageManager に合わせた既定値（pnpm なら pnpm check / pnpm test / bugyo verify {feature}）を使う */
   commands?: { check?: string | undefined; test?: string | undefined; verify?: string | undefined } | undefined;
   evidence: {

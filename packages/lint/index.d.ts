@@ -51,7 +51,7 @@ export interface BugyoContext {
   src: string;
   effectHooksDir: string;
   apiClientDir: string;
-  layers: { app: string; features: string; shared: { ui: string; api: string; lib: string } };
+  layers: ResolvedLayers;
   /** エラー文に書く、機能のフォルダの名前（layers がなければ `features`） */
   featuresLabel: string;
 }
@@ -97,12 +97,22 @@ export interface BugyoLayers {
   features?: string;
   /** どの feature からも使える層。features と app には依存できない */
   shared?: { ui?: string; api?: string; lib?: string };
+  /**
+   * feature の中のフォルダ名を役割ごとに書く。既定は `{ ui: ['ui'], api: ['api'], model: ['model'] }`。
+   * ui に書いたフォルダには ui の禁止が、model に書いたフォルダには model の禁止が当たる。1つの名前は1つの役割にだけ書ける。
+   * 例: `{ ui: ['components', 'hooks'], api: ['api'], model: ['lib'] }`
+   */
+  featureParts?: { ui?: string[]; api?: string[]; model?: string[] };
 }
 
-export function resolveLayers(
-  src: string,
-  layers: BugyoLayers | undefined,
-): { app: string; features: string; shared: { ui: string; api: string; lib: string } };
+export interface ResolvedLayers {
+  app: string;
+  features: string;
+  shared: { ui: string; api: string; lib: string };
+  featureParts: { ui: string[]; api: string[]; model: string[] };
+}
+
+export function resolveLayers(src: string, layers: BugyoLayers | undefined): ResolvedLayers;
 
 export interface BugyoOptions {
   /** eslint.config.js で `import.meta.dirname` を渡す */

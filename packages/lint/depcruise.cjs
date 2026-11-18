@@ -11,7 +11,12 @@
  *   tsConfig?: string,
  *   forbidden?: object[],
  *   react?: boolean,
- *   layers?: { app?: string, features?: string, shared?: { ui?: string, api?: string, lib?: string } },
+ *   layers?: {
+ *     app?: string,
+ *     features?: string,
+ *     shared?: { ui?: string, api?: string, lib?: string },
+ *     featureParts?: { ui?: string[], api?: string[], model?: string[] },
+ *   },
  * }} [options]
  */
 function config(options = {}) {
@@ -29,6 +34,7 @@ function config(options = {}) {
           shared: `${s}/shared`,
           sharedTo: `^${s}/(features|app)/`,
           modelTo: `^${s}/(features|shared/(ui|api)|app)/`,
+          model: 'model',
         }
       : (() => {
           const features = dir(layers.features, 'features');
@@ -42,6 +48,7 @@ function config(options = {}) {
             shared: `(${ui}|${api}|${lib})`,
             sharedTo: `^(${features}|${app})/`,
             modelTo: `^(${features}|${ui}|${api}|${app})/`,
+            model: `(${(layers.featureParts?.model ?? ['model']).map(escape).join('|')})`,
           };
         })();
   return {
@@ -88,10 +95,10 @@ function config(options = {}) {
         name: 'model-is-pure',
         severity: 'error',
         comment: 'model/ が使えるのは自分のmodel、shared/lib、純粋なライブラリだけです。',
-        from: { path: `^${p.features}/([^/]+)/model/` },
+        from: { path: `^${p.features}/([^/]+)/${p.model}/` },
         to: {
           path: react ? `(${p.modelTo}|(^|/)node_modules/(react|react-dom|@tanstack)/)` : p.modelTo,
-          pathNot: `^${p.features}/$1/model/`,
+          pathNot: `^${p.features}/$1/${p.model}/`,
         },
       },
       {
