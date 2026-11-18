@@ -1,12 +1,18 @@
 # @bugyo/lint-react
 
-[@bugyo/lint](../lint) に足す、React 用の部品と禁止です。
+English ・ [日本語](https://github.com/khrtz/bugyo/blob/main/packages/lint-react/README.ja.md)
 
-- 部品 `react`: react-hooks の推奨ルールと、`model/` から React への依存の禁止
-- 禁止 `noUseEffect`: `useEffect` / `useLayoutEffect` は `shared/lib`（`effectHooksDir`）でだけ書ける
-- 禁止 `noUiTimers`: feature の UI で `setTimeout`・`setInterval`・`requestAnimationFrame` を使えない（テストでは書ける）
+The React part and bans to add on top of [@bugyo/lint](https://www.npmjs.com/package/@bugyo/lint).
 
-禁止は、`parts` に並べたものだけが当たります。
+- Part `react`: the recommended react-hooks rules, and no React imports from `model/`
+- Ban `noUseEffect`: `useEffect` / `useLayoutEffect` only in `shared/lib` (`effectHooksDir`)
+- Ban `noUiTimers`: no `setTimeout`, `setInterval`, or `requestAnimationFrame` in feature UI (tests may use them)
+
+Only the bans you list in `parts` apply.
+
+```bash
+npm install --save-dev @bugyo/lint @bugyo/lint-react eslint @eslint/js typescript dependency-cruiser
+```
 
 ```js
 // eslint.config.js
@@ -16,17 +22,15 @@ import { noUiTimers, noUseEffect, react } from '@bugyo/lint-react';
 export default bugyo({ root: import.meta.dirname, parts: [common, structure, react, noUseEffect, noUiTimers] });
 ```
 
-dependency-cruiser は `@bugyo/lint` のものを `react: true` で使います。
+For dependency-cruiser, use the one from `@bugyo/lint` with `react: true`.
 
 ```js
 // .dependency-cruiser.cjs
 module.exports = require('@bugyo/lint/depcruise').config({ react: true });
 ```
 
-止めるものの一覧と例外の場所は [docs/foundation.md](../../docs/foundation.md) にあります。
+What each rule stops and where the exceptions live are in [docs/foundation.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.md) (in Japanese).
 
-テストは、わざと違反した React のファイル（`test/fixture`）に対して、部品と禁止を組み合わせた設定と dependency-cruiser の各ルールがエラーを出すことと、`react` だけでは `useEffect` と UI のタイマーを止めないことを確かめます。
+## License
 
-```bash
-pnpm test
-```
+MIT
