@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { featureRoots, loadConfig } from './config.js';
-import { featureDir, loadFeatures, loadSweepOrder, requiredSections } from './feature-map.js';
+import { featureDir, loadFeatures, loadSweepOrder, missingSections, sectionHeadings } from './feature-map.js';
 import { runsOf } from './runners.js';
 
 /**
@@ -40,9 +40,10 @@ export function featureMapChecks(options = {}) {
       skip: null,
       problems: () =>
         features.flatMap((feature) =>
-          requiredSections
-            .filter((section) => !feature.body.includes(`## ${section}`))
-            .map((section) => `${feature.file} に「## ${section}」がありません`),
+          missingSections(feature).map((section) => {
+            const english = sectionHeadings.find((heading) => heading.ja === section)?.en;
+            return `${feature.file} に「## ${section}」（英語なら「## ${english}」）がありません`;
+          }),
         ),
     },
     {

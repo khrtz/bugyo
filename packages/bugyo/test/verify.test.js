@@ -190,12 +190,24 @@ test('runners: Playwright の確かめ方が2つあると、それぞれを env 
   );
 });
 
-test('verify は実行のたびに artifacts を消してから始める', () => {
+test('verify は実行のたびに、自分が書いたものだけを artifacts から消してから始める', () => {
   const cwd = plainProject();
+  setVerify(cwd, { runner: 'command', command: 'node {spec}', runners: { api: { runner: 'command', command: 'node {spec}' } } });
   bugyo(cwd, 'verify', 'greet');
-  writeFileSync(join(cwd, 'artifacts/stale.txt'), 'old');
+  for (const file of ['artifacts/verify/old.log', 'artifacts/report/old.html', 'artifacts/test-results/old.png', 'artifacts/api/old.json', 'artifacts/results.json']) {
+    mkdirSync(join(cwd, file, '..'), { recursive: true });
+    writeFileSync(join(cwd, file), 'old');
+  }
+  mkdirSync(join(cwd, 'artifacts/build'), { recursive: true });
+  writeFileSync(join(cwd, 'artifacts/build/app.zip'), 'keep');
+  writeFileSync(join(cwd, 'artifacts/notes.txt'), 'keep');
   bugyo(cwd, 'verify', 'greet');
-  assert.ok(!existsSync(join(cwd, 'artifacts/stale.txt')));
+  for (const file of ['artifacts/verify/old.log', 'artifacts/report', 'artifacts/test-results', 'artifacts/api', 'artifacts/results.json']) {
+    assert.ok(!existsSync(join(cwd, file)), `${file} は verify が書くものなので消す`);
+  }
+  assert.equal(readFileSync(join(cwd, 'artifacts/build/app.zip'), 'utf8'), 'keep', 'verify が書かないものは残す');
+  assert.equal(readFileSync(join(cwd, 'artifacts/notes.txt'), 'utf8'), 'keep');
+  assert.ok(existsSync(join(cwd, 'artifacts/verify/greet.log')));
 });
 
 test('設定がなければ playwright 方式と今までの場所になる', () => {

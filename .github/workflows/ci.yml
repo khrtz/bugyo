@@ -34,6 +34,21 @@ jobs:
       - run: pnpm check
       - run: pnpm test
 
+  windows:
+    name: Windows で pnpm check / test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+
   oldest:
     name: ESLint 9.24 と TypeScript 5.8 で lint
     runs-on: ubuntu-latest
