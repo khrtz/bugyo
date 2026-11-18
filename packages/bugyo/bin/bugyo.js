@@ -2,7 +2,7 @@
 import { parseArgs } from 'node:util';
 import { baselineCommand, doctorCommand, doctorUsage } from '../src/doctor-cli.js';
 import { defaultTemplate, init, newFeature, templates } from '../src/scaffold.js';
-import { UsageError, gateCommand, mistakeCommand, taskCommand, taskUsage } from '../src/task-cli.js';
+import { UsageError, gateCommand, mistakeCommand, statsCommand, taskCommand, taskUsage } from '../src/task-cli.js';
 import { verify } from '../src/verify.js';
 
 const usage = `使い方:
@@ -42,6 +42,8 @@ function main() {
       return mistakeCommand(args);
     case 'gate':
       return gateCommand(args);
+    case 'stats':
+      return statsCommand(args);
     case 'doctor':
       return doctorCommand(args);
     case 'baseline':

@@ -83,7 +83,7 @@ PASS todos  確認手順: docs/features/todos.md
 - **依存ルール** — 循環依存、他の feature の内部への依存、`shared` から上の層への依存を止める
 - **feature map** — 機能ごとに `docs/features/<id>.md` を1つ置き、「何があるか・どう辿り着くか・どう操作して確かめるか・よく嘘をつくところ」を書く。機能・spec・地図の対応漏れはテストが落とす
 - **検証** — `bugyo verify <id>` がその機能を実際に動かし、合否と証拠を毎回残す。既定は Playwright（動画・スクリーンショット・トレース）。`.bugyo/config.json` で、機能ごとに任意のコマンドを実行する方式にもできる
-- **タスク台帳と門番** — 仕事を `.bugyo/tasks/<id>.md` に1件1ファイルで残す。`bugyo task done` が種類ごとに必要な証拠を自分で取り、通ったときだけ閉じる。手で完了に書き換えたタスクは `pnpm check` の `bugyo task lint` が落とす。`bugyo gate` が、手直しの少なさ・1回で通った件数・ミスの再発から、任せる範囲を広げてよいかを計算する
+- **タスク台帳と門番** — 仕事を `.bugyo/tasks/<id>.md` に1件1ファイルで残す。`bugyo task done` が種類ごとに必要な証拠を自分で取り、通ったときだけ閉じる。手で完了に書き換えたタスクは `pnpm check` の `bugyo task lint` が落とす。`bugyo gate` が、手直しの少なさ・1回で通った件数・ミスの再発から、任せる範囲を広げてよいかを計算する。`bugyo stats` が、作業の種類・モデル・ハーネスごとの実績を出す
 - **雛形** — `bugyo init --template <名前>` と `bugyo new feature` が、上の決まりに沿った形でプロジェクトと機能を作る
 - **段階的な導入** — `bugyo doctor` が入れる前に禁止ごとの違反を数え、`bugyo baseline save` が今の違反をベースラインにする。`bugyo baseline check` は禁止ごとの件数が増えても減っても落ちるので、ベースラインは減る方向にだけ動く
 
