@@ -13,6 +13,8 @@ export const types = /** @type {const} */ (['feature', 'ui-flow', 'ui-look', 'lo
 export const typesNeedingFeature = new Set(['feature', 'ui-flow', 'ui-look', 'logic']);
 
 const idPattern = /^t-\d{3,}$/;
+/** 課題の参照（`123`、`#123`、`PROJ-45`、URL）。通知のコマンドにそのまま埋め込むので、シェルで意味を持つ文字は使えない */
+export const issuePattern = /^[A-Za-z0-9#._:/-]+$/;
 const count = z
   .string()
   .regex(/^\d+$/, '0 以上の整数にしてください')
@@ -24,6 +26,7 @@ const Fields = z
     status: z.enum(statuses),
     type: z.enum(types),
     feature: z.string().default(''),
+    issue: z.string().regex(issuePattern, '英数字と # . _ : / - だけにしてください').optional(),
     'blocked-by': z
       .string()
       .default('')
@@ -151,6 +154,7 @@ export function saveTask(cwd, task) {
     status: task.status,
     type: task.type,
     feature: task.feature,
+    issue: task.issue,
     'blocked-by': task['blocked-by'].join(','),
     assignee: task.assignee,
     rework: task.rework,
@@ -188,6 +192,7 @@ export function openBlockers(task, tasks) {
 export function taskLine(task) {
   const extras = [
     task.feature === '' ? '' : `機能: ${task.feature}`,
+    task.issue === undefined ? '' : `課題: ${task.issue}`,
     task.assignee === '' ? '' : `担当: ${task.assignee}`,
     task['blocked-by'].length === 0 ? '' : `待ち: ${task['blocked-by'].join(',')}`,
   ].filter((extra) => extra !== '');
@@ -202,6 +207,7 @@ export function taskJson(task) {
     type: task.type,
     title: task.title,
     feature: task.feature,
+    ...(task.issue === undefined ? {} : { issue: task.issue }),
     assignee: task.assignee,
     blockedBy: task['blocked-by'],
     rework: task.rework,

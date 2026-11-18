@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { collectEvidence, readEvidence, requirements } from './evidence.js';
+import { runCommand, tail } from './run.js';
 import { archiveDir } from './tasks.js';
 
 /**
@@ -77,6 +78,29 @@ export function duplicateIdsAgainst(cwd, base) {
 /**
  * @typedef {{ id: string, ok: boolean, reason: string, output: string }} RecheckResult
  */
+
+const safeValue = /^[A-Za-z0-9#._:/-]+$/;
+
+/**
+ * 証拠を取り直して通ったタスクを、課題に知らせる。`notify.verified` のコマンドの `{issue}`・`{task}`・`{evidence}` を置き換えてシェルで実行する。
+ * 同じ値とタイトルを環境変数（BUGYO_ISSUE・BUGYO_TASK・BUGYO_EVIDENCE・BUGYO_TITLE）にも入れる。
+ * 知らせられなかったことは返すだけで、照合の合否は変えない。
+ *
+ * @param {import('./tasks.js').Task} task
+ * @param {string} command
+ * @param {string} cwd
+ * @returns {{ ok: boolean, message: string }}
+ */
+export function notifyVerified(task, command, cwd) {
+  const issue = task.issue ?? '';
+  const evidence = task['evidence-file'] ?? '';
+  if (!safeValue.test(issue) || !safeValue.test(evidence)) return { ok: false, message: `${task.id} の issue か evidence-file に、コマンドに埋め込めない文字があります` };
+  const filled = command.replaceAll('{issue}', issue).replaceAll('{task}', task.id).replaceAll('{evidence}', evidence);
+  const run = runCommand(filled, cwd, { BUGYO_ISSUE: issue, BUGYO_TASK: task.id, BUGYO_EVIDENCE: evidence, BUGYO_TITLE: task.title });
+  return run.status === 0
+    ? { ok: true, message: `${task.id} を ${issue} に知らせました` }
+    : { ok: false, message: `${task.id} を ${issue} に知らせられませんでした（終了コード ${run.status}）: ${tail(run.output, 5)}` };
+}
 
 /**
  * 完了タスクの証拠を取り直し、手順が今も通ることと、ツリーのハッシュが台帳と一致することを確かめる。

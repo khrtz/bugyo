@@ -7,13 +7,14 @@ import { featureDir, loadFeatures } from './feature-map.js';
 import { evaluateGate } from './gate.js';
 import { isMistakeKind, loadMistakes, mistakeLine, mistakeState, recordMistake, recordRule, sortMistakes } from './mistakes.js';
 import { claimTask, fetchClaims, listRecords, openClaims, reassignClaim, readRecord, releaseClaim, reserveId } from './claims.js';
-import { changedArchiveIds, duplicateIdsAgainst, recheckTask } from './recheck.js';
+import { changedArchiveIds, duplicateIdsAgainst, notifyVerified, recheckTask } from './recheck.js';
 import { commandExists, ranNoTests, runCommand, tail } from './run.js';
 import { lintTasks } from './task-lint.js';
 import {
   evidenceDir,
   findTask,
   isTaskId,
+  issuePattern,
   loadTasks,
   nextTaskId,
   openBlockers,
@@ -26,7 +27,7 @@ import {
 
 export class UsageError extends Error {}
 
-export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--blocked-by <id,...>] [--body "<本文>"]
+export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]
   bugyo task ready                       未着手でブロックされていないタスク
   bugyo task start <id> --as <名前>      作業中にする
   bugyo task show <id>                   本文、読むもの、完了に必要なもの
@@ -37,7 +38,8 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo task ls [--all]                  一覧（--all で完了・中止も）
   bugyo task release <id>                人: 止まったエージェントの着手の記録を消す
   bugyo task lint [--base <ref>]         台帳の整合を検査する（--base なら、<ref> にすでにある id と重なるタスクも見つける）
-  bugyo task recheck [<id>...] [--base <ref>]  完了タスクの証拠を取り直して照合する（CI 用。--base なら <ref>...HEAD で閉じたタスク）
+  bugyo task recheck [<id>...] [--base <ref>] [--notify]  完了タスクの証拠を取り直して照合する（CI 用。--base なら <ref>...HEAD で閉じたタスク。
+                                         --notify なら、通ったタスクの課題に notify.verified のコマンドで知らせる）
   bugyo mistake ls                       ミスの種類ごとの回数とルール
   bugyo mistake rule <種類> --at <パス>  ルールに変えたことを記録する
   bugyo gate [--scope <まとまり>]        任せる範囲を広げてよいかを、作業の種類のまとまりごとに計算する
@@ -54,6 +56,8 @@ function parse(args) {
       options: {
         type: { type: 'string' },
         feature: { type: 'string' },
+        issue: { type: 'string' },
+        notify: { type: 'boolean' },
         'blocked-by': { type: 'string' },
         body: { type: 'string' },
         as: { type: 'string' },
@@ -124,6 +128,8 @@ function add(args, cwd) {
   for (const id of blockedBy) {
     if (!isTaskId(id) || !tasks.some((task) => task.id === id)) throw new Error(`blocked-by の ${id} というタスクはありません`);
   }
+  const issue = values.issue?.trim() || undefined;
+  if (issue !== undefined && !issuePattern.test(issue)) throw new UsageError('--issue は英数字と # . _ : / - だけにしてください（例: 123、PROJ-45、課題の URL）');
   const claims = openClaims(cwd, loadConfig(cwd).claims.remote);
   const id = claims === undefined ? nextTaskId(tasks) : reserveId(claims, Number(nextTaskId(tasks).slice(2)) - 1);
   const description = values.body?.trim() || '（何が起きているか、どうなれば終わりか）';
@@ -133,6 +139,7 @@ function add(args, cwd) {
     status: 'open',
     type: /** @type {import('./tasks.js').Task['type']} */ (type),
     feature,
+    issue,
     'blocked-by': blockedBy,
     assignee: '',
     rework: 0,
@@ -427,11 +434,30 @@ function recheck(args, cwd) {
   const tasks = loadTasks(cwd);
   const results = ids.map((id) => recheckTask(findTask(tasks, id), config, cwd));
   const failed = results.filter((result) => !result.ok);
+  /** @type {{ id: string, ok: boolean, message: string }[]} */
+  const notices = [];
+  if (values.notify) {
+    const command = config.notify.verified;
+    const verified = results
+      .filter((result) => result.ok)
+      .map((result) => findTask(tasks, result.id))
+      .filter((task) => task.status === 'done' && task.issue !== undefined);
+    if (command === undefined) {
+      if (verified.length > 0) notices.push({ id: '', ok: false, message: `${configFile} に notify.verified がないので、課題に知らせません` });
+    } else {
+      for (const task of verified) notices.push({ id: task.id, ...notifyVerified(task, command, cwd) });
+    }
+  }
   const lines = [
     ...results.flatMap((result) => [`${result.ok ? 'OK  ' : 'FAIL'} ${result.id}  ${result.reason}`, ...(result.output === '' ? [] : [result.output])]),
+    ...notices.map((notice) => `${notice.ok ? 'notify' : 'warn  '} ${notice.message}`),
     `task recheck: ${results.length}件を照合、不一致 ${failed.length}件`,
   ];
-  print(values.json, lines, { ok: failed.length === 0, results: results.map(({ id, ok, reason }) => ({ id, ok, reason })) });
+  print(values.json, lines, {
+    ok: failed.length === 0,
+    results: results.map(({ id, ok, reason }) => ({ id, ok, reason })),
+    ...(values.notify ? { notified: notices } : {}),
+  });
   return failed.length === 0 ? 0 : 1;
 }
 

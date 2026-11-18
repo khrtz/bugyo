@@ -426,6 +426,44 @@ test('recheck: 本物の証拠は通り、閉じたあとにコードが変わ�
   assert.match(changed.stdout, /^FAIL t-001 {2}今のコードのハッシュ.*evidence-tree.*と違います/m);
 });
 
+test('issue: add --issue で課題の参照を残し、シェルで意味を持つ文字は断る', () => {
+  const cwd = project();
+  const added = JSON.parse(ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet', '--issue', 'PROJ-45', '--json').stdout);
+  assert.equal(added.issue, 'PROJ-45');
+  assert.match(readFileSync(taskFile(cwd, 't-001'), 'utf8'), /^issue: PROJ-45$/m);
+  assert.match(ok(cwd, 'task', 'ls').stdout, /課題: PROJ-45/);
+  assert.equal(bugyo(cwd, 'task', 'add', 'x', '--type', 'chore', '--issue', '1; rm -rf ~').status, 2);
+});
+
+test('recheck --notify: 通った課題つきのタスクだけを知らせ、done では知らせず、知らせられなくても合否は変えない', () => {
+  const cwd = project();
+  const log = join(cwd, 'notified.log');
+  editConfig(cwd, (config) => (config.notify = { verified: `node -e "require('fs').appendFileSync(process.argv[1], process.argv.slice(2).join(' ') + ' ' + process.env.BUGYO_TITLE + '\\n')" "${log}" {issue} {task} {evidence}` }));
+  ok(cwd, 'task', 'add', 'あいさつ', '--type', 'ui-flow', '--feature', 'greet', '--issue', '123');
+  ok(cwd, 'task', 'add', '課題なし', '--type', 'chore');
+  for (const id of ['t-001', 't-002']) {
+    ok(cwd, 'task', 'start', id, '--as', `w-${id}`);
+    ok(cwd, 'task', 'done', id);
+  }
+  assert.ok(!existsSync(log), 'done では知らせない');
+
+  ok(cwd, 'task', 'recheck', 't-001', 't-002');
+  assert.ok(!existsSync(log), '--notify がなければ知らせない');
+
+  const run = ok(cwd, 'task', 'recheck', 't-001', 't-002', '--notify');
+  assert.match(run.stdout, /^notify t-001 を 123 に知らせました$/m);
+  assert.equal(readFileSync(log, 'utf8'), '123 t-001 .bugyo/evidence/t-001.json あいさつ\n');
+
+  writeFileSync(join(cwd, 'lib/greet/extra.js'), 'export const extra = 1;\n');
+  assert.equal(bugyo(cwd, 'task', 'recheck', 't-001', '--notify').status, 1);
+  assert.equal(readFileSync(log, 'utf8').split('\n').length, 2, '照合に落ちたタスクは知らせない');
+  rmSync(join(cwd, 'lib/greet/extra.js'));
+
+  editConfig(cwd, (config) => (config.notify = { verified: 'node -e "process.exit(3)"' }));
+  const failing = ok(cwd, 'task', 'recheck', 't-001', '--notify');
+  assert.match(failing.stdout, /^warn {3}t-001 を 123 に知らせられませんでした（終了コード 3）/m);
+});
+
 test('recheck: ハッシュまで合わせた偽の証拠は task lint を通るが、取り直すと verify で落ちる', async () => {
   const { treeHash } = await import('../src/evidence.js');
   const cwd = project();

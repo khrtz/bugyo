@@ -134,6 +134,10 @@ const Config = z
       .object({ remote: z.string().min(1).optional() })
       .strict()
       .prefault({}),
+    notify: z
+      .object({ verified: z.string().trim().min(1).optional() })
+      .strict()
+      .prefault({}),
   })
   .strict();
 

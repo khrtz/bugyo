@@ -65,6 +65,13 @@ export interface BugyoConfig {
     /** id の予約と着手の記録（git の ref）を共有するリモート。書かなければ、同じマシンの worktree の間だけで共有する */
     remote?: string | undefined;
   };
+  notify: {
+    /**
+     * bugyo task recheck --notify が、証拠を取り直して通った課題つきのタスクごとに実行するコマンド。
+     * `{issue}`・`{task}`・`{evidence}` が置き換わる。手元の bugyo task done では実行しない
+     */
+    verified?: string | undefined;
+  };
 }
 
 export const configFile: string;

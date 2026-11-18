@@ -51,6 +51,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `status` | `open`（未着手）→ `active`（作業中）→ `done`（証拠つきで完了）。やめたものは `dropped` |
 | `type` | 変更の種類。完了に必要な証拠がこれで決まる |
 | `feature` | `docs/features/<id>.md` の `id`。どの機能を verify するかがこれで決まる |
+| `issue` | 任意。外の課題管理の参照（`123`、`PROJ-45`、課題の URL など）。CI で証拠を取り直して通ったとき、`notify.verified` のコマンドでここに知らせる |
 | `blocked-by` | 先に終わっている必要があるタスクの id（カンマ区切り） |
 | `assignee` | 作業中のエージェント名か人の名前 |
 | `rework` | 完了後に人が手直しした回数 |
@@ -70,7 +71,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 
 | コマンド | 使う人 | すること |
 | --- | --- | --- |
-| `bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--blocked-by <id,...>] [--body "<本文>"]` | 人・エージェント | タスクを作る。`--feature` が feature map になければ断る。`feature` `ui-flow` `ui-look` `logic` では `--feature` が必須。存在しない `--blocked-by` も断る |
+| `bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]` | 人・エージェント | タスクを作る。`--feature` が feature map になければ断る。`feature` `ui-flow` `ui-look` `logic` では `--feature` が必須。存在しない `--blocked-by` も断る。`--issue` は英数字と `# . _ : / -` だけ |
 | `bugyo task ready` | エージェント | 未着手で、`blocked-by` がすべて `done` のタスクを、作った順に出す |
 | `bugyo task start <id> --as <名前>` | エージェント | 作業中にする。すでに誰かが作業中なら断る。同じ名前で別のタスクが作業中のときも、`blocked-by` が終わっていないときも断る |
 | `bugyo task show <id>` | エージェント | 本文、読むべき feature map、完了に必要なものを出す |
@@ -81,7 +82,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `bugyo task release <id>` | 人 | 止まったエージェントの着手の記録を消す。台帳のファイルは変えない |
 | `bugyo task ls [--all]` | 人 | 一覧。`--all` で完了とやめたものも出す |
 | `bugyo task lint [--base <ref>]` | `pnpm check`・CI | 台帳の整合を検査する。`--base` なら、`<ref>...HEAD` で足したタスクのうち、`<ref>` にすでにある id の別のタスク（作った日時が違うもの）も見つける |
-| `bugyo task recheck [<id>...] [--base <ref>]` | CI | 完了タスクの証拠を取り直して照合する。`--base` なら `<ref>...HEAD` で `archive/` に追加・変更されたタスクが対象。証拠ファイルは書き換えない |
+| `bugyo task recheck [<id>...] [--base <ref>] [--notify]` | CI | 完了タスクの証拠を取り直して照合する。`--base` なら `<ref>...HEAD` で `archive/` に追加・変更されたタスクが対象。証拠ファイルは書き換えない。`--notify` なら、照合に通った `issue` つきのタスクを `notify.verified` のコマンドで知らせる |
 | `bugyo mistake ls` / `rule <種類> --at <パス>` | 人・エージェント | ミスの一覧と、ルール化したことの記録 |
 | `bugyo gate` | 人 | 任せる範囲を広げてよいかを計算する。合格で 0、不合格で 1 |
 
@@ -153,6 +154,28 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 
 動画やトレースは git に入れません。リポジトリに残すのは要約の JSON だけで、実物は手元の `artifacts/` と CI の成果物に置きます。
 
+### 課題に知らせる
+
+`issue` を付けたタスクは、CI で証拠を取り直して通ったときに、外の課題管理へ知らせられます。知らせるのは `bugyo task recheck --notify` だけで、手元の `done` では知らせません（手元の証拠は、CI で取り直すまで確かではないためです）。
+
+```json
+{ "notify": { "verified": "gh issue comment {issue} --body \"{task} の証拠を CI で取り直して確かめました（{evidence}）\"" } }
+```
+
+```yaml
+permissions:
+  contents: read
+  issues: write
+# …
+- run: npx bugyo task recheck --base "origin/${{ github.base_ref }}" --notify
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+- コマンドはシェルで実行します。`{issue}`・`{task}`・`{evidence}`（証拠ファイルの場所）が置き換わり、同じ値とタスクのタイトルが環境変数 `BUGYO_ISSUE`・`BUGYO_TASK`・`BUGYO_EVIDENCE`・`BUGYO_TITLE` にも入ります。タイトルはコマンドに埋め込まないので、環境変数から読みます
+- 知らせるのは照合に通ったタスクだけです。コマンドが失敗しても警告を出すだけで、`recheck` の合否は変わりません
+- 課題を閉じるかどうかは、このコマンドで決めます（コメントだけにするか、閉じるところまでするか）
+
 ## 設定
 
 `done` が実行するコマンド、ハッシュを取るパス、門番のしきい値は `.bugyo/config.json` で決めます。ファイルの置き場所と、確かめ方（`verify`・`featureMap`）の設定は [foundation.md](foundation.md#設定ファイルbugyoconfigjson) にあります。
@@ -175,6 +198,7 @@ CI は、その PR で閉じたタスク（`archive/` に追加・変更され�
 | `gate.maxDropped` | `2` | そのうち中止したタスクの上限 |
 | `gate.scopes` | 下の3つ | 作業の種類のまとまりごとの判定。`{ "<名前>": { "types": [...], "window"?: …, "maxRework"?: …, "minFirstPass"?: …, "maxDropped"?: … } }`。しきい値を省いたまとまりは上の値を使う |
 | `claims.remote` | なし | id の予約と着手の記録を共有するリモートの名前（例: `origin`）。書かなければ、同じマシンの worktree の間だけで共有する |
+| `notify.verified` | なし | `bugyo task recheck --notify` が、照合に通った `issue` つきのタスクごとに実行するコマンド（上の「課題に知らせる」） |
 
 - 既定値を使うのは、`commands` のキーそのものがないときだけです。`commands` があれば書かれたものだけを使い、そのタスクの種類に必要なコマンドが未定義か空なら `done` は断ります
 - **`.bugyo/config.json` を変えるのは人だけです。** コマンドを変えれば `done` の判定も変わるからです。エージェントはこのファイルを書き換えません。変えた跡が残るように、証拠ファイルには実行したコマンドの文字列（verify が中で実行したコマンドも）とハッシュを取ったパスをそのまま記録します

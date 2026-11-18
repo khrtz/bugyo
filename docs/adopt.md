@@ -123,6 +123,8 @@ npx bugyo task done t-001
 - run: npx bugyo task recheck --base "origin/${{ github.base_ref }}"
 ```
 
+外の課題管理を使っているなら、`task add --issue <参照>` で課題を結び、`recheck --notify` で、証拠を取り直して通ったことをその課題に知らせられます（[課題に知らせる](tasks.md#課題に知らせる)）。
+
 `.bugyo/config.json` を変えた PR に人の確認を求める仕組みは、このリポジトリの [config guard](../.github/workflows/config-guard.yml) を写して使えます。
 
 ## lint を段階的に入れる
