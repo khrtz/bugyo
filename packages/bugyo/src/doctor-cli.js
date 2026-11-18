@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { commonDir, featureParts, layerDirs, loadConfig } from './config.js';
+import { commonDir, dirsOfLayers, featureRoots, loadConfig, sourcesOf } from './config.js';
 import {
   baselineFile,
   baselineGrowth,
@@ -44,9 +44,16 @@ function parse(args) {
  */
 function dirsOf(cwd, option) {
   if (option !== undefined) return option.split(',').map((dir) => dir.trim()).filter((dir) => dir !== '');
-  const config = loadConfig(cwd);
-  const root = config.layers === undefined ? 'src' : commonDir(layerDirs(config));
-  return existsSync(join(cwd, root)) ? [root] : [];
+  return sourceRoots(loadConfig(cwd)).filter((root) => existsSync(join(cwd, root)));
+}
+
+/**
+ * ソースごとの、層のフォルダをまとめたフォルダ。layers も sources もなければ src。
+ *
+ * @param {import('./index.js').BugyoConfig} config
+ */
+function sourceRoots(config) {
+  return sourcesOf(config).map((source) => (source.custom ? commonDir(dirsOfLayers(source.layers)) : 'src'));
 }
 
 /** @param {Record<string, number>} counts */
@@ -66,9 +73,23 @@ export function doctorCommand(args, cwd = process.cwd()) {
   const tsc = values.tsconfig === undefined ? undefined : tscErrors(cwd, values.tsconfig);
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const config = loadConfig(cwd);
-  const outside = config.layers === undefined ? undefined : filesOutsideLayers(cwd, layerDirs(config), commonDir(layerDirs(config)));
-  const featuresDir = config.featureMap.featuresDir;
-  const parts = featuresDir === null ? undefined : featurePartsReport(cwd, featuresDir, featureParts(config));
+  const sources = sourcesOf(config);
+  const outside = sources.some((source) => source.custom)
+    ? sources.flatMap((source) => filesOutsideLayers(cwd, dirsOfLayers(source.layers), commonDir(dirsOfLayers(source.layers)))).sort()
+    : undefined;
+  const reports = featureRoots(config).flatMap(({ featuresDir, parts: roles }) => {
+    const report = featurePartsReport(cwd, featuresDir, roles);
+    return report === undefined ? [] : [{ roles, report }];
+  });
+  const parts =
+    reports.length === 0
+      ? undefined
+      : {
+          features: reports.reduce((sum, { report }) => sum + report.features, 0),
+          ui: reports.reduce((sum, { report }) => sum + report.ui, 0),
+          model: reports.reduce((sum, { report }) => sum + report.model, 0),
+          unassigned: reports.flatMap(({ report }) => report.unassigned).sort(),
+        };
   if (values.json) {
     console.log(JSON.stringify({ total, counts, warned, parseErrors, tsc, outsideLayers: outside, featureParts: parts, errors }));
   } else {
@@ -92,8 +113,8 @@ export function doctorCommand(args, cwd = process.cwd()) {
       if (parseErrors.length > 20) console.log(`  ほか ${parseErrors.length - 20}件（--json ですべて出ます）`);
     }
     if (parts !== undefined && parts.features > 0) {
-      const roles = featureParts(config);
-      console.log(`feature の中: ui の禁止が当たるファイル ${parts.ui}件（${roles.ui.join('・')}）、model の禁止が当たるファイル ${parts.model}件（${roles.model.join('・')}）`);
+      const names = (/** @type {'ui' | 'model'} */ role) => [...new Set(reports.flatMap(({ roles }) => roles[role]))].join('・');
+      console.log(`feature の中: ui の禁止が当たるファイル ${parts.ui}件（${names('ui')}）、model の禁止が当たるファイル ${parts.model}件（${names('model')}）`);
       const hint = parts.unassigned.length > 0;
       if (hint && parts.ui === 0) console.log('  ui の禁止が何にも当たっていません。下のフォルダが ui なら、layers.featureParts.ui に名前を書いてください');
       if (hint && parts.model === 0) console.log('  model の禁止が何にも当たっていません。下のフォルダが model なら、layers.featureParts.model に名前を書いてください');

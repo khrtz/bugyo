@@ -47,7 +47,7 @@ module.exports = require('@bugyo/lint/depcruise').config(); // React を使う�
 
 部品と禁止ごとに止めるものの一覧、設定項目、`defineBan` の書き方は [docs/foundation.md](../../docs/foundation.md) にあります。
 
-テストは、わざと違反した `.ts` だけのファイル（`test/fixture-node`）に対して共通と構成のルールと禁止がエラーを出すこと、既定の組み合わせに書き方の禁止と React 用のルールが入らないこと、`defineBan` の禁止が bugyo の禁止と同じ決まりで当たることを確かめます。`test/fixture-layers` は、層のフォルダ名、feature の中のフォルダ名、import の別名が既定と違うプロジェクトです。
+テストは、わざと違反した `.ts` だけのファイル（`test/fixture-node`）に対して共通と構成のルールと禁止がエラーを出すこと、既定の組み合わせに書き方の禁止と React 用のルールが入らないこと、`defineBan` の禁止が bugyo の禁止と同じ決まりで当たることを確かめます。`test/fixture-layers` は、層のフォルダ名、feature の中のフォルダ名、import の別名が既定と違うプロジェクトです。`test/fixture-sources` は、フロントとサーバーの2つのソースを、それぞれの tsconfig と部品で1つの設定にまとめたプロジェクトです。
 
 ```bash
 pnpm test

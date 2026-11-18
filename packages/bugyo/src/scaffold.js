@@ -246,6 +246,10 @@ export function newFeature(id, options = {}) {
       `${configFile} に layers があるので、new feature は雛形を作りません（雛形は src/features の形でしか作れないため）。${config.layers.features}/${id} を手で作り、docs/features/${id}.md を足してください`,
     );
   }
+  if (config.sources !== undefined) {
+    const dirs = Object.values(config.sources).map((source) => `${source.layers.features}/${id}`);
+    throw new Error(`${configFile} に sources があるので、new feature は雛形を作りません。${dirs.join('・')} のうち使うものを手で作り、docs/features/${id}.md を足してください`);
+  }
   const template = config.template ?? defaultTemplate;
   switch (template) {
     case 'react-vite':

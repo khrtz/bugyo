@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { featureParts, taskCommands } from './config.js';
+import { featureRoots, taskCommands } from './config.js';
 import { featureDir, loadFeatures, unfilledSections } from './feature-map.js';
 import { runCommand, tail } from './run.js';
 import { evidenceDir } from './tasks.js';
@@ -91,8 +91,9 @@ export function requirements(task, config) {
     const resolved = template?.replaceAll('{feature}', task.feature).replaceAll('{task}', task.id);
     return /** @type {Step} */ ({ kind: 'command', name, label: resolved ?? `commands.${name}（未設定）`, command: resolved });
   };
-  const featuresDir = config.featureMap.featuresDir ?? '機能のフォルダ';
-  const modelDirs = featureParts(config).model.map((name) => `${name}/`).join(' か ');
+  const modelDirs = featureRoots(config)
+    .flatMap(({ featuresDir, parts }) => parts.model.map((name) => `${featuresDir}/${task.feature}/${name}/`))
+    .join(' か ');
   switch (task.type) {
     case 'feature':
       return [{ kind: 'condition', name: 'feature-map', label: `${featureDir}/${task.feature}.md の4見出しを埋める` }, command('check'), command('test'), command('verify')];
@@ -101,7 +102,7 @@ export function requirements(task, config) {
     case 'ui-look':
       return [command('check'), command('verify')];
     case 'logic':
-      return [{ kind: 'condition', name: 'model-test', label: `${featuresDir}/${task.feature}/${modelDirs} にテストがある` }, command('check'), command('test')];
+      return [{ kind: 'condition', name: 'model-test', label: `${modelDirs || '機能のフォルダの model/'} にテストがある` }, command('check'), command('test')];
     case 'bugfix':
       return [
         { kind: 'condition', name: 'repro-recorded', label: 'repro の記録' },
@@ -135,7 +136,7 @@ function checkCondition(step, task, config, cwd) {
     }
     case 'model-test': {
       if (config.featureMap.featuresDir === null) return 'featureMap.featuresDir が null なので model/ を探せません';
-      const dirs = featureParts(config).model.map((name) => `${config.featureMap.featuresDir}/${task.feature}/${name}`);
+      const dirs = featureRoots(config).flatMap(({ featuresDir, parts }) => parts.model.map((name) => `${featuresDir}/${task.feature}/${name}`));
       return dirs.some((dir) => walk(cwd, dir).some((file) => testFilePattern.test(file))) ? null : `${dirs.join(' と ')} にテスト（*.test.*）がありません`;
     }
     case 'repro-recorded':

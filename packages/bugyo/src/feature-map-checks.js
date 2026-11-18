@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadConfig } from './config.js';
+import { featureRoots, loadConfig } from './config.js';
 import { featureDir, loadFeatures, loadSweepOrder, requiredSections } from './feature-map.js';
 import { runsOf } from './runners.js';
 
@@ -13,9 +13,12 @@ import { runsOf } from './runners.js';
  */
 export function featureMapChecks(options = {}) {
   const cwd = options.cwd ?? process.cwd();
-  const { featureMap: config, verify } = loadConfig(cwd);
-  const featuresDir =
-    options.featuresDir !== undefined ? options.featuresDir : options.src !== undefined ? `${options.src}/features` : config.featuresDir;
+  const loaded = loadConfig(cwd);
+  const { featureMap: config, verify } = loaded;
+  const override = options.featuresDir !== undefined ? options.featuresDir : options.src !== undefined ? `${options.src}/features` : undefined;
+  /** @type {(string | null)[]} */
+  const featuresDirs =
+    override !== undefined ? [override] : loaded.sources !== undefined ? featureRoots(loaded).map((root) => root.featuresDir) : [config.featuresDir];
   const specDir = options.specDir !== undefined ? options.specDir : config.specDir;
   const specSuffix = options.specSuffix ?? config.specSuffix;
   const features = loadFeatures(cwd);
@@ -69,7 +72,7 @@ export function featureMapChecks(options = {}) {
           .map((spec) => `${spec} に対応する ${featureDir}/*.md がありません`);
       },
     },
-    {
+    ...featuresDirs.map((featuresDir) => ({
       title: `${featuresDir ?? '機能のフォルダ'} のフォルダがすべて feature map に載っている`,
       skip: missing(featuresDir),
       problems: () => {
@@ -78,7 +81,7 @@ export function featureMapChecks(options = {}) {
           .filter((dir) => !ids.has(dir))
           .map((dir) => `${featuresDir}/${dir} に対応する ${featureDir}/${dir}.md がありません`);
       },
-    },
+    })),
     {
       title: 'README の回帰の順番に、すべての機能がちょうど1回ずつ載っている',
       skip: null,

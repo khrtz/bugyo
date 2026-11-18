@@ -71,6 +71,20 @@ export interface BugyoConfig {
         featureParts: { ui: string[]; api: string[]; model: string[] };
       }
     | undefined;
+  /**
+   * 層の決まりを当てるソースがいくつもあるとき（フロントとサーバーなど）の、ソースごとの場所。layers とは一緒に書けない。
+   * 台帳と feature map は1つのままで、同じ id の機能のフォルダは、どのソースにあっても同じ機能として扱う
+   */
+  sources?:
+    | Record<
+        string,
+        {
+          src: string;
+          layers: NonNullable<BugyoConfig['layers']>;
+          tsconfig?: string | undefined;
+        }
+      >
+    | undefined;
   /** bugyo task done が実行するコマンド。このキーがないときだけ、packageManager に合わせた既定値（pnpm なら pnpm check / pnpm test / bugyo verify {feature}）を使う */
   commands?: { check?: string | undefined; test?: string | undefined; verify?: string | undefined } | undefined;
   evidence: {

@@ -36,7 +36,7 @@ function config(options = {}) {
     layers === undefined
       ? {
           features: `${s}/features`,
-          app: `${s}/app`,
+          app: `^${s}/app/`,
           shared: `${s}/shared`,
           sharedTo: `^${s}/(features|app)/`,
           modelTo: `^${s}/(features|shared/(ui|api)|app)/`,
@@ -51,14 +51,15 @@ function config(options = {}) {
           const sharedModel = dirs(layers.shared?.model, []);
           const other = dirs(layers.shared?.other, []);
           const impure = [...ui, ...api, ...other];
+          const impureTo = `^(${any([features, ...impure])}/|${app}(/|$))`;
           return {
             features,
-            app,
+            app: `^${app}(/|$)`,
             shared: any([...ui, ...api, ...lib, ...sharedModel, ...other]),
-            sharedTo: `^(${features}|${app})/`,
-            modelTo: `^${any([features, ...impure, app])}/`,
+            sharedTo: `^(${features}/|${app}(/|$))`,
+            modelTo: impureTo,
             model: any((layers.featureParts?.model ?? ['model']).map(escape)),
-            ...(sharedModel.length === 0 ? {} : { sharedModel: any(sharedModel), sharedModelTo: `^${any([features, ...impure, app])}/` }),
+            ...(sharedModel.length === 0 ? {} : { sharedModel: any(sharedModel), sharedModelTo: impureTo }),
           };
         })();
   const reactLibs = '(^|/)node_modules/(react|react-dom|@tanstack)/';
@@ -85,7 +86,7 @@ function config(options = {}) {
         name: 'app-only-via-feature-index',
         severity: 'error',
         comment: 'app は features/<名前>/index.ts だけをimportできます。',
-        from: { path: `^${p.app}/` },
+        from: { path: p.app },
         to: { path: `^${p.features}/[^/]+/.+`, pathNot: `^${p.features}/[^/]+/index[.]ts$` },
       },
       {
@@ -100,7 +101,7 @@ function config(options = {}) {
         severity: 'error',
         comment: 'features は app に依存できません。',
         from: { path: `^${p.features}/` },
-        to: { path: `^${p.app}/` },
+        to: { path: p.app },
       },
       {
         name: 'model-is-pure',

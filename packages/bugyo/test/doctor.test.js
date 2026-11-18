@@ -204,6 +204,57 @@ test('layers: shared の各値は配列でも書け、model と other の場所�
   assert.throws(() => loadConfig(cwd), /config\.json が不正です/);
 });
 
+const sources = {
+  web: { src: 'web', layers: { featureParts: { ui: ['components'] } } },
+  server: { src: 'server/src', tsconfig: 'server/tsconfig.json' },
+};
+const sourceFiles = [
+  'web/app/main.tsx',
+  'web/features/invoices/components/List.tsx',
+  'web/legacy.ts',
+  'server/src/app/main.ts',
+  'server/src/features/invoices/model/total.ts',
+  'server/src/features/invoices/model/total.test.ts',
+  'server/src/scripts/seed.ts',
+];
+
+test('sources: doctor はソースごとに、どの層にも入っていないファイルと feature の中のフォルダを見る', () => {
+  const cwd = project();
+  setResults(cwd, {});
+  withFiles(cwd, { sources }, sourceFiles);
+  const run = bugyo(cwd, 'doctor', '--json');
+  assert.equal(run.status, 0, run.all);
+  const report = JSON.parse(run.all);
+  assert.deepEqual(report.outsideLayers, ['server/src/scripts/seed.ts', 'web/legacy.ts']);
+  assert.deepEqual(report.featureParts, { features: 2, ui: 1, model: 2, unassigned: [] });
+});
+
+test('sources: 同じ id の機能は1つとして扱い、logic のテストはどのソースの model にあってもよい', async () => {
+  const { loadConfig, featureRoots } = await import('../src/config.js');
+  const { requirements } = await import('../src/evidence.js');
+  const cwd = project();
+  withFiles(cwd, { sources }, sourceFiles);
+  const config = loadConfig(cwd);
+  assert.deepEqual(
+    featureRoots(config).map((root) => root.featuresDir),
+    ['web/features', 'server/src/features'],
+  );
+  const task = /** @type {any} */ ({ id: 't1', type: 'logic', feature: 'invoices' });
+  assert.equal(requirements(task, config)[0]?.label, 'web/features/invoices/model/ か server/src/features/invoices/model/ にテストがある');
+  const run = bugyo(cwd, 'new', 'feature', 'payments');
+  assert.equal(run.status, 1);
+  assert.match(run.all, /sources があるので.*web\/features\/payments・server\/src\/features\/payments/);
+});
+
+test('sources: layers と一緒に書いたり、src が重なったりする設定は断る', async () => {
+  const { loadConfig } = await import('../src/config.js');
+  for (const config of [{ sources, layers }, { sources: { a: { src: 'web' }, b: { src: 'web/admin' } } }, { sources: {} }, { sources: { Web: { src: 'web' } } }]) {
+    const cwd = project();
+    withFiles(cwd, config, []);
+    assert.throws(() => loadConfig(cwd), /config\.json/, JSON.stringify(config));
+  }
+});
+
 test('doctor は構文エラーのファイルと場所とメッセージを出す', () => {
   const cwd = project();
   setResults(cwd, { [join(cwd, 'src', 'broken.ts')]: [{ ruleId: null, message: 'Parsing error: Unexpected token', line: 3 }] });
@@ -273,7 +324,7 @@ test('featureParts: logic タスクのテストは、model の役割のどのフ
   withFiles(cwd, { layers: { featureParts: { model: ['lib', 'domain'] } } }, []);
   const config = loadConfig(cwd);
   const task = /** @type {any} */ ({ id: 't1', type: 'logic', feature: 'billing' });
-  assert.equal(requirements(task, config)[0]?.label, 'src/features/billing/lib/ か domain/ にテストがある');
+  assert.equal(requirements(task, config)[0]?.label, 'src/features/billing/lib/ か src/features/billing/domain/ にテストがある');
 });
 
 test('layers: 機能のフォルダの既定は layers.features になり、new feature は雛形を作らず断る', async () => {

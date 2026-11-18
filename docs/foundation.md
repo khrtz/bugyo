@@ -190,6 +190,93 @@ feature の中のフォルダが `ui/`・`api/`・`model/` でないプロジェ
 
 `bugyo doctor` は、feature の中のどの役割にも入っていないフォルダと、`ui` と `model` の禁止が当たるファイルの数を出します。数が0なら、フォルダ名が役割と合っておらず、その禁止は何にも効いていません。
 
+#### ソースをいくつも置く
+
+1つのリポジトリに、層の決まりを当てるソースがいくつもあるとき（フロントとサーバーなど）は、ソースごとに場所と部品を分けます。台帳と feature map は1つのままです。
+
+```json
+{
+  "sources": {
+    "web": { "src": "web", "layers": { "featureParts": { "ui": ["components", "hooks"], "model": ["lib"] } } },
+    "server": { "src": "server/src", "tsconfig": "server/tsconfig.json" }
+  }
+}
+```
+
+```js
+// eslint.config.js
+import { readFileSync } from 'node:fs';
+import { bugyo, common, fetchOnlyInApi, structure } from '@bugyo/lint';
+import { noUseEffect, react } from '@bugyo/lint-react';
+
+const { sources } = JSON.parse(readFileSync(new URL('./.bugyo/config.json', import.meta.url), 'utf8'));
+export default bugyo({
+  root: import.meta.dirname,
+  sources: [
+    { ...sources.web, parts: [common, structure, react, fetchOnlyInApi, noUseEffect] },
+    { ...sources.server, parts: [common, structure] },
+  ],
+});
+```
+
+- `sources` の各ソースには `src`・`layers`・`tsconfig`（import の解決に使う tsconfig。既定は `tsconfig.json`）を書きます。`layers` で書かなかった場所は `<src>/app` などで埋まります。`.bugyo/config.json` では、`sources` と `layers` は一緒に書けません
+- ESLint では、ソースごとに `parts`・`explicitExtensions`・`effectHooksDir`・`apiClientDir` も書けます。`sources` を使うときは、これらを外に書きません。`root`・`ignores`・`severity` は全体に1つです
+- 禁止と層の境界は、そのソースの `src` の下にだけ当たります。同じ名前の禁止を、別々のソースに入れられます。部品の、src の外にも当てるルール（`common` の型の検査など）は、どれかのソースに入っていれば全体に1回だけ当てます
+- ソースの `src` は重ねられません（`web` と `web/admin` など）
+- 同じ id の機能のフォルダは、どのソースにあっても同じ機能です。どのソースの機能のフォルダにも `docs/features/<id>.md` が要ります。`logic` タスクの「model にテストがある」は、どれかのソースの model にテストがあれば通ります
+- `bugyo doctor` は、どの層にも入っていないファイルと feature の中のフォルダを、ソースごとに見ます。`bugyo new feature` は雛形を作らずに断ります
+- HTTP サーバーのソースの例は、下の「サーバーの層」です
+- dependency-cruiser は1つの設定で1つの tsconfig しか使えないので、ソースごとに設定ファイルを分けて `config({ src, layers, tsConfig })` を呼びます。`bugyo doctor` と `bugyo baseline` が数えるのは、プロジェクトのルートの `.dependency-cruiser.cjs` の1つだけです
+
+#### サーバーの層
+
+HTTP サーバーも、同じ層と禁止で書けます。入口のファイル（ルートのマウントと全体にかかるミドルウェア）を `app` に、ミドルウェアやデータベースの置き場を `shared.other` に置きます。
+
+```json
+{
+  "sources": {
+    "server": {
+      "src": "server/src",
+      "tsconfig": "server/tsconfig.json",
+      "layers": {
+        "app": "server/src/app.ts",
+        "features": "server/src/features",
+        "shared": { "ui": "server/src/views", "api": "server/src/http", "lib": "server/src/lib", "other": ["server/src/middleware", "server/src/db"] },
+        "featureParts": { "ui": ["routes"], "api": ["services"], "model": ["model"] }
+      }
+    }
+  }
+}
+```
+
+| 決まり | 書き方 |
+| --- | --- |
+| `app.ts` からは feature の `index.ts` だけを使う | `app` をファイルにする（`structure` の境界と、dependency-cruiser の `app-only-via-feature-index` がそのまま当たる） |
+| `middleware` と `db` は features に依存しない | `shared.other` に置く |
+| リクエストの本文を読むのは、決めた入口だけ | 下の `readBody` の禁止 |
+| データベースのクライアントを直接 import するのは、features か services だけ | 下の `db-client` の禁止 |
+
+```js
+const readBody = defineBan({
+  name: 'read-body',
+  allow: ['server/src/http/body.ts', 'tests'],
+  syntax: [
+    {
+      selector: "CallExpression[callee.property.name=/^(json|text|formData|parseBody)$/][callee.object.property.name='req']",
+      message: 'リクエストの本文は server/src/http/body.ts の readBody(c, schema) で読んでください',
+    },
+  ],
+});
+
+const dbClient = defineBan({
+  name: 'db-client',
+  allow: ['server/src/db', 'server/src/features', 'tests'],
+  imports: { patterns: [{ group: ['**/db/client', '**/db/client.ts'], message: 'データベースのクライアントは features か services からだけ使ってください' }] },
+});
+```
+
+`shared` の `ui`・`api`・`lib` は空にできないので、使わない役割にも、フォルダを1つ書きます（なくても動きます）。
+
 ### 独自の禁止を足す
 
 独自の禁止は `defineBan` で作り、`parts` に bugyo の禁止と並べて渡します。bugyo の禁止も同じ形で書かれていて、名前・止める範囲・許す場所の決まりも、`severity` で warn に下げられることも同じです。
@@ -473,6 +560,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
 | `verify.command` | なし | `command` で動かすときは必須 |
 | `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |
+| `sources` | なし | ソースごとの `src`・`layers`・`tsconfig`。`layers` とは一緒に書けない（上の「ソースをいくつも置く」） |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |

@@ -1,0 +1,15 @@
+{
+  "sources": {
+    "web": { "src": "web" },
+    "server": {
+      "src": "server/src",
+      "tsconfig": "server/tsconfig.json",
+      "layers": {
+        "app": "server/src/app.ts",
+        "features": "server/src/features",
+        "shared": { "ui": "server/src/views", "api": "server/src/http", "lib": "server/src/lib", "other": ["server/src/middleware", "server/src/db"] },
+        "featureParts": { "ui": ["routes"], "api": ["services"], "model": ["model"] }
+      }
+    }
+  }
+}
