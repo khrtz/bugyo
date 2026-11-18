@@ -360,7 +360,38 @@ test('gate: 同じ種類の手直しを2回記録すると不合格になり、�
   assert.match(ok(cwd, 'gate').stdout, /^gate: 合格/);
 
   ok(cwd, 'task', 'rework', 't-003', '-r', 'また深い import', '--kind', 'deep-import');
-  assert.match(ok(cwd, 'mistake', 'ls').stdout, /^deep-import 3回 {2}ルール: scripts\/check\.js {2}← ルールが漏れている/m);
+  assert.match(ok(cwd, 'mistake', 'ls').stdout, /^deep-import 3回 {2}ルール: scripts\/check\.js {2}ルール化のとき 2回 {2}← ルールが漏れている/m);
+});
+
+test('mistake ls は、ルール化済みの種類の数と、ルールの名前を出す', () => {
+  const cwd = project();
+  for (const title of ['a', 'b']) ok(cwd, 'task', 'add', title, '--type', 'chore');
+  for (const [id, who] of [['t-001', 'w1'], ['t-002', 'w2']]) {
+    ok(cwd, 'task', 'start', id, '--as', who);
+    ok(cwd, 'task', 'done', id);
+  }
+  for (const [id, kind] of [['t-001', 'deep-import'], ['t-002', 'deep-import'], ['t-001', 'date-now'], ['t-002', 'wrong-name']]) {
+    ok(cwd, 'task', 'rework', id, '-r', `${kind} のミス`, '--kind', kind);
+    ok(cwd, 'task', 'done', id);
+  }
+  const bad = bugyo(cwd, 'mistake', 'rule', 'date-now', '--at', 'scripts/check.js', '--name', 'no date now');
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /ルールの名前 no date now は/);
+  ok(cwd, 'mistake', 'rule', 'date-now', '--at', 'scripts/check.js', '--name', 'clock');
+  ok(cwd, 'task', 'rework', 't-001', '-r', 'また Date.now', '--kind', 'date-now');
+
+  const lines = ok(cwd, 'mistake', 'ls').stdout.trim().split('\n');
+  assert.deepEqual(lines, [
+    'date-now 2回  ルール: clock（scripts/check.js）  ルール化のとき 1回  ← ルールが漏れている（ルール化のあとにまた起きた）',
+    'deep-import 2回  ルール: なし  ← ルール化が必要',
+    'wrong-name 1回  ルール: なし',
+    'ミス 3種類  ルール化済み 1種類（うちルールが漏れている 1種類）  ルール化が必要 1種類  1回だけ 1種類',
+  ]);
+  const json = JSON.parse(ok(cwd, 'mistake', 'ls', '--json').stdout);
+  assert.deepEqual(json.summary, { kinds: 3, ruled: 1, leak: 1, unruled: 1, once: 1 });
+  assert.deepEqual(json.mistakes[0], { kind: 'date-now', count: 2, rule: 'scripts/check.js', ruleName: 'clock', ruledCount: 1, state: 'leak' });
+  assert.deepEqual(json.mistakes[1], { kind: 'deep-import', count: 2, rule: '', state: 'unruled' });
+  assert.match(readFileSync(join(cwd, '.bugyo', 'mistakes', 'date-now.md'), 'utf8'), /^rule: scripts\/check\.js\nrule-name: clock\nruled-count: 1$/m);
 });
 
 test('gate: 件数が判定に足りないときと、1回で通った割合の区間が広いときに警告を出す', () => {
