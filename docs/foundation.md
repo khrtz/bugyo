@@ -536,12 +536,44 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | `command` | `runner` が `command` のときのコマンド（必須）。`{id}` と `{spec}` が置き換わる |
 | `env` | そのときだけ足す環境変数 |
 | `match` | この確かめ方で動かす spec の glob（1つか配列） |
+| `evidence` | `runner` が `command` のとき、実行が書くはずの証拠のファイルの glob の配列。`{id}` と `{spec}` が置き換わる（下の「証拠のファイル」） |
+| `requires` | `"sandbox"` なら、`verify.sandbox` のコマンドが通るときだけ動かす（下の「隔離環境でだけ動かす」） |
 
 - frontmatter の `spec` には、確かめるファイルを `,` で区切っていくつも書けます。spec のパスに使えるのは英数字と `. _ @ + / -` だけです
 - spec ごとの確かめ方は、frontmatter の `runner`（その機能のすべての spec に使う）、`match` に当たる確かめ方、`verify.runner` の順に決まります。知らない名前、2つの `match` に当たる spec は、動かす前に断ります（終了コード 2。`pnpm test` の feature map の検査でも出ます）
 - Playwright は確かめ方ごとに1回実行します。`verify.runner` の確かめ方の証拠は今までの場所に、ほかの確かめ方の証拠は `artifacts/<名前>/` の下（`test-results`・`report`・`results.json`）に置きます
 - 機能は、そのすべての spec が通ったときに `PASS` です。`artifacts/verify.json` には、spec ごとの確かめ方と合否（`runs`）も書きます
 - `playwright`・`command`・`report`・`test-results`・`verify` は名前に使えません
+
+#### 証拠のファイル
+
+`command` の確かめ方は、終了コードしか見ません。スクリーンショットなど、実行が残すはずのファイルがあるなら、`evidence` に glob で書きます。
+
+```json
+{ "runners": { "desktop": { "runner": "command", "command": "node scripts/shoot.js {id}", "evidence": ["artifacts/screens/{id}/*.png"] } } }
+```
+
+- 実行が始まってから書かれた、glob に当たるファイルが1つもなければ、終了コードが 0 でも `FAIL` です。前の実行で残ったファイルは数えません（ファイルの時刻で見ます。時刻の粗いファイルシステムのぶん、始まる2秒前までは数えます）
+- 見つかったファイルは、パスと中身のハッシュ（sha256）を `artifacts/verify.json` の機能ごとの `files` に書き、`証拠:` の行にも出します。`bugyo task done` の証拠には `verify.json` がそのまま入るので、ハッシュも残ります
+- glob に当たるファイルを verify が消すことはありません
+- Playwright の確かめ方には書けません（証拠を決まった場所に残すため）
+
+#### 隔離環境でだけ動かす
+
+実際のファイルや外のサービスに触る確かめ方は、隔離環境（コンテナや使い捨ての VM など）でだけ動かせます。隔離環境かどうかを確かめるコマンドを `verify.sandbox` に書き、確かめ方に `"requires": "sandbox"` を付けます。
+
+```json
+{
+  "verify": {
+    "sandbox": "node scripts/in-sandbox.js",
+    "runners": { "desktop": { "runner": "command", "command": "node scripts/shoot.js {id}", "requires": "sandbox" } }
+  }
+}
+```
+
+- `requires: "sandbox"` の確かめ方を動かす前に、`verify.sandbox` を1回だけ実行します。終了コードが 0 でなければ、その確かめ方は動かさずに `FAIL` にします（飛ばして通すことはしません）。`bugyo task done` も通りません
+- どれを隔離環境で動かすかは設定にだけ書けます。feature map の frontmatter では変えられません
+- `requires: "sandbox"` があるのに `verify.sandbox` がなければ、設定を読むときに断ります
 
 ## 設定ファイル（`.bugyo/config.json`）
 
@@ -560,6 +592,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
 | `verify.command` | なし | `command` で動かすときは必須 |
 | `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |
+| `verify.sandbox` | なし | 隔離環境かどうかを確かめるコマンド。`requires: "sandbox"` の確かめ方の前に実行する（上の「隔離環境でだけ動かす」） |
 | `sources` | なし | ソースごとの `src`・`layers`・`tsconfig`。`layers` とは一緒に書けない（上の「ソースをいくつも置く」） |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |

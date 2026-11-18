@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -137,6 +138,69 @@ test('runners: 設定の誤りは読むときに断る', () => {
     setVerify(cwd, verify);
     assert.throws(() => loadConfig(cwd), /config\.json/, JSON.stringify(verify));
   }
+});
+
+/** 引数の数だけ artifacts/screens/<id>/ に画像の代わりのファイルを書くスクリプト */
+const screenshotCheck = `const { mkdirSync, writeFileSync } = require('node:fs');\nconst [id, count] = process.argv.slice(2);\nmkdirSync('artifacts/screens/' + id, { recursive: true });\nfor (let i = 0; i < Number(count); i += 1) writeFileSync('artifacts/screens/' + id + '/' + i + '.png', 'shot ' + i);\n`;
+
+test('evidence: 証拠のファイルの glob を書くと、ハッシュと一緒に残し、1つもなければ終了コードが 0 でも FAIL', () => {
+  const cwd = plainProject();
+  writeFileSync(join(cwd, 'checks/shots.cjs'), screenshotCheck);
+  const withCount = (/** @type {number} */ count) =>
+    setVerify(cwd, { runner: 'shots', runners: { shots: { runner: 'command', command: `node checks/shots.cjs {id} ${count}`, evidence: ['artifacts/screens/{id}/*.png'] } } });
+
+  withCount(2);
+  const run = bugyo(cwd, 'verify', 'greet');
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.match(run.stdout, /証拠: artifacts\/verify\/greet\.log, artifacts\/screens\/greet\/0\.png, artifacts\/screens\/greet\/1\.png/);
+  const summary = JSON.parse(readFileSync(join(cwd, 'artifacts/verify.json'), 'utf8'));
+  const sha = (/** @type {string} */ text) => createHash('sha256').update(text).digest('hex');
+  assert.deepEqual(summary.features[0].files, [
+    { path: 'artifacts/screens/greet/0.png', sha256: sha('shot 0') },
+    { path: 'artifacts/screens/greet/1.png', sha256: sha('shot 1') },
+  ]);
+
+  rmSync(join(cwd, 'artifacts/screens'), { recursive: true });
+  withCount(0);
+  const none = bugyo(cwd, 'verify', 'greet');
+  assert.equal(none.status, 1);
+  assert.match(none.stdout, /^FAIL greet/);
+  assert.match(none.stdout, /証拠のファイルがありません（artifacts\/screens\/greet\/\*\.png/);
+});
+
+test('evidence: 前の実行で残ったファイルは、今回の証拠にならない', () => {
+  const cwd = plainProject();
+  writeFileSync(join(cwd, 'checks/shots.cjs'), screenshotCheck);
+  mkdirSync(join(cwd, 'artifacts/screens/greet'), { recursive: true });
+  writeFileSync(join(cwd, 'artifacts/screens/greet/old.png'), 'old');
+  const old = new Date(Date.now() - 60_000);
+  utimesSync(join(cwd, 'artifacts/screens/greet/old.png'), old, old);
+  setVerify(cwd, { runner: 'shots', runners: { shots: { runner: 'command', command: 'node checks/shots.cjs {id} 0', evidence: ['artifacts/screens/{id}/*.png'] } } });
+  const run = bugyo(cwd, 'verify', 'greet');
+  assert.equal(run.status, 1, run.stdout);
+  assert.ok(existsSync(join(cwd, 'artifacts/screens/greet/old.png')), 'evidence の glob に当たるファイルは消さない');
+});
+
+test('sandbox: 隔離環境が要る確かめ方は、verify.sandbox のコマンドが通るときだけ動かし、通らなければ FAIL', () => {
+  const cwd = plainProject();
+  writeFileSync(join(cwd, 'checks/sandbox.cjs'), "process.exit(process.env.IN_SANDBOX === '1' ? 0 : 3);\n");
+  writeFileSync(join(cwd, 'checks/greet.js'), `(await import('node:fs')).writeFileSync('ran.txt', 'ran');\n${readFileSync(join(cwd, 'checks/greet.js'), 'utf8')}`);
+  setVerify(cwd, { runner: 'isolated', sandbox: 'node checks/sandbox.cjs', runners: { isolated: { runner: 'command', command: 'node {spec}', requires: 'sandbox' } } });
+
+  const outside = bugyo(cwd, 'verify', 'greet');
+  assert.equal(outside.status, 1);
+  assert.match(outside.stdout, /^FAIL greet/);
+  assert.match(outside.stdout, /隔離環境ではないので.*isolated.*node checks\/sandbox\.cjs が終了コード 3/);
+  assert.ok(!existsSync(join(cwd, 'ran.txt')), '隔離環境でなければ動かさない');
+
+  const inside = spawnSync(process.execPath, [bin, 'verify', 'greet'], { cwd, encoding: 'utf8', env: { ...process.env, IN_SANDBOX: '1' } });
+  assert.equal(inside.status, 0, inside.stdout + inside.stderr);
+  assert.ok(existsSync(join(cwd, 'ran.txt')));
+
+  setVerify(cwd, { runner: 'isolated', runners: { isolated: { runner: 'command', command: 'node {spec}', requires: 'sandbox' } } });
+  assert.throws(() => loadConfig(cwd), /verify\.sandbox/);
+  setVerify(cwd, { runner: 'playwright', runners: { e2e: { runner: 'playwright', evidence: ['x/*.png'] } } });
+  assert.throws(() => loadConfig(cwd), /evidence は、runner が "command"/);
 });
 
 test('spec にはコマンドに入れて困る文字を書けない', () => {
