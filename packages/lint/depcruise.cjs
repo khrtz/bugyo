@@ -14,7 +14,7 @@
  *   layers?: {
  *     app?: string,
  *     features?: string,
- *     shared?: { ui?: string, api?: string, lib?: string },
+ *     shared?: { ui?: string | string[], api?: string | string[], lib?: string | string[], model?: string | string[], other?: string | string[] },
  *     featureParts?: { ui?: string[], api?: string[], model?: string[] },
  *   },
  * }} [options]
@@ -25,7 +25,13 @@ function config(options = {}) {
   const escape = (/** @type {string} */ text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const s = escape(src);
   const layers = options.layers;
-  const dir = (/** @type {string | undefined} */ value, /** @type {string} */ fallback) => escape((value ?? `${src}/${fallback}`).replace(/^\.\//, '').replace(/\/+$/, ''));
+  const trim = (/** @type {string} */ path) => escape(path.replace(/^\.\//, '').replace(/\/+$/, ''));
+  const dir = (/** @type {string | undefined} */ value, /** @type {string} */ fallback) => trim(value ?? `${src}/${fallback}`);
+  /** @returns {string[]} */
+  const dirs = (/** @type {string | string[] | undefined} */ value, /** @type {string[]} */ fallback) =>
+    value === undefined ? fallback.map(trim) : (typeof value === 'string' ? [value] : value).map(trim);
+  const any = (/** @type {string[]} */ list) => `(${list.join('|')})`;
+  /** @type {{ features: string, app: string, shared: string, sharedTo: string, modelTo: string, model: string, sharedModel?: string, sharedModelTo?: string }} */
   const p =
     layers === undefined
       ? {
@@ -39,18 +45,23 @@ function config(options = {}) {
       : (() => {
           const features = dir(layers.features, 'features');
           const app = dir(layers.app, 'app');
-          const ui = dir(layers.shared?.ui, 'shared/ui');
-          const api = dir(layers.shared?.api, 'shared/api');
-          const lib = dir(layers.shared?.lib, 'shared/lib');
+          const ui = dirs(layers.shared?.ui, [`${src}/shared/ui`]);
+          const api = dirs(layers.shared?.api, [`${src}/shared/api`]);
+          const lib = dirs(layers.shared?.lib, [`${src}/shared/lib`]);
+          const sharedModel = dirs(layers.shared?.model, []);
+          const other = dirs(layers.shared?.other, []);
+          const impure = [...ui, ...api, ...other];
           return {
             features,
             app,
-            shared: `(${ui}|${api}|${lib})`,
+            shared: any([...ui, ...api, ...lib, ...sharedModel, ...other]),
             sharedTo: `^(${features}|${app})/`,
-            modelTo: `^(${features}|${ui}|${api}|${app})/`,
-            model: `(${(layers.featureParts?.model ?? ['model']).map(escape).join('|')})`,
+            modelTo: `^${any([features, ...impure, app])}/`,
+            model: any((layers.featureParts?.model ?? ['model']).map(escape)),
+            ...(sharedModel.length === 0 ? {} : { sharedModel: any(sharedModel), sharedModelTo: `^${any([features, ...impure, app])}/` }),
           };
         })();
+  const reactLibs = '(^|/)node_modules/(react|react-dom|@tanstack)/';
   return {
     forbidden: [
       {
@@ -97,10 +108,21 @@ function config(options = {}) {
         comment: 'model/ が使えるのは自分のmodel、shared/lib、純粋なライブラリだけです。',
         from: { path: `^${p.features}/([^/]+)/${p.model}/` },
         to: {
-          path: react ? `(${p.modelTo}|(^|/)node_modules/(react|react-dom|@tanstack)/)` : p.modelTo,
+          path: react ? `(${p.modelTo}|${reactLibs})` : p.modelTo,
           pathNot: `^${p.features}/$1/${p.model}/`,
         },
       },
+      ...(p.sharedModel === undefined || p.sharedModelTo === undefined
+        ? []
+        : [
+            {
+              name: 'shared-model-is-pure',
+              severity: 'error',
+              comment: '共有の model が使えるのは shared の lib と model、純粋なライブラリだけです。',
+              from: { path: `^${p.sharedModel}/` },
+              to: { path: react ? `(${p.sharedModelTo}|${reactLibs})` : p.sharedModelTo },
+            },
+          ]),
       {
         name: 'not-to-unresolvable',
         severity: 'error',

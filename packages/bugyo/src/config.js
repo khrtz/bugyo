@@ -25,6 +25,10 @@ const LayerDir = z
   .min(1)
   .regex(/^(?!\.{1,2}(\/|$))(?!\/)[^\\]*[^/\\]$/,'プロジェクトのルートからの相対パス（先頭の ./ や末尾の / なし、区切りは /）にしてください');
 
+/** shared の場所。1つなら文字列、いくつもあれば配列で書ける */
+const SharedDirs = z.union([LayerDir.transform((dir) => [dir]), z.array(LayerDir).min(1)]);
+const OptionalDirs = z.union([LayerDir.transform((dir) => [dir]), z.array(LayerDir)]);
+
 const PartName = z
   .string()
   .regex(/^[A-Za-z0-9._-]+$/, 'feature の中のフォルダ名（/ を含まない）にしてください')
@@ -35,7 +39,7 @@ const PartNames = z.array(PartName).min(1);
 export const defaultLayers = Object.freeze({
   app: 'src/app',
   features: 'src/features',
-  shared: Object.freeze({ ui: 'src/shared/ui', api: 'src/shared/api', lib: 'src/shared/lib' }),
+  shared: Object.freeze({ ui: ['src/shared/ui'], api: ['src/shared/api'], lib: ['src/shared/lib'], model: [], other: [] }),
   featureParts: Object.freeze({ ui: ['ui'], api: ['api'], model: ['model'] }),
 });
 
@@ -43,7 +47,10 @@ const Layers = z
   .object({
     app: LayerDir.optional(),
     features: LayerDir.optional(),
-    shared: z.object({ ui: LayerDir.optional(), api: LayerDir.optional(), lib: LayerDir.optional() }).strict().optional(),
+    shared: z
+      .object({ ui: SharedDirs.optional(), api: SharedDirs.optional(), lib: SharedDirs.optional(), model: OptionalDirs.optional(), other: OptionalDirs.optional() })
+      .strict()
+      .optional(),
     featureParts: z
       .object({ ui: PartNames.optional(), api: PartNames.optional(), model: PartNames.optional() })
       .strict()
@@ -58,9 +65,11 @@ const Layers = z
     app: layers.app ?? defaultLayers.app,
     features: layers.features ?? defaultLayers.features,
     shared: {
-      ui: layers.shared?.ui ?? defaultLayers.shared.ui,
-      api: layers.shared?.api ?? defaultLayers.shared.api,
-      lib: layers.shared?.lib ?? defaultLayers.shared.lib,
+      ui: layers.shared?.ui ?? [...defaultLayers.shared.ui],
+      api: layers.shared?.api ?? [...defaultLayers.shared.api],
+      lib: layers.shared?.lib ?? [...defaultLayers.shared.lib],
+      model: layers.shared?.model ?? [],
+      other: layers.shared?.other ?? [],
     },
     featureParts: {
       ui: layers.featureParts?.ui ?? [...defaultLayers.featureParts.ui],
@@ -207,13 +216,15 @@ export function loadConfig(cwd = process.cwd()) {
 }
 
 /**
- * 層のフォルダの一覧（app・features・shared の ui / api / lib）。`layers` がなければ src の下の既定の場所。
+ * 層のフォルダの一覧（app・features・shared の ui / api / lib / model / other）。`layers` がなければ src の下の既定の場所。
  *
  * @param {import('./index.js').BugyoConfig} config
+ * @returns {string[]}
  */
 export function layerDirs(config) {
   const layers = config.layers ?? defaultLayers;
-  return [layers.app, layers.features, layers.shared.ui, layers.shared.api, layers.shared.lib];
+  const { shared } = layers;
+  return [layers.app, layers.features, ...shared.ui, ...shared.api, ...shared.lib, ...shared.model, ...shared.other];
 }
 
 /**

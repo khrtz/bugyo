@@ -13,7 +13,7 @@ import { noComments as noCommentsRule } from './rules/no-comments.js';
  * @typedef {{
  *   app: string,
  *   features: string,
- *   shared: { ui: string, api: string, lib: string },
+ *   shared: { ui: string[], api: string[], lib: string[], model: string[], other: string[] },
  *   featureParts: { ui: string[], api: string[], model: string[] },
  * }} Layers
  * @typedef {Required<Omit<BugyoOptions, 'parts' | 'layers' | 'severity'>> & {
@@ -203,7 +203,8 @@ export const structure = {
     const roleLabel = (/** @type {string[]} */ list) => list.map((name) => `${name}/`).join('・');
     const internals = customLayers ? [`**/${featuresName}/*/*`] : ['@/features/*/*', '**/features/*/*'];
     const indexes = customLayers ? [`!**/${featuresName}/*/index.ts`] : ['!@/features/*/index.ts', '!**/features/*/index.ts'];
-    const sharedDirs = [shared.ui, shared.api, shared.lib];
+    const sharedDirs = [...shared.ui, ...shared.api, ...shared.lib, ...shared.model, ...shared.other];
+    const pureDirs = [...shared.lib, ...shared.model].join('・');
     const zones = customLayers
       ? [
           {
@@ -214,9 +215,18 @@ export const structure = {
           { target: `./${features}`, from: `./${app}`, message: `${features} は ${app} に依存できません。` },
           {
             target: featureParts.model.map((name) => `./${features}/*/${name}/**/*`),
-            from: [`./${shared.ui}`, `./${shared.api}`],
-            message: `${roleLabel(featureParts.model)} が使えるのは自分の${roleLabel(featureParts.model)}と ${shared.lib} だけです。`,
+            from: [...shared.ui, ...shared.api, ...shared.other].map((dir) => `./${dir}`),
+            message: `${roleLabel(featureParts.model)} が使えるのは自分の${roleLabel(featureParts.model)}と ${pureDirs} だけです。`,
           },
+          ...(shared.model.length === 0
+            ? []
+            : [
+                {
+                  target: shared.model.map((dir) => `./${dir}`),
+                  from: [...shared.ui, ...shared.api, ...shared.other].map((dir) => `./${dir}`),
+                  message: `${shared.model.join('・')} が使えるのは ${pureDirs} だけです。`,
+                },
+              ]),
         ]
       : [
           {
@@ -229,7 +239,9 @@ export const structure = {
     return {
       plugins: { 'import-x': importX },
       settings: { 'import-x/resolver-next': [createTypeScriptImportResolver({ project: `${root}/tsconfig.json` })] },
-      srcRules: { 'import-x/no-restricted-paths': ['error', { basePath: root, zones }] },
+      srcRules: {
+        'import-x/no-restricted-paths': ['error', { basePath: root, zones: zones.filter((zone) => [zone.target, zone.from].every((list) => list.length > 0)) }],
+      },
       bans: [
         normalizeBan({
           name: 'feature-internals',
@@ -289,6 +301,19 @@ export function resolveLayers(src, layers) {
     }
     return [...list];
   };
+  /**
+   * @param {string} role
+   * @param {string | string[] | undefined} value
+   * @param {string[]} fallback
+   */
+  const dirs = (role, value, fallback) => {
+    if (value === undefined) return fallback;
+    const list = typeof value === 'string' ? [value] : value;
+    if (!Array.isArray(list) || (fallback.length > 0 && list.length === 0) || list.some((dir) => typeof dir !== 'string' || dir === '')) {
+      throw new Error(`bugyo({ layers }) の shared.${role} は、フォルダ1つか、フォルダの空でない配列にしてください`);
+    }
+    return list.map(trimSlash);
+  };
   const featureParts = { ui: names('ui', parts?.ui), api: names('api', parts?.api), model: names('model', parts?.model) };
   const all = [...featureParts.ui, ...featureParts.api, ...featureParts.model];
   const twice = all.filter((name, index) => all.indexOf(name) !== index);
@@ -297,13 +322,15 @@ export function resolveLayers(src, layers) {
     app: trimSlash(layers?.app ?? `${src}/app`),
     features: trimSlash(layers?.features ?? `${src}/features`),
     shared: {
-      ui: trimSlash(layers?.shared?.ui ?? `${src}/shared/ui`),
-      api: trimSlash(layers?.shared?.api ?? `${src}/shared/api`),
-      lib: trimSlash(layers?.shared?.lib ?? `${src}/shared/lib`),
+      ui: dirs('ui', layers?.shared?.ui, [`${src}/shared/ui`]),
+      api: dirs('api', layers?.shared?.api, [`${src}/shared/api`]),
+      lib: dirs('lib', layers?.shared?.lib, [`${src}/shared/lib`]),
+      model: dirs('model', layers?.shared?.model, []),
+      other: dirs('other', layers?.shared?.other, []),
     },
     featureParts,
   };
-  const outside = [resolved.app, resolved.features, ...Object.values(resolved.shared)].filter((dir) => !dir.startsWith(`${src}/`));
+  const outside = [resolved.app, resolved.features, ...Object.values(resolved.shared).flat()].filter((dir) => !dir.startsWith(`${src}/`));
   if (outside.length > 0) throw new Error(`bugyo({ layers }) の ${outside.join(', ')} が src（${src}）の中にありません。src に層をまとめて入れるフォルダを渡してください`);
   return resolved;
 }
@@ -355,7 +382,10 @@ export function bugyo(options) {
   }
   if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
   const layers = resolveLayers(src, options.layers);
-  const { effectHooksDir = layers.shared.lib, apiClientDir = layers.shared.api } = options;
+  const effectsDirs = options.effectHooksDir === undefined ? layers.shared.lib : [trimSlash(options.effectHooksDir)];
+  const apiDirs = options.apiClientDir === undefined ? layers.shared.api : [trimSlash(options.apiClientDir)];
+  const effectHooksDir = effectsDirs.join('・');
+  const apiClientDir = apiDirs.join('・');
   const customLayers = options.layers !== undefined;
 
   /** @type {Context} */
@@ -435,7 +465,10 @@ export function bugyo(options) {
       case 'ui':
         return layers.featureParts.ui.map((name) => `${layers.features}/*/${name}/**/*.{ts,tsx}`);
       case 'model':
-        return layers.featureParts.model.map((name) => `${layers.features}/*/${name}/**/*.ts`);
+        return [
+          ...layers.featureParts.model.map((name) => `${layers.features}/*/${name}/**/*.ts`),
+          ...layers.shared.model.map((dir) => `${dir}/**/*.ts`),
+        ];
       default:
         return [scope];
     }
@@ -444,9 +477,9 @@ export function bugyo(options) {
   const placeGlobs = (place) => {
     switch (place) {
       case 'effects':
-        return [`${effectHooksDir}/**/*.{ts,tsx}`];
+        return effectsDirs.map((dir) => `${dir}/**/*.{ts,tsx}`);
       case 'api':
-        return [`${apiClientDir}/**/*.ts`];
+        return apiDirs.map((dir) => `${dir}/**/*.ts`);
       case 'tests':
         return [`${src}/**/*.test.{ts,tsx}`];
       default:

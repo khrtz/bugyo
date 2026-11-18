@@ -43,7 +43,8 @@ export interface BugyoConfig {
     | {
         app: string;
         features: string;
-        shared: { ui: string; api: string; lib: string };
+        /** shared の場所。設定では1つなら文字列でも書け、読み込むと配列になる */
+        shared: { ui: string[]; api: string[]; lib: string[]; model: string[]; other: string[] };
         /** feature の中のフォルダ名を役割ごとに。書かなかった役割は ui・api・model */
         featureParts: { ui: string[]; api: string[]; model: string[] };
       }

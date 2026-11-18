@@ -57,8 +57,8 @@ export default bugyo({
 | `root` | 必須 | `import.meta.dirname` を渡す |
 | `src` | `src` | ソースの場所。`layers` のフォルダはすべてこの中に置く |
 | `layers` | `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}` | 層のフォルダの場所（下の「層のフォルダ名を変える」） |
-| `effectHooksDir` | `layers.shared.lib` | 禁止の `allow` に書く `effects` の場所（`noUseEffect` を入れたときに `useEffect` を書いてよい場所） |
-| `apiClientDir` | `layers.shared.api` | 禁止の `allow` に書く `api` の場所（`fetchOnlyInApi` を入れたときに `fetch` を呼んでよい場所） |
+| `effectHooksDir` | `layers.shared.lib`（いくつもあればそのすべて） | 禁止の `allow` に書く `effects` の場所（`noUseEffect` を入れたときに `useEffect` を書いてよい場所） |
+| `apiClientDir` | `layers.shared.api`（いくつもあればそのすべて） | 禁止の `allow` に書く `api` の場所（`fetchOnlyInApi` を入れたときに `fetch` を呼んでよい場所） |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `severity` | `{}` | 禁止を warn に下げる（下の「禁止を warn に下げる」） |
 | `parts` | `[common, structure]` | 使う部品と禁止（下の「部品と禁止」）。`common` は必須 |
@@ -145,6 +145,32 @@ module.exports = require('@bugyo/lint/depcruise').config({ src: 'web', layers })
 
 `layers` を渡すと、`effectHooksDir` と `apiClientDir` の既定も `layers.shared.lib` と `layers.shared.api` になります（例では `fetch` は `web/app/api` でだけ呼べる）。境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` で書かなかった場所は `src/app` などの既定で埋まります。ESLint と dependency-cruiser では `<src>/app` などで埋まるので、`src` が `src` でなければ5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
 
+#### shared にフォルダをいくつも置く
+
+`shared` の `ui`・`api`・`lib` は、フォルダ1つの文字列か、フォルダの配列で書けます。役割の違う共有のフォルダは、`model` と `other` に書きます。
+
+```json
+{
+  "layers": {
+    "shared": {
+      "ui": "web/app/ui",
+      "api": "web/app/api",
+      "lib": ["web/app/lib", "web/lib"],
+      "model": "web/app/domain",
+      "other": ["web/app/stores"]
+    }
+  }
+}
+```
+
+| キー | 置くもの | 当たるルール |
+| --- | --- | --- |
+| `ui`・`api`・`lib` | 共有の部品・API のクライアント・フック | features と app に依存できない。`allow` の `effects` は `lib` のすべて、`api` は `api` のすべて |
+| `model` | 共有の純粋なロジック | features と app に加えて、shared の `ui`・`api`・`other` にも依存できない（使えるのは shared の `lib` と `model` だけ）。`scope: 'model'` の禁止が当たる（`model-react` など）。dependency-cruiser では `shared-model-is-pure` |
+| `other` | 役割を持たない共有のフォルダ（状態管理など） | features と app に依存できないことだけ。feature の model と shared の `model` からは使えない |
+
+feature の model が使えるのは、自分の model と、shared の `lib` と `model` です。
+
 #### feature の中のフォルダ名を変える
 
 feature の中のフォルダが `ui/`・`api/`・`model/` でないプロジェクトでは、`layers.featureParts` に役割ごとのフォルダ名を書きます。書かなかった役割は `ui`・`api`・`model` のままです。
@@ -199,7 +225,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, clo
 | `rules` | `{ '<ルール ID>': <設定> }` | 合成しない ESLint のルール。`scope` の中で当て、`allow` の場所では off にする |
 | `plugins` | `{ '<名前>': <プラグイン> }` | `rules` で使うプラグイン |
 
-- エラー文に `effectHooksDir` などの場所を入れたいときは、`build(context)` で `name` 以外の項目を返します（`defineBan({ name, allow, build: (context) => ({ globals: [...] }) })`）。`context` には `src`・`effectHooksDir`・`apiClientDir`・`layers`・`featuresLabel` が入っています
+- エラー文に `effectHooksDir` などの場所を入れたいときは、`build(context)` で `name` 以外の項目を返します（`defineBan({ name, allow, build: (context) => ({ globals: [...] }) })`）。`context` には `src`・`effectHooksDir`・`apiClientDir`・`layers`・`featuresLabel` が入っています（`effectHooksDir` と `apiClientDir` は、場所がいくつもあれば `・` でつないだ文字列。`layers.shared` の各値は配列）
 - 禁止したものの「正しい入口」は、`allow` に書いた場所に作ります（例: `Date.now` を禁止し、`shared/lib/clock.ts` だけで使う）
 - 知らない項目、何も止めていない禁止、同じ名前の禁止は断ります
 - `no-restricted-imports` などを自分の設定ブロックで直接書くと、合成した bugyo の禁止が上書きされて消えます。必ず `defineBan` で足します
@@ -391,7 +417,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
-| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared.ui`・`shared.api`・`shared.lib`）と、feature の中のフォルダ名（`featureParts`）。上の「層のフォルダ名を変える」 |
+| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared` の `ui`・`api`・`lib`・`model`・`other`）と、feature の中のフォルダ名（`featureParts`）。上の「層のフォルダ名を変える」 |
 
 同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 

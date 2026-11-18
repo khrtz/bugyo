@@ -185,6 +185,25 @@ test('layers: doctor は、どの層にも入っていないコードのファ�
   assert.deepEqual(JSON.parse(run.all).outsideLayers, ['web/legacy/old.js', 'web/main.tsx']);
 });
 
+test('layers: shared の各値は配列でも書け、model と other の場所も層に入る', async () => {
+  const cwd = project();
+  withLayers(cwd);
+  const shared = { ui: 'web/app/ui', api: ['web/app/api'], lib: ['web/app/lib', 'web/lib'], model: 'web/app/domain', other: ['web/legacy'] };
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ layers: { ...layers, shared } }));
+  for (const file of ['web/lib/format.ts', 'web/app/domain/price.ts']) {
+    mkdirSync(join(cwd, file, '..'), { recursive: true });
+    writeFileSync(join(cwd, file), '');
+  }
+  setResults(cwd, {});
+  const run = bugyo(cwd, 'doctor', '--json');
+  assert.equal(run.status, 0, run.all);
+  assert.deepEqual(JSON.parse(run.all).outsideLayers, ['web/main.tsx']);
+  const { loadConfig } = await import('../src/config.js');
+  assert.deepEqual(loadConfig(cwd).layers?.shared, { ui: ['web/app/ui'], api: ['web/app/api'], lib: ['web/app/lib', 'web/lib'], model: ['web/app/domain'], other: ['web/legacy'] });
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ layers: { ...layers, shared: { ...shared, lib: [] } } }));
+  assert.throws(() => loadConfig(cwd), /config\.json が不正です/);
+});
+
 test('doctor は構文エラーのファイルと場所とメッセージを出す', () => {
   const cwd = project();
   setResults(cwd, { [join(cwd, 'src', 'broken.ts')]: [{ ruleId: null, message: 'Parsing error: Unexpected token', line: 3 }] });

@@ -49,7 +49,9 @@ export const fetchOnlyInApi: BugyoPart;
 export interface BugyoContext {
   root: string;
   src: string;
+  /** エラー文に書く、`effects` の場所。いくつもあれば `・` でつなぐ */
   effectHooksDir: string;
+  /** エラー文に書く、`api` の場所。いくつもあれば `・` でつなぐ */
   apiClientDir: string;
   layers: ResolvedLayers;
   /** エラー文に書く、機能のフォルダの名前（layers がなければ `features`） */
@@ -63,12 +65,12 @@ export interface BanSpec {
   /** 禁止の名前。小文字・数字・ハイフン。`severity` で warn に下げるときにも使う。同じ名前の禁止は2つ置けない */
   name: string;
   /**
-   * どこで止めるか。`src`（既定。src の下の .ts / .tsx）、`ui`（features の各 feature の ui/）、`model`（各 feature の model/）。
+   * どこで止めるか。`src`（既定。src の下の .ts / .tsx）、`ui`（features の各 feature の ui/）、`model`（各 feature の model/ と `layers.shared.model`）。
    * root からの glob は、`rules` だけの禁止で使える（imports・globals・syntax・properties があると断る）
    */
   scope?: string;
   /**
-   * どこでは許すか。`effects`（effectHooksDir）、`api`（apiClientDir）、`tests`（src の下の *.test.ts(x)）か、root からの glob
+   * どこでは許すか。`effects`（effectHooksDir、なければ `layers.shared.lib` のすべて）、`api`（apiClientDir、なければ `layers.shared.api` のすべて）、`tests`（src の下の *.test.ts(x)）か、root からの glob
    */
   allow?: string[];
   imports?: { paths?: RestrictedImportPath[]; patterns?: RestrictedImportPattern[] };
@@ -95,8 +97,18 @@ export interface BugyoLayers {
   app?: string;
   /** feature を1つずつフォルダに置く層 */
   features?: string;
-  /** どの feature からも使える層。features と app には依存できない */
-  shared?: { ui?: string; api?: string; lib?: string };
+  /**
+   * どの feature からも使える層。features と app には依存できない。それぞれフォルダ1つか、フォルダの配列で書く。
+   * - `model`: 共有の純粋なロジック。feature の model と同じく、`scope: 'model'` の禁止が当たり、shared の lib と model だけを使える。既定はなし
+   * - `other`: 役割を持たない共有のフォルダ（状態管理など）。features と app に依存できないことだけを守る。model からは使えない。既定はなし
+   */
+  shared?: {
+    ui?: string | string[];
+    api?: string | string[];
+    lib?: string | string[];
+    model?: string | string[];
+    other?: string | string[];
+  };
   /**
    * feature の中のフォルダ名を役割ごとに書く。既定は `{ ui: ['ui'], api: ['api'], model: ['model'] }`。
    * ui に書いたフォルダには ui の禁止が、model に書いたフォルダには model の禁止が当たる。1つの名前は1つの役割にだけ書ける。
@@ -108,7 +120,7 @@ export interface BugyoLayers {
 export interface ResolvedLayers {
   app: string;
   features: string;
-  shared: { ui: string; api: string; lib: string };
+  shared: { ui: string[]; api: string[]; lib: string[]; model: string[]; other: string[] };
   featureParts: { ui: string[]; api: string[]; model: string[] };
 }
 

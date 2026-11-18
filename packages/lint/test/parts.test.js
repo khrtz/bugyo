@@ -108,11 +108,16 @@ test('layers: 層のフォルダ名と import の別名が既定と違っても�
     result.messages.map((m) => `${relative(layersRoot, result.filePath).split(sep).join('/')}:${m.line} ${m.ruleId}`),
   );
   assert.deepEqual(found.sort(), [
+    'web/app/domain/price.ts:2 import-x/no-restricted-paths',
+    'web/app/domain/price.ts:3 import-x/no-restricted-paths',
+    'web/app/domain/price.ts:4 import-x/no-restricted-paths',
     'web/app/lib/leak.ts:1 import-x/no-restricted-paths',
     'web/app/lib/leak.ts:2 import-x/no-restricted-paths',
+    'web/app/stores/count.ts:1 import-x/no-restricted-paths',
     'web/features/billing/domain/total.ts:1 import-x/no-restricted-paths',
     'web/features/billing/domain/total.ts:2 no-restricted-imports',
     'web/features/billing/domain/total.ts:3 no-restricted-imports',
+    'web/features/calc/model/stored.ts:3 import-x/no-restricted-paths',
     'web/features/report/api/fetchReport.ts:1 no-restricted-globals',
     'web/features/report/model/bad.ts:1 import-x/no-restricted-paths',
     'web/features/report/model/bad.ts:2 import-x/no-restricted-paths',
@@ -138,6 +143,30 @@ test('featureParts: ui・model の範囲は、役割に書いたフォルダ名�
   assert.deepEqual(await globalsFor('web/features/billing/domain/total.ts'), ['Date']);
   assert.deepEqual(await globalsFor('web/features/calc/model/add.ts'), ['Date']);
   assert.deepEqual(await globalsFor('web/features/billing/services/amount.ts'), []);
+  assert.deepEqual(await globalsFor('web/app/domain/price.ts'), ['Date'], 'shared.model にも model の禁止が当たる');
+});
+
+test('shared: lib を配列で書くと、allow の effects はそのすべてで許す', async () => {
+  const timers = defineBan({ name: 'timers', allow: ['effects'], globals: [{ name: 'setTimeout', message: 'lib の専用フックを使う' }] });
+  const linter = new ESLint({
+    cwd: layersRoot,
+    overrideConfigFile: true,
+    baseConfig: bugyo({ root: layersRoot, src: 'web', layers, parts: [common, structure, timers] }),
+  });
+  const globalsFor = async (file) => {
+    const rule = (await linter.calculateConfigForFile(join(layersRoot, file))).rules['no-restricted-globals'];
+    return rule === 'off' || rule?.[0] === 0 ? [] : (rule?.slice(1) ?? []).map((entry) => entry.name);
+  };
+  assert.deepEqual(await globalsFor('web/app/lib/leak.ts'), []);
+  assert.deepEqual(await globalsFor('web/lib/format.ts'), []);
+  assert.deepEqual(await globalsFor('web/app/ui/label.ts'), ['setTimeout']);
+  assert.deepEqual(await globalsFor('web/app/stores/count.ts'), ['setTimeout']);
+});
+
+test('shared: ui・api・lib を空の配列にすると断る', () => {
+  for (const shared of [{ ui: [] }, { lib: [''] }, { api: 1 }]) {
+    assert.throws(() => bugyo({ root: layersRoot, src: 'web', layers: { ...layers, shared: { ...layers.shared, ...shared } } }), /shared\./, JSON.stringify(shared));
+  }
 });
 
 test('featureParts: フォルダ名に / を含むか、空の配列なら断る', () => {
@@ -159,11 +188,17 @@ test('depcruise: layers の場所で構成の境界を止める', () => {
     'model-is-pure web/features/billing/domain/total.ts -> web/app/ui/label.ts',
     'model-is-pure web/features/billing/domain/total.ts -> web/features/billing/components/view.ts',
     'model-is-pure web/features/billing/domain/total.ts -> web/features/billing/services/amount.ts',
+    'model-is-pure web/features/calc/model/stored.ts -> web/app/stores/count.ts',
     'model-is-pure web/features/report/model/bad.ts -> web/app/api/client.ts',
     'model-is-pure web/features/report/model/bad.ts -> web/app/ui/label.ts',
     'model-is-pure web/features/report/model/bad.ts -> web/features/calc/model/add.ts',
+    'shared-is-leaf web/app/domain/price.ts -> web/features/billing/index.ts',
     'shared-is-leaf web/app/lib/leak.ts -> web/features/calc/index.ts',
     'shared-is-leaf web/app/lib/leak.ts -> web/pages/main.ts',
+    'shared-is-leaf web/app/stores/count.ts -> web/features/billing/index.ts',
+    'shared-model-is-pure web/app/domain/price.ts -> web/app/stores/count.ts',
+    'shared-model-is-pure web/app/domain/price.ts -> web/app/ui/label.ts',
+    'shared-model-is-pure web/app/domain/price.ts -> web/features/billing/index.ts',
   ]);
 });
 
