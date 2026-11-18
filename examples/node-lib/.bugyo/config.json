@@ -1,7 +1,29 @@
 {
   "template": "node-lib",
-  "verify": { "runner": "command", "command": "node {spec}" },
-  "featureMap": { "specDir": "checks", "specSuffix": ".ts", "featuresDir": "src/features" },
-  "commands": { "check": "pnpm check", "test": "pnpm test", "verify": "bugyo verify {feature}" },
-  "evidence": { "tree": ["src", "checks", "test"] }
+  "verify": {
+    "runner": "command",
+    "command": "node {spec}"
+  },
+  "featureMap": {
+    "specDir": "checks",
+    "specSuffix": ".ts",
+    "featuresDir": "src/features"
+  },
+  "commands": {
+    "check": "pnpm check",
+    "test": "pnpm test",
+    "verify": "bugyo verify {feature}"
+  },
+  "evidence": {
+    "tree": [
+      "src",
+      "checks",
+      "test"
+    ]
+  },
+  "gate": {
+    "window": 5,
+    "maxRework": 1,
+    "minFirstPass": 4
+  }
 }

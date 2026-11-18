@@ -1,0 +1,33 @@
+{
+  "task": "t-001",
+  "type": "logic",
+  "feature": "slug",
+  "closedAt": "2026-11-18T00:35:39.429Z",
+  "attempt": 1,
+  "rework": 0,
+  "conditions": [
+    "src/features/slug/model/ にテストがある"
+  ],
+  "steps": [
+    {
+      "name": "check",
+      "command": "pnpm check",
+      "status": 0,
+      "ms": 7152
+    },
+    {
+      "name": "test",
+      "command": "pnpm test",
+      "status": 0,
+      "ms": 1323
+    }
+  ],
+  "tree": {
+    "paths": [
+      "src",
+      "checks",
+      "test"
+    ],
+    "hash": "sha256:d98b318a0886d7601f62b5212c9b197b83572162966983d4736e10e95aac0b4e"
+  }
+}
