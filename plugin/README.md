@@ -13,8 +13,11 @@ bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature ma
 | skill | `bugyo-explain` | 仕組みをコードを辿って説明する |
 | agent | `slop-reviewer` | 差分を独立した目でレビューするサブエージェント |
 | hook | `PreToolUse`（`hooks/guard.mjs`） | 完了の判定を決めるファイルの直接の書き換えを断る（下を参照） |
+| hook | `Stop`（`hooks/stop-check.mjs`） | 作業を終える前に `bugyo task lint` を実行し、落ちたら終わらせない（下を参照） |
 
 ## フック
+
+### 書き換えを断る（`PreToolUse`）
 
 エージェントが次のものを書き換えようとすると、ツールの実行前に断り、代わりに使うコマンドを伝えます。
 
@@ -23,7 +26,16 @@ bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature ma
 - ベースライン（`.bugyo/baseline.json`・`eslint-suppressions.json`・`.dependency-cruiser-known-violations.json`）
 - タスク台帳の状態の項目（`status`・`assignee`・`rework`・`gate-attempts`・`repro`・`evidence` など）と、台帳のファイルを手で作ること。`feature`・`issue`・`blocked-by`・本文は直せる
 
-シェルのコマンド（Bash・PowerShell）は、守るファイルの名前とリダイレクトや `sed -i`・`rm`・`cp` などの形を見て断ります。形を見るだけなので、すべての書き換えは止められません。止めきれなかったものは、`pnpm check` の `bugyo task lint` と CI が見つけます。動かすには Node が要ります。
+シェルのコマンド（Bash・PowerShell）は、守るファイルの名前とリダイレクトや `sed -i`・`rm`・`cp` などの形を見て断ります。形を見るだけなので、すべての書き換えは止められません。止めきれなかったものは、下の `Stop` のフック、`pnpm check` の `bugyo task lint`、CI が見つけます。
+
+### 終わる前に台帳を確かめる（`Stop`）
+
+エージェントが作業を終えようとすると、`.bugyo/tasks` のあるフォルダを作業中のフォルダから上へ探し、`node_modules` の `bugyo` で `bugyo task lint` を実行します。落ちたら、その出力と直し方を返して作業を続けさせます。
+
+- 止めるのは1回だけです。直したあと、または直せないまま続けて終わろうとしたときは止めません
+- 台帳か `node_modules/bugyo` が見つからなければ何もしません
+
+どちらのフックも、動かすには Node が要ります。
 
 ## インストール
 
