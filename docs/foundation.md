@@ -128,7 +128,7 @@ bugyo の禁止のメッセージは、英語（`en`、既定）と日本語（`
 ```
 
 - メッセージの頭の禁止の名前（`[bugyo:use-effect]`）は、言語によらず同じです。`bugyo baseline` はこの名前までで数えるので、言語を変えても件数は変わりません
-- 言語が変わるのは、`@bugyo/lint` と `@bugyo/lint-react` の禁止のメッセージ（コメントの禁止を含む）だけです。設定の書き方の誤りを知らせるエラー、dependency-cruiser のルールの説明、`bugyo` の CLI の出力は日本語のままです
+- 言語が変わるのは、`@bugyo/lint` と `@bugyo/lint-react` の禁止のメッセージ（コメントの禁止を含む）と、`bugyo verify` の出力、`bugyo task done` の結果の行です。CLI のほかの出力、設定の書き方の誤りを知らせるエラー、dependency-cruiser のルールの説明は日本語のままです。CLI は `BUGYO_LOCALE` と `.bugyo/config.json` の `locale` を見ます
 - `defineBan` で作った禁止のメッセージは書いたとおりに出ます。言語ごとに変えたいときは、`build(context)` で `context.locale` を見ます
 - `.bugyo/baseline.json` が名前で数える前の形式（`version` のないもの）なら、言語を変える前に `bugyo baseline save` で作り直します。古い形式はメッセージの文で数えるので、言語を変えると件数が合わなくなります
 - どれもなければ英語です
@@ -576,7 +576,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 ```
 
 - 実行が始まってから書かれた、glob に当たるファイルが1つもなければ、終了コードが 0 でも `FAIL` です。前の実行で残ったファイルは数えません（ファイルの時刻で見ます。時刻の粗いファイルシステムのぶん、始まる2秒前までは数えます）
-- 見つかったファイルは、パスと中身のハッシュ（sha256）を `artifacts/verify.json` の機能ごとの `files` に書き、`証拠:` の行にも出します。`bugyo task done` の証拠には `verify.json` がそのまま入るので、ハッシュも残ります
+- 見つかったファイルは、パスと中身のハッシュ（sha256）を `artifacts/verify.json` の機能ごとの `files` に書き、`evidence:`（`ja` では `証拠:`）の行にも出します。`bugyo task done` の証拠には `verify.json` がそのまま入るので、ハッシュも残ります
 - glob に当たるファイルを verify が消すことはありません
 - Playwright の確かめ方には書けません（証拠を決まった場所に残すため）
 
@@ -637,7 +637,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 
 `node-lib` の `.bugyo/config.json` は、`verify` を `command` 方式（`node {spec}`）にし、spec のフォルダを `checks`、`evidence.tree` を `src`・`checks`・`test` にしています。lint は `parts: [common, structure, noComments, fetchOnlyInApi]` と `explicitExtensions: true`、dependency-cruiser は `config()` です。`@bugyo/lint-react` は依存に入れません。`react-vite` は `parts: [common, structure, react, noComments, fetchOnlyInApi, noUseEffect, noUiTimers]` と `config({ react: true })` です。
 
-`pnpm check` が通るだけでは完了ではありません。変更の種類ごとに必要な証拠は、見本の [docs/土台設計.md](../examples/todo-app/docs/土台設計.md) にあります。
+`pnpm check` が通るだけでは完了ではありません。変更の種類ごとに必要な証拠は、見本の [docs/architecture.md](../examples/todo-app/docs/architecture.md) にあります。
 
 ## Claude Code プラグイン
 

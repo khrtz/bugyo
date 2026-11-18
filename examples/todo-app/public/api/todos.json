@@ -1,5 +1,5 @@
 [
-  { "id": "t1", "title": "pnpm check を通す", "done": true },
-  { "id": "t2", "title": "境界lintを入れる", "done": false },
-  { "id": "t3", "title": "pnpm verify で証拠を残す", "done": false }
+  { "id": "t1", "title": "Pass pnpm check", "done": true },
+  { "id": "t2", "title": "Add the boundary lint", "done": false },
+  { "id": "t3", "title": "Keep evidence with pnpm verify", "done": false }
 ]

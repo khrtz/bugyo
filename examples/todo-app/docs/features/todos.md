@@ -6,26 +6,26 @@ spec: e2e/todos.spec.ts
 
 # todos
 
-## 何があるか
-- Todoの一覧（`/api/todos.json` から取得し、Zodで検証）
-- 各行のチェックボックスで完了・未完了を切り替える（画面内の状態のみ。保存はしない）
-- 「すべて／未完了／完了」の絞り込みボタン
-- 「残り N 件」の表示と、同じ内容のタブタイトル
+## What is there
+- The todo list (fetched from `/api/todos.json` and validated with Zod)
+- A checkbox on each row toggles done / not done (in-page state only; nothing is saved)
+- Filter buttons: All / Active / Done
+- "N left", and the same text in the tab title
 
-## どう辿り着くか
-- トップページ `/` を開く。ログインなどの前提はない
+## How to reach it
+- Open the top page `/`. No login or other setup
 
-## どう操作して確かめるか
-- `pnpm verify todos`（動画・スクリーンショット・トレースが `artifacts/` に残る）
-- 成功：3件が表示され「残り 2 件」になる。1件チェックすると「残り 1 件」、タイトルも変わる
-- 絞り込み：「未完了」で未完了だけ、「完了」で完了だけが出る。ボタンは `aria-pressed` で選択中を表す
-- エラー：`/api/todos.json` が失敗するか形が違うと `role="alert"` で「読み込みに失敗しました」と出る
-- 読み込み中：`role="status"` で「読み込み中…」が出る
-- 空：一覧が0件のとき「残り 0 件」になり、リストは空になる
-- 永続化：なし。リロードすると切り替えは元に戻る（これが正しい挙動）
+## How to check it
+- `pnpm verify todos` (video, screenshots, and a trace are kept in `artifacts/`)
+- Success - three todos show and the page says "2 left". Checking one changes it to "1 left", and the title follows
+- Filter - "Active" shows only open todos, "Done" only finished ones. The selected button has `aria-pressed`
+- Error - if `/api/todos.json` fails or has the wrong shape, `role="alert"` shows "Failed to load"
+- Loading - `role="status"` shows "Loading…"
+- Empty - with zero todos the page says "0 left" and the list is empty
+- Persistence - none. Reloading undoes the toggles (this is correct)
 
-## よく嘘をつくところ
-- 「残り N 件」は表示中の絞り込みではなく**全件**から数える。絞り込み後の件数と一致しなくても正しい
-- 「完了」ボタンを名前で探すとき、`exact: true` を付けないと「未完了」にも当たる
-- タブタイトルは `shared/lib/useDocumentTitle` が更新する。本文が正しくてもタイトルだけずれることがある
-- 読み込み中と失敗時のタイトルは「Todo」で、件数は出さない（`model/todo.ts` の `todoTitle`）。「残り 0 件」と出ていたら、データが無いのに件数を数えている
+## Where it lies
+- "N left" counts **all** todos, not the filtered ones. It is correct even when it differs from the filtered count
+- While loading and on failure the title is "Todo" with no count (`todoTitle` in `model/todo.ts`). "0 left" there means the count was taken without data
+- The tab title is updated by `shared/lib/useDocumentTitle`. The body can be right while only the title is wrong
+- When finding the "Done" button by name, use `exact: true` so the lookup stays exact as labels change

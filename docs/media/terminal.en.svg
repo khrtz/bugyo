@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="380.79999999999995" viewBox="0 0 1040 380.79999999999995" role="img" aria-label="pnpm check が useEffect と fetch を止め、pnpm verify が証拠を残し、bugyo task done が証拠つきでタスクを閉じる">
+<style>
+text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;font-size:14px}
+.l0{animation:k0 16s linear infinite}@keyframes k0{0%,2.19%{opacity:0}2.50%,94%{opacity:1}97%,100%{opacity:0}}
+.l1{animation:k1 16s linear infinite}@keyframes k1{0%,9.69%{opacity:0}10.00%,94%{opacity:1}97%,100%{opacity:0}}
+.l2{animation:k2 16s linear infinite}@keyframes k2{0%,11.56%{opacity:0}11.88%,94%{opacity:1}97%,100%{opacity:0}}
+.l3{animation:k3 16s linear infinite}@keyframes k3{0%,11.56%{opacity:0}11.88%,94%{opacity:1}97%,100%{opacity:0}}
+.l4{animation:k4 16s linear infinite}@keyframes k4{0%,14.06%{opacity:0}14.37%,94%{opacity:1}97%,100%{opacity:0}}
+.l5{animation:k5 16s linear infinite}@keyframes k5{0%,14.06%{opacity:0}14.37%,94%{opacity:1}97%,100%{opacity:0}}
+.l6{animation:k6 16s linear infinite}@keyframes k6{0%,27.19%{opacity:0}27.50%,94%{opacity:1}97%,100%{opacity:0}}
+.l7{animation:k7 16s linear infinite}@keyframes k7{0%,37.19%{opacity:0}37.50%,94%{opacity:1}97%,100%{opacity:0}}
+.l8{animation:k8 16s linear infinite}@keyframes k8{0%,38.44%{opacity:0}38.75%,94%{opacity:1}97%,100%{opacity:0}}
+.l9{animation:k9 16s linear infinite}@keyframes k9{0%,52.19%{opacity:0}52.50%,94%{opacity:1}97%,100%{opacity:0}}
+.l10{animation:k10 16s linear infinite}@keyframes k10{0%,62.19%{opacity:0}62.50%,94%{opacity:1}97%,100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){text{animation:none!important;opacity:1}}
+</style>
+<rect x="0.5" y="0.5" width="1039" height="379.79999999999995" rx="12" fill="#0d1117" stroke="#30363d"/>
+<rect width="1040" height="36" rx="12" fill="#161b22"/>
+<rect y="24" width="1040" height="12" fill="#161b22"/>
+<circle cx="22" cy="18" r="6" fill="#f0314f"/>
+<circle cx="42" cy="18" r="6" fill="#ffd23f"/>
+<circle cx="62" cy="18" r="6" fill="#35e0c2"/>
+<text class="l0" x="28" y="64" xml:space="preserve"><tspan fill="#35e0c2">$ </tspan><tspan fill="#e6edf3">pnpm check</tspan></text>
+<text class="l1" x="28" y="88" xml:space="preserve"><tspan fill="#8b949e">src/features/a/ui/Bad.tsx</tspan></text>
+<text class="l2" x="28" y="112" xml:space="preserve"><tspan fill="#8b949e">   1:17  </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">'useEffect' import from 'react' is restricted. [bugyo:use-effect] useEffect is not allowed in product code.</tspan></text>
+<text class="l3" x="28" y="136" xml:space="preserve"><tspan fill="#e6edf3">                Use a dedicated hook in src/shared/lib for subscriptions and timers.</tspan></text>
+<text class="l4" x="28" y="160" xml:space="preserve"><tspan fill="#8b949e">  10:3   </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">Unexpected use of 'fetch'. [bugyo:fetch] Do not call fetch directly.</tspan></text>
+<text class="l5" x="28" y="184" xml:space="preserve"><tspan fill="#e6edf3">                Use the client in src/shared/api and validate the response with a schema.</tspan></text>
+<text class="l6" x="28" y="222.4" xml:space="preserve"><tspan fill="#35e0c2">$ </tspan><tspan fill="#e6edf3">pnpm verify todos</tspan></text>
+<text class="l7" x="28" y="246.4" xml:space="preserve"><tspan fill="#35e0c2">PASS </tspan><tspan fill="#e6edf3">todos  steps: docs/features/todos.md</tspan></text>
+<text class="l8" x="28" y="270.4" xml:space="preserve"><tspan fill="#8b949e">evidence: </tspan><tspan fill="#ffd23f">artifacts/test-results</tspan><tspan fill="#8b949e"> (video, screenshots, traces), </tspan><tspan fill="#ffd23f">artifacts/report/index.html</tspan></text>
+<text class="l9" x="28" y="308.79999999999995" xml:space="preserve"><tspan fill="#35e0c2">$ </tspan><tspan fill="#e6edf3">bugyo task done t-001</tspan></text>
+<text class="l10" x="28" y="332.79999999999995" xml:space="preserve"><tspan fill="#35e0c2">DONE </tspan><tspan fill="#e6edf3">t-001 [done/logic] Fix the slug separator  </tspan><tspan fill="#8b949e">evidence: </tspan><tspan fill="#ffd23f">.bugyo/evidence/t-001.json</tspan></text>
+</svg>

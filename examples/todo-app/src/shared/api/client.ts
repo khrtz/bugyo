@@ -7,7 +7,7 @@ class HttpError extends Error {
     readonly status: number,
     readonly path: string,
   ) {
-    super(`GET ${path} が ${String(status)} を返しました`);
+    super(`GET ${path} returned ${String(status)}`);
   }
 }
 

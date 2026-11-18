@@ -32,8 +32,8 @@ test('command 方式: React も Playwright もないプロジェクトで verify
   const run = bugyo(cwd, 'verify', 'greet');
   assert.equal(run.status, 0, run.stdout + run.stderr);
   const lines = run.stdout.trim().split('\n');
-  assert.equal(lines[0], 'PASS greet  確認手順: docs/features/greet.md');
-  assert.equal(lines[1], '証拠: artifacts/verify/greet.log');
+  assert.equal(lines[0], 'PASS greet  steps: docs/features/greet.md');
+  assert.equal(lines[1], 'evidence: artifacts/verify/greet.log');
   assert.equal(lines.length, 2);
   assert.match(readFileSync(join(cwd, 'artifacts/verify/greet.log'), 'utf8'), /^\$ node checks\/greet\.js\n.*greet: ok/s);
 });
@@ -44,15 +44,15 @@ test('command 方式: 壊すと FAIL と終了コード 1、末尾に失敗の�
   const run = bugyo(cwd, 'verify', '--all');
   assert.equal(run.status, 1);
   const lines = run.stdout.trim().split('\n');
-  assert.equal(lines[0], 'FAIL greet  確認手順: docs/features/greet.md');
-  assert.equal(lines[1], '証拠: artifacts/verify/greet.log');
+  assert.equal(lines[0], 'FAIL greet  steps: docs/features/greet.md');
+  assert.equal(lines[1], 'evidence: artifacts/verify/greet.log');
   assert.match(run.stdout, /"hi bugyo"/);
 });
 
 test('command 方式: feature map にない機能は終了コード 2 で候補を出す', () => {
   const run = bugyo(plainProject(), 'verify', 'nope');
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /候補: greet/);
+  assert.match(run.stderr, /features: greet/);
 });
 
 /**
@@ -85,7 +85,7 @@ test('runners: spec を , で並べると spec ごとに動かし、match の gl
   const run = bugyo(cwd, 'verify', 'greet');
   assert.equal(run.status, 0, run.stdout + run.stderr);
   assert.match(run.stdout, /^PASS greet/);
-  assert.match(run.stdout, /証拠: artifacts\/verify\/greet\.1\.log, artifacts\/verify\/greet\.2\.log/);
+  assert.match(run.stdout, /evidence: artifacts\/verify\/greet\.1\.log, artifacts\/verify\/greet\.2\.log/);
   assert.match(readFileSync(join(cwd, 'artifacts/verify/greet.2.log'), 'utf8'), /api: greet/);
   const summary = JSON.parse(readFileSync(join(cwd, 'artifacts/verify.json'), 'utf8'));
   assert.deepEqual(summary.features[0].runs, [
@@ -152,7 +152,7 @@ test('evidence: 証拠のファイルの glob を書くと、ハッシュと一�
   withCount(2);
   const run = bugyo(cwd, 'verify', 'greet');
   assert.equal(run.status, 0, run.stdout + run.stderr);
-  assert.match(run.stdout, /証拠: artifacts\/verify\/greet\.log, artifacts\/screens\/greet\/0\.png, artifacts\/screens\/greet\/1\.png/);
+  assert.match(run.stdout, /evidence: artifacts\/verify\/greet\.log, artifacts\/screens\/greet\/0\.png, artifacts\/screens\/greet\/1\.png/);
   const summary = JSON.parse(readFileSync(join(cwd, 'artifacts/verify.json'), 'utf8'));
   const sha = (/** @type {string} */ text) => createHash('sha256').update(text).digest('hex');
   assert.deepEqual(summary.features[0].files, [
@@ -165,7 +165,7 @@ test('evidence: 証拠のファイルの glob を書くと、ハッシュと一�
   const none = bugyo(cwd, 'verify', 'greet');
   assert.equal(none.status, 1);
   assert.match(none.stdout, /^FAIL greet/);
-  assert.match(none.stdout, /証拠のファイルがありません（artifacts\/screens\/greet\/\*\.png/);
+  assert.match(none.stdout, /there are no evidence files \(written during the run and matching artifacts\/screens\/greet\/\*\.png/);
 });
 
 test('evidence: 前の実行で残ったファイルは、今回の証拠にならない', () => {
@@ -190,7 +190,7 @@ test('sandbox: 隔離環境が要る確かめ方は、verify.sandbox のコマ�
   const outside = bugyo(cwd, 'verify', 'greet');
   assert.equal(outside.status, 1);
   assert.match(outside.stdout, /^FAIL greet/);
-  assert.match(outside.stdout, /隔離環境ではないので.*isolated.*node checks\/sandbox\.cjs が終了コード 3/);
+  assert.match(outside.stdout, /Not in a sandbox, so the runners that require one \(isolated\) were not run: node checks\/sandbox\.cjs exited with 3/);
   assert.ok(!existsSync(join(cwd, 'ran.txt')), '隔離環境でなければ動かさない');
 
   const inside = spawnSync(process.execPath, [bin, 'verify', 'greet'], { cwd, encoding: 'utf8', env: { ...process.env, IN_SANDBOX: '1' } });
@@ -240,7 +240,7 @@ test('runners: Playwright の確かめ方が2つあると、それぞれを env 
   assert.match(run.stdout, /^PASS greet/);
   assert.match(
     run.stdout,
-    /証拠: artifacts\/test-results（動画・スクリーンショット・トレース）, artifacts\/report\/index\.html, artifacts\/client\/test-results（動画・スクリーンショット・トレース）, artifacts\/client\/report\/index\.html/,
+    /evidence: artifacts\/test-results \(video, screenshots, traces\), artifacts\/report\/index\.html, artifacts\/client\/test-results \(video, screenshots, traces\), artifacts\/client\/report\/index\.html/,
   );
   assert.equal(readFileSync(join(cwd, 'artifacts/test-results/mode.txt'), 'utf8'), '');
   assert.equal(readFileSync(join(cwd, 'artifacts/client/test-results/mode.txt'), 'utf8'), 'client');

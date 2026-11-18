@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="380.79999999999995" viewBox="0 0 1040 380.79999999999995" role="img" aria-label="pnpm check が useEffect と fetch を止め、pnpm verify が証拠を残し、bugyo task done が証拠つきでタスクを閉じる">
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="380.79999999999995" viewBox="0 0 980 380.79999999999995" role="img" aria-label="pnpm check が useEffect と fetch を止め、pnpm verify が証拠を残し、bugyo task done が証拠つきでタスクを閉じる">
 <style>
 text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;font-size:14px}
 .l0{animation:k0 16s linear infinite}@keyframes k0{0%,2.19%{opacity:0}2.50%,94%{opacity:1}97%,100%{opacity:0}}
@@ -14,18 +14,18 @@ text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',mo
 .l10{animation:k10 16s linear infinite}@keyframes k10{0%,62.19%{opacity:0}62.50%,94%{opacity:1}97%,100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){text{animation:none!important;opacity:1}}
 </style>
-<rect x="0.5" y="0.5" width="1039" height="379.79999999999995" rx="12" fill="#0d1117" stroke="#30363d"/>
-<rect width="1040" height="36" rx="12" fill="#161b22"/>
-<rect y="24" width="1040" height="12" fill="#161b22"/>
+<rect x="0.5" y="0.5" width="979" height="379.79999999999995" rx="12" fill="#0d1117" stroke="#30363d"/>
+<rect width="980" height="36" rx="12" fill="#161b22"/>
+<rect y="24" width="980" height="12" fill="#161b22"/>
 <circle cx="22" cy="18" r="6" fill="#f0314f"/>
 <circle cx="42" cy="18" r="6" fill="#ffd23f"/>
 <circle cx="62" cy="18" r="6" fill="#35e0c2"/>
 <text class="l0" x="28" y="64" xml:space="preserve"><tspan fill="#35e0c2">$ </tspan><tspan fill="#e6edf3">pnpm check</tspan></text>
 <text class="l1" x="28" y="88" xml:space="preserve"><tspan fill="#8b949e">src/features/a/ui/Bad.tsx</tspan></text>
-<text class="l2" x="28" y="112" xml:space="preserve"><tspan fill="#8b949e">   1:17  </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">'useEffect' import from 'react' is restricted. [bugyo:use-effect] useEffect is not allowed in product code.</tspan></text>
-<text class="l3" x="28" y="136" xml:space="preserve"><tspan fill="#e6edf3">                Use a dedicated hook in src/shared/lib for subscriptions and timers.</tspan></text>
-<text class="l4" x="28" y="160" xml:space="preserve"><tspan fill="#8b949e">  10:3   </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">Unexpected use of 'fetch'. [bugyo:fetch] Do not call fetch directly.</tspan></text>
-<text class="l5" x="28" y="184" xml:space="preserve"><tspan fill="#e6edf3">                Use the client in src/shared/api and validate the response with a schema.</tspan></text>
+<text class="l2" x="28" y="112" xml:space="preserve"><tspan fill="#8b949e">   1:17  </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">'useEffect' import from 'react' is restricted. [bugyo:use-effect] 製品コードでuseEffectは使えません。</tspan></text>
+<text class="l3" x="28" y="136" xml:space="preserve"><tspan fill="#e6edf3">                購読やタイマーは src/shared/lib の専用フックを使ってください。</tspan></text>
+<text class="l4" x="28" y="160" xml:space="preserve"><tspan fill="#8b949e">  10:3   </tspan><tspan fill="#ff7b8a">error  </tspan><tspan fill="#e6edf3">Unexpected use of 'fetch'. [bugyo:fetch] fetchを直接呼ばないでください。</tspan></text>
+<text class="l5" x="28" y="184" xml:space="preserve"><tspan fill="#e6edf3">                src/shared/api のクライアントを使い、スキーマで応答を検証してください。</tspan></text>
 <text class="l6" x="28" y="222.4" xml:space="preserve"><tspan fill="#35e0c2">$ </tspan><tspan fill="#e6edf3">pnpm verify todos</tspan></text>
 <text class="l7" x="28" y="246.4" xml:space="preserve"><tspan fill="#35e0c2">PASS </tspan><tspan fill="#e6edf3">todos  確認手順: docs/features/todos.md</tspan></text>
 <text class="l8" x="28" y="270.4" xml:space="preserve"><tspan fill="#8b949e">証拠: </tspan><tspan fill="#ffd23f">artifacts/test-results</tspan><tspan fill="#8b949e">（動画・スクリーンショット・トレース）, </tspan><tspan fill="#ffd23f">artifacts/report/index.html</tspan></text>
