@@ -1,0 +1,25 @@
+{
+  "task": "t-002",
+  "type": "chore",
+  "feature": "",
+  "closedAt": "2026-11-18T00:39:24.887Z",
+  "attempt": 1,
+  "rework": 0,
+  "conditions": [],
+  "steps": [
+    {
+      "name": "check",
+      "command": "pnpm check",
+      "status": 0,
+      "ms": 7060
+    }
+  ],
+  "tree": {
+    "paths": [
+      "src",
+      "checks",
+      "test"
+    ],
+    "hash": "sha256:a244857f9187235ab52a233a19f59c1a003ebf014a82bd978c024d3bfc2c4be9"
+  }
+}
