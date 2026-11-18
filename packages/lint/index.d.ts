@@ -77,8 +77,12 @@ export interface BanSpec {
    * どこでは許すか。`effects`（effectHooksDir、なければ `layers.shared.lib` のすべて）、`api`（apiClientDir、なければ `layers.shared.api` のすべて）、`tests`（src の下の *.test.ts(x)）か、root からの glob
    */
   allow?: string[];
+  /**
+   * imports・globals・syntax・properties の項目には、どれも `message` が要る（空や、ない項目は断る）。
+   * 止めた相手が次に何をすればよいか（代わりに使うものと置き場所）を書く
+   */
   imports?: { paths?: RestrictedImportPath[]; patterns?: RestrictedImportPattern[] };
-  globals?: (string | RestrictedGlobal)[];
+  globals?: RestrictedGlobal[];
   syntax?: RestrictedSyntax[];
   properties?: RestrictedProperty[];
   /** 合成しない ESLint のルール（例: `{ 'no-console': 'error' }`）。scope の中で当て、allow の場所では off にする */
