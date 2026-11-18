@@ -135,6 +135,10 @@ export interface BugyoConfig {
      */
     verified?: string | undefined;
   };
+  pullRequests: {
+    /** bugyo task pr-check が、タスクに紐づかなくても通すブランチ名の glob（例: `dependabot/**`） */
+    allowBranches: string[];
+  };
 }
 
 export const configFile: string;

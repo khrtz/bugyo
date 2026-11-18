@@ -6,6 +6,7 @@ import { cliLocale, cliMessages } from './locale.js';
 import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
 import { evaluateGate } from './gate.js';
+import { currentBranch, prCheck } from './pr-check.js';
 import { isMistakeKind, loadMistakes, mistakeJson, mistakeLine, mistakeState, mistakeSummary, mistakeSummaryLine, recordMistake, recordRule, sortMistakes } from './mistakes.js';
 import { claimTask, fetchClaims, listRecords, openClaims, reassignClaim, readRecord, releaseClaim, reserveId } from './claims.js';
 import { changedArchiveIds, duplicateIdsAgainst, notifyVerified, recheckTask } from './recheck.js';
@@ -43,6 +44,7 @@ export const taskUsage = `  bugyo task add "<タイトル>" --type <種類> [--f
   bugyo task lint [--base <ref>]         台帳の整合を検査する（--base なら、<ref> にすでにある id と重なるタスクも見つける）
   bugyo task recheck [<id>...] [--base <ref>] [--notify]  完了タスクの証拠を取り直して照合する（CI 用。--base なら <ref>...HEAD で閉じたタスク。
                                          --notify なら、通ったタスクの課題に notify.verified のコマンドで知らせる）
+  bugyo task pr-check [--branch <名前>] [--base <ref>]  CI 用: PR の作業がタスクに紐づいているかを確かめる（task/<id> のブランチか、台帳の差分）
   bugyo mistake ls                       ミスの種類ごとの回数とルール、ルール化済みの種類の数
   bugyo mistake rule <種類> --at <パス> [--name <ルールの名前>]  ルールに変えたことを記録する
   bugyo gate [--scope <まとまり>]        任せる範囲を広げてよいかを、作業の種類のまとまりごとに計算する
@@ -73,6 +75,7 @@ function parse(args) {
         at: { type: 'string' },
         name: { type: 'string' },
         base: { type: 'string' },
+        branch: { type: 'string' },
         scope: { type: 'string' },
         expect: { type: 'string' },
         json: { type: 'boolean' },
@@ -453,6 +456,21 @@ function lint(args, cwd) {
  * @param {string[]} args
  * @param {string} cwd
  */
+function prCheckCommand(args, cwd) {
+  const { values } = parse(args);
+  const branch = currentBranch(cwd, values.branch);
+  const result = prCheck({ cwd, branch, base: values.base, allowBranches: loadConfig(cwd).pullRequests.allowBranches, tasks: loadTasks(cwd) });
+  const how = { branch: 'ブランチ名', ledger: '台帳の差分', allowed: 'pullRequests.allowBranches' };
+  if (values.json) console.log(JSON.stringify({ branch, ...result }));
+  else if (result.ok) console.log(`pr-check: OK ${branch}（${how[result.how]}${result.ids.length === 0 ? '' : `: ${result.ids.join(', ')}`}）`);
+  else console.error(`pr-check: NG ${result.message}`);
+  return result.ok ? 0 : 1;
+}
+
+/**
+ * @param {string[]} args
+ * @param {string} cwd
+ */
 function recheck(args, cwd) {
   const { values, positionals } = parse(args);
   if (positionals.length === 0 && values.base === undefined) throw new UsageError('使い方: bugyo task recheck <id>... か bugyo task recheck --base <ref>');
@@ -517,10 +535,12 @@ export function taskCommand(args, cwd = process.cwd()) {
       return lint(rest, cwd);
     case 'recheck':
       return recheck(rest, cwd);
+    case 'pr-check':
+      return prCheckCommand(rest, cwd);
     case 'release':
       return release(rest, cwd);
     default:
-      throw new UsageError(`bugyo task のサブコマンドは add / ready / start / show / repro / done / rework / drop / release / ls / lint / recheck です`);
+      throw new UsageError(`bugyo task のサブコマンドは add / ready / start / show / repro / done / rework / drop / release / ls / lint / recheck / pr-check です`);
   }
 }
 

@@ -802,3 +802,38 @@ test('task lint --base: 別のブランチで同じ id を振ったタスクを�
   assert.equal(run.status, 1, run.all);
   assert.match(run.stderr, /t-001 は main の .*archive\/t-001\.md と同じ id の別のタスクです/);
 });
+
+test('task pr-check: task/<id> のブランチか台帳の差分で紐づきを確かめ、allowBranches は通す', () => {
+  const cwd = repo();
+  ok(cwd, 'task', 'add', 'a', '--type', 'chore');
+  ok(cwd, 'task', 'add', 'b', '--type', 'chore');
+  ok(cwd, 'task', 'drop', 't-002', '-r', 'いらなくなった');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'tasks');
+
+  assert.match(ok(cwd, 'task', 'pr-check', '--branch', 'task/t-001-login').stdout, /^pr-check: OK task\/t-001-login（ブランチ名: t-001）/);
+  const missing = bugyo(cwd, 'task', 'pr-check', '--branch', 'task/t-009');
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /タスク t-009 が台帳にありません/);
+  assert.match(bugyo(cwd, 'task', 'pr-check', '--branch', 'task/t-002').stderr, /t-002 は中止されています/);
+
+  git(cwd, 'switch', '-q', '-c', 'fix-typo');
+  writeFileSync(join(cwd, 'README.md'), 'typo\n');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'typo');
+  const unlinked = bugyo(cwd, 'task', 'pr-check', '--base', 'main');
+  assert.equal(unlinked.status, 1, unlinked.all);
+  assert.match(unlinked.stderr, /ブランチ fix-typo の作業がタスクに紐づいていません/);
+  assert.match(unlinked.stderr, /pullRequests\.allowBranches/);
+
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', 'start');
+  assert.match(ok(cwd, 'task', 'pr-check', '--base', 'main').stdout, /OK fix-typo（台帳の差分: t-001）/);
+
+  git(cwd, 'switch', '-q', '-c', 'dependabot/npm/zod-4', 'main');
+  assert.equal(bugyo(cwd, 'task', 'pr-check', '--base', 'main').status, 1);
+  editConfig(cwd, (config) => (config.pullRequests = { allowBranches: ['dependabot/**'] }));
+  const allowed = JSON.parse(ok(cwd, 'task', 'pr-check', '--base', 'main', '--json').stdout);
+  assert.deepEqual(allowed, { branch: 'dependabot/npm/zod-4', ok: true, how: 'allowed', ids: [] });
+});

@@ -8,7 +8,7 @@
 | [コマンド](#コマンド) | 実装済み（`tree` は未実装） |
 | [証拠つきの完了](#証拠つきの完了) | 実装済み（`ui-look` の基準画像の記録は未実装） |
 | [設定](#設定) | 実装済み |
-| [機械的に守らせる場所](#機械的に守らせる場所) | CLI、`bugyo task lint`、CI での証拠の取り直しと設定の変更の検出は実装済み。プラグインのフックで、判定を決めるファイルの直接の書き換えを断るのと、終わる前に `bugyo task lint` を実行するのも実装済み。タスクに紐づかない PR の検出と、セッションの始まりと終わりのフックは未実装 |
+| [機械的に守らせる場所](#機械的に守らせる場所) | CLI、`bugyo task lint`、CI での証拠の取り直しと設定の変更の検出は実装済み。プラグインのフックで、判定を決めるファイルの直接の書き換えを断るのと、終わる前に `bugyo task lint` を実行するのも実装済み。CI でタスクに紐づかない PR を見つけるのも実装済み。セッションの始まりと終わりのフックは未実装 |
 | [ミスの記録とルールへの昇格](#ミスの記録とルールへの昇格) | 実装済み |
 | [門番](#門番bugyo-gate) | 実装済み |
 
@@ -84,6 +84,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 | `bugyo task ls [--all]` | 人 | 一覧。`--all` で完了とやめたものも出す |
 | `bugyo task lint [--base <ref>]` | `pnpm check`・CI | 台帳の整合を検査する。`--base` なら、`<ref>...HEAD` で足したタスクのうち、`<ref>` にすでにある id の別のタスク（作った日時が違うもの）も見つける |
 | `bugyo task recheck [<id>...] [--base <ref>] [--notify]` | CI | 完了タスクの証拠を取り直して照合する。`--base` なら `<ref>...HEAD` で `archive/` に追加・変更されたタスクが対象。証拠ファイルは書き換えない。`--notify` なら、照合に通った `issue` つきのタスクを `notify.verified` のコマンドで知らせる |
+| `bugyo task pr-check [--branch <名前>] [--base <ref>]` | CI | PR の作業がタスクに紐づいているかを確かめる。ブランチ名が `task/<id>`（`task/t-001-login` のように後ろに説明を付けてよい）でそのタスクが台帳にあるか、`--base` からの差分でタスクのファイルが変わっていれば通る。ブランチ名は `--branch`、`GITHUB_HEAD_REF`、今のブランチの順に見る |
 | `bugyo mistake ls` / `rule <種類> --at <パス> [--name <ルールの名前>]` | 人・エージェント | ミスの一覧とルール化済みの種類の数と、ルール化したことの記録 |
 | `bugyo gate` | 人 | 任せる範囲を広げてよいかを計算する。合格で 0、不合格で 1 |
 | `bugyo stats` | 人 | 閉じたタスクの実績を、作業の種類・モデル・ハーネスごとに出す |
@@ -214,6 +215,7 @@ jobs:
 | `gate.maxDropped` | `2` | そのうち中止したタスクの上限 |
 | `gate.scopes` | 下の3つ | 作業の種類のまとまりごとの判定。`{ "<名前>": { "types": [...], "window"?: …, "maxRework"?: …, "minFirstPass"?: …, "maxDropped"?: … } }`。しきい値を省いたまとまりは上の値を使う |
 | `claims.remote` | なし | id の予約と着手の記録を共有するリモートの名前（例: `origin`）。書かなければ、同じマシンの worktree の間だけで共有する |
+| `pullRequests.allowBranches` | `[]` | `bugyo task pr-check` が、タスクに紐づかなくても通すブランチ名の glob（例: `["dependabot/**", "release/*"]`） |
 | `notify.verified` | なし | `bugyo task recheck --notify` が、照合に通った `issue` つきのタスクごとに実行するコマンド（上の「課題に知らせる」） |
 
 - 既定値を使うのは、`commands` のキーそのものがないときだけです。`commands` があれば書かれたものだけを使い、そのタスクの種類に必要なコマンドが未定義か空なら `done` は断ります
@@ -230,7 +232,7 @@ jobs:
 | CI（`bugyo task recheck --base`） | その PR で閉じたタスクのうち、取り直すと通らないもの、`evidence-tree` が今のコードと合わないもの、記録されたコマンドが今の設定と違うもの | 実装済み |
 | CI（`config guard`） | `.bugyo/config.json` を変えた PR で、ラベル `bugyo-config-approved` が付いていないもの | 実装済み |
 | CI（`bugyo task lint --base`） | ベースのブランチにすでにある id と同じ id の別のタスクを足した PR | 実装済み |
-| CI | タスクに紐づかない PR（ブランチ名 `task/<id>` で判定） | 未実装 |
+| CI（`bugyo task pr-check --base`） | タスクに紐づかない PR。ブランチ名が `task/<id>`（台帳にあり、中止されていない）か、PR でタスクのファイルが変わっていれば紐づいているとみなす。`pullRequests.allowBranches` に合うブランチは通す | 実装済み |
 | Claude Code のフック（プラグイン） | エージェントが、`.bugyo/config.json`・証拠ファイル・ベースラインのファイルを書き換えること、タスク台帳の状態の項目（`status`・`assignee`・`model`・`harness`・`rework`・`gate-attempts`・`repro`・`evidence` など）を書き換えること、台帳のファイルを手で作ること。シェルのコマンドでの書き換えは、リダイレクトや `sed -i`・`rm`・`cp` などの形を見て止める | 実装済み |
 | Claude Code のフック（プラグイン、`Stop`） | エージェントが作業を終える前に `bugyo task lint` を実行し、落ちたら理由を返して終わらせない（手で閉じたタスクを `pnpm check` を待たずに見つける）。止めるのは1回だけで、続けて終わろうとしたときは止めない | 実装済み |
 | Claude Code のフック | セッション開始時に `bugyo task ready` を見せる。`active` なタスクを残したまま終わろうとしたら知らせる | 未実装 |

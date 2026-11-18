@@ -121,7 +121,10 @@ npx bugyo task done t-001
     fetch-depth: 0
 - run: npm ci
 - run: npx bugyo task recheck --base "origin/${{ github.base_ref }}"
+- run: npx bugyo task pr-check --base "origin/${{ github.base_ref }}"
 ```
+
+`pr-check` は、PR の作業がタスクに紐づいているか（`task/<id>` のブランチか、PR でタスクのファイルを変えたか）を確かめます。依存の更新などタスクのいらないブランチは、`.bugyo/config.json` の `pullRequests.allowBranches` に glob で書きます。
 
 外の課題管理を使っているなら、`task add --issue <参照>` で課題を結び、`recheck --notify` で、証拠を取り直して通ったことをその課題に知らせられます（[課題に知らせる](tasks.md#課題に知らせる)）。
 
