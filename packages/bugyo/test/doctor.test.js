@@ -139,6 +139,46 @@ test('baseline check はベースラインがなければ何もしない', () =>
   assert.match(run.all, /がないので/);
 });
 
+const layers = { app: 'web/pages', features: 'web/features', shared: { ui: 'web/app/ui', api: 'web/app/api', lib: 'web/app/lib' } };
+
+/** @param {string} cwd */
+function withLayers(cwd) {
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ layers }));
+  for (const file of ['web/pages/home.tsx', 'web/features/billing/index.ts', 'web/app/ui/Button.tsx', 'web/main.tsx', 'web/legacy/old.js', 'web/legacy/notes.md']) {
+    mkdirSync(join(cwd, file, '..'), { recursive: true });
+    writeFileSync(join(cwd, file), '');
+  }
+}
+
+test('layers: doctor は、どの層にも入っていないコードのファイルを出す', () => {
+  const cwd = project();
+  withLayers(cwd);
+  setResults(cwd, {});
+  const run = bugyo(cwd, 'doctor', '--json');
+  assert.equal(run.status, 0, run.all);
+  assert.deepEqual(JSON.parse(run.all).outsideLayers, ['web/legacy/old.js', 'web/main.tsx']);
+});
+
+test('layers: 機能のフォルダの既定は layers.features になり、new feature は雛形を作らず断る', async () => {
+  const cwd = project();
+  withLayers(cwd);
+  const { loadConfig } = await import('../src/config.js');
+  assert.equal(loadConfig(cwd).featureMap.featuresDir, 'web/features');
+  const run = bugyo(cwd, 'new', 'feature', 'invoices');
+  assert.equal(run.status, 1);
+  assert.match(run.all, /layers があるので.*web\/features\/invoices を手で作り/);
+  assert.equal(readFileSync(join(cwd, '.bugyo/config.json'), 'utf8'), JSON.stringify({ layers }));
+});
+
+test('layers: 層のフォルダは ./ や末尾の / のない相対パスでなければ断る', async () => {
+  const cwd = project();
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ layers: { ...layers, app: './web/pages/' } }));
+  const { loadConfig } = await import('../src/config.js');
+  assert.throws(() => loadConfig(cwd), /相対パス/);
+});
+
 test('baseline diff は、base よりベースラインが増えたら落ち、減っただけなら通る', () => {
   const cwd = project();
   git(cwd, 'init', '-q', '-b', 'main');

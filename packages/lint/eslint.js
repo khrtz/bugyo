@@ -8,7 +8,13 @@ import { noComments } from './rules/no-comments.js';
 
 /**
  * @typedef {import('./index.js').BugyoOptions} BugyoOptions
- * @typedef {Required<Omit<BugyoOptions, 'parts' | 'extra'>> & { extra: NonNullable<BugyoOptions['extra']> }} Context
+ * @typedef {{ app: string, features: string, shared: { ui: string, api: string, lib: string } }} Layers
+ * @typedef {Required<Omit<BugyoOptions, 'parts' | 'extra' | 'layers'>> & {
+ *   extra: NonNullable<BugyoOptions['extra']>,
+ *   layers: Layers,
+ *   customLayers: boolean,
+ *   featuresLabel: string,
+ * }} Context
  * @typedef {'effects' | 'api' | 'tests'} Exception
  * @typedef {{ value: object, exempt?: Exception[] }} Entry
  * @typedef {{ paths?: Entry[], patterns?: Entry[], globals?: Entry[], syntax?: Entry[], properties?: Entry[] }} Bans
@@ -98,33 +104,44 @@ export const structure = {
   name: 'structure',
   rank: 2,
   build: (context) => {
-    const { root, src } = context;
-    const internals = ['@/features/*/*', '**/features/*/*'];
+    const { root, src, layers, customLayers } = context;
+    const { app, features, shared } = layers;
+    const featuresName = features.split('/').at(-1) ?? features;
+    const internals = customLayers ? [`**/${featuresName}/*/*`] : ['@/features/*/*', '**/features/*/*'];
+    const indexes = customLayers ? [`!**/${featuresName}/*/index.ts`] : ['!@/features/*/index.ts', '!**/features/*/index.ts'];
+    const sharedDirs = [shared.ui, shared.api, shared.lib];
+    const zones = customLayers
+      ? [
+          {
+            target: sharedDirs.map((dir) => `./${dir}`),
+            from: [`./${features}`, `./${app}`],
+            message: `${sharedDirs.join('・')} は ${features} や ${app} に依存できません。`,
+          },
+          { target: `./${features}`, from: `./${app}`, message: `${features} は ${app} に依存できません。` },
+          {
+            target: `./${features}/*/model/**/*`,
+            from: [`./${shared.ui}`, `./${shared.api}`],
+            message: `model/ が使えるのは自分のmodelと ${shared.lib} だけです。`,
+          },
+        ]
+      : [
+          {
+            target: `./${src}/shared`,
+            from: [`./${src}/features`, `./${src}/app`],
+            message: 'shared は features や app に依存できません。',
+          },
+          { target: `./${src}/features`, from: `./${src}/app`, message: 'features は app に依存できません。' },
+        ];
     return {
       plugins: { 'import-x': importX },
       settings: { 'import-x/resolver-next': [createTypeScriptImportResolver({ project: `${root}/tsconfig.json` })] },
-      srcRules: {
-        'import-x/no-restricted-paths': [
-          'error',
-          {
-            basePath: root,
-            zones: [
-              {
-                target: `./${src}/shared`,
-                from: [`./${src}/features`, `./${src}/app`],
-                message: 'shared は features や app に依存できません。',
-              },
-              { target: `./${src}/features`, from: `./${src}/app`, message: 'features は app に依存できません。' },
-            ],
-          },
-        ],
-      },
+      srcRules: { 'import-x/no-restricted-paths': ['error', { basePath: root, zones }] },
       src: {
         patterns: [
           {
             value: {
-              group: context.explicitExtensions ? [...internals, '!@/features/*/index.ts', '!**/features/*/index.ts'] : internals,
-              message: 'featureの内部ファイルは直接importできません。features/<名前>/index.ts から公開されたものを使ってください。',
+              group: context.explicitExtensions ? [...internals, ...indexes] : internals,
+              message: `featureの内部ファイルは直接importできません。${customLayers ? features : 'features'}/<名前>/index.ts から公開されたものを使ってください。`,
             },
           },
         ],
@@ -146,18 +163,48 @@ export const structure = {
               message: 'model/ から ui/ や api/ はimportできません。依存の向きは ui → api → model です。',
             },
           },
-          {
-            value: {
-              group: ['@/shared/ui', '@/shared/ui/*', '@/shared/api', '@/shared/api/*'],
-              message: 'model/ が使えるのは自分のmodelと shared/lib だけです。',
-            },
-          },
+          ...(customLayers
+            ? []
+            : [
+                {
+                  value: {
+                    group: ['@/shared/ui', '@/shared/ui/*', '@/shared/api', '@/shared/api/*'],
+                    message: 'model/ が使えるのは自分のmodelと shared/lib だけです。',
+                  },
+                },
+              ]),
         ],
       },
       exceptions: ['api'],
     };
   },
 };
+
+/**
+ * 層のフォルダを、指定のないところは `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}` で埋める。
+ * どの層も src の中になければ断る（src の外のファイルには bugyo のルールが当たらないため）。
+ *
+ * @param {string} src
+ * @param {BugyoOptions['layers']} layers
+ * @returns {Layers}
+ */
+export function resolveLayers(src, layers) {
+  const resolved = {
+    app: trimSlash(layers?.app ?? `${src}/app`),
+    features: trimSlash(layers?.features ?? `${src}/features`),
+    shared: {
+      ui: trimSlash(layers?.shared?.ui ?? `${src}/shared/ui`),
+      api: trimSlash(layers?.shared?.api ?? `${src}/shared/api`),
+      lib: trimSlash(layers?.shared?.lib ?? `${src}/shared/lib`),
+    },
+  };
+  const outside = [resolved.app, resolved.features, ...Object.values(resolved.shared)].filter((dir) => !dir.startsWith(`${src}/`));
+  if (outside.length > 0) throw new Error(`bugyo({ layers }) の ${outside.join(', ')} が src（${src}）の中にありません。src に層をまとめて入れるフォルダを渡してください`);
+  return resolved;
+}
+
+/** @param {string} path */
+const trimSlash = (path) => path.replace(/^\.\//, '').replace(/\/+$/, '');
 
 /** @param {Context} context @returns {Contribution} */
 const extraContribution = (context) => {
@@ -201,12 +248,25 @@ const merged = (list, key) => Object.assign({}, ...list.map((contribution) => co
  */
 export function bugyo(options) {
   const { root, src = 'src', ignores = [], extra = {}, parts = [common, structure], explicitExtensions = false } = options;
-  const { effectHooksDir = `${src}/shared/lib`, apiClientDir = `${src}/shared/api` } = options;
   if (typeof root !== 'string') throw new Error('bugyo({ root }) に import.meta.dirname を渡してください');
   if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
+  const layers = resolveLayers(src, options.layers);
+  const { effectHooksDir = layers.shared.lib, apiClientDir = layers.shared.api } = options;
+  const customLayers = options.layers !== undefined;
 
   /** @type {Context} */
-  const context = { root, src, effectHooksDir, apiClientDir, ignores, extra, explicitExtensions };
+  const context = {
+    root,
+    src,
+    effectHooksDir,
+    apiClientDir,
+    ignores,
+    extra,
+    explicitExtensions,
+    layers,
+    customLayers,
+    featuresLabel: customLayers ? layers.features : 'features',
+  };
   const built = [...new Set(parts)].sort((a, b) => a.rank - b.rank).map((part) => part.build(context));
   const extras = extraContribution(context);
 
@@ -230,7 +290,7 @@ export function bugyo(options) {
   /** @type {import('eslint').Linter.Config[]} */
   const scopeBlocks = [];
   /** @type {Record<'ui' | 'model', string>} */
-  const scopeFiles = { ui: `${src}/features/*/ui/**/*.{ts,tsx}`, model: `${src}/features/*/model/**/*.ts` };
+  const scopeFiles = { ui: `${layers.features}/*/ui/**/*.{ts,tsx}`, model: `${layers.features}/*/model/**/*.ts` };
   for (const scope of /** @type {const} */ (['ui', 'model'])) {
     /** @type {Record<string, unknown>} */
     const rules = {};

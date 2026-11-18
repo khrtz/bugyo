@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { baselineFile, baselineGrowth, banCounts, compareCounts, depcruiseConfig, readBaseline, saveBaseline, tscErrors } from './doctor.js';
+import { commonDir, layerDirs, loadConfig } from './config.js';
+import { baselineFile, baselineGrowth, banCounts, compareCounts, depcruiseConfig, filesOutsideLayers, readBaseline, saveBaseline, tscErrors } from './doctor.js';
 import { UsageError } from './task-cli.js';
 
-export const doctorUsage = `  bugyo doctor [--dirs <a,b>] [--tsconfig <path>]  何も変えずに、禁止ごとの違反の件数を出す（入れる前の見積もり）
+export const doctorUsage = `  bugyo doctor [--dirs <a,b>] [--tsconfig <path>]  何も変えずに、禁止ごとの違反の件数と、どの層にも入っていないファイルを出す（入れる前の見積もり）
   bugyo baseline save [--dirs <a,b>]  今の違反をすべてベースラインにする（ESLint の抑制・dependency-cruiser の既知の違反・禁止ごとの件数）
   bugyo baseline check [--dirs <a,b>] 禁止ごとの件数がベースラインと同じか確かめる（pnpm check に入れる）
   bugyo baseline diff --base <ref>    ベースラインのファイルが <ref> より増えていないか確かめる（CI 用）`;
@@ -23,14 +24,16 @@ function parse(args) {
 }
 
 /**
- * dependency-cruiser に渡すフォルダ。指定がなければ src（なければ渡さない）。
+ * dependency-cruiser に渡すフォルダ。指定がなければ、layers の層をまとめたフォルダ、layers がなければ src（なければ渡さない）。
  *
  * @param {string} cwd
  * @param {string | undefined} option
  */
 function dirsOf(cwd, option) {
   if (option !== undefined) return option.split(',').map((dir) => dir.trim()).filter((dir) => dir !== '');
-  return existsSync(join(cwd, 'src')) ? ['src'] : [];
+  const config = loadConfig(cwd);
+  const root = config.layers === undefined ? 'src' : commonDir(layerDirs(config));
+  return existsSync(join(cwd, root)) ? [root] : [];
 }
 
 /** @param {Record<string, number>} counts */
@@ -49,13 +52,20 @@ export function doctorCommand(args, cwd = process.cwd()) {
   const { counts, errors } = banCounts(cwd, dirs);
   const tsc = values.tsconfig === undefined ? undefined : tscErrors(cwd, values.tsconfig);
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  const config = loadConfig(cwd);
+  const outside = config.layers === undefined ? undefined : filesOutsideLayers(cwd, layerDirs(config), commonDir(layerDirs(config)));
   if (values.json) {
-    console.log(JSON.stringify({ total, counts, tsc, errors }));
+    console.log(JSON.stringify({ total, counts, tsc, outsideLayers: outside, errors }));
   } else {
     console.log(`doctor: 違反 ${total}件（禁止ごと、多い順。ESLint の抑制ファイルで隠れているものも数える）`);
     for (const line of countLines(counts)) console.log(line);
     if (depcruiseConfig(cwd) === undefined) console.log('  dependency-cruiser の設定がないので、依存の違反は数えていません');
     if (tsc !== undefined) console.log(`tsc（${values.tsconfig}）: エラー ${tsc}件`);
+    if (outside !== undefined) {
+      console.log(`どの層にも入っていないファイル ${outside.length}件（層の境界のルールが当たりません）`);
+      for (const path of outside.slice(0, 20)) console.log(`  ${path}`);
+      if (outside.length > 20) console.log(`  ほか ${outside.length - 20}件（--json ですべて出ます）`);
+    }
     for (const error of errors) console.error(`error ${error}`);
   }
   return errors.length > 0 ? 1 : 0;

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { join, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
 import { config } from '../depcruise.cjs';
@@ -84,6 +85,43 @@ test('depcruise: 既定では model-is-pure は React とその周辺を見ず�
   const pure = (options) => config(options).forbidden.find((rule) => rule.name === 'model-is-pure').to.path;
   assert.doesNotMatch(pure(), /node_modules/);
   assert.match(pure({ react: true }), /node_modules\/\(react\|react-dom\|@tanstack\)/);
+});
+
+const layersRoot = join(import.meta.dirname, 'fixture-layers');
+const { layers } = JSON.parse(readFileSync(join(layersRoot, '.bugyo/config.json'), 'utf8'));
+
+test('layers: 層のフォルダ名と import の別名が既定と違っても、解決したパスで境界を止める', async () => {
+  const linter = new ESLint({ cwd: layersRoot });
+  const found = (await linter.lintFiles(['web/**/*.ts'])).flatMap((result) =>
+    result.messages.map((m) => `${relative(layersRoot, result.filePath).split(sep).join('/')}:${m.line} ${m.ruleId}`),
+  );
+  assert.deepEqual(found.sort(), [
+    'web/app/lib/leak.ts:1 import-x/no-restricted-paths',
+    'web/app/lib/leak.ts:2 import-x/no-restricted-paths',
+    'web/features/report/api/fetchReport.ts:1 no-restricted-globals',
+    'web/features/report/model/bad.ts:1 import-x/no-restricted-paths',
+    'web/features/report/model/bad.ts:2 import-x/no-restricted-paths',
+    'web/features/report/model/bad.ts:3 no-restricted-imports',
+    'web/pages/main.ts:2 no-restricted-imports',
+  ]);
+});
+
+test('layers: src の外にある層は断る', () => {
+  assert.throws(() => bugyo({ root: layersRoot, layers }), /src（src）の中にありません/);
+});
+
+test('depcruise: layers の場所で構成の境界を止める', () => {
+  const run = spawnSync('pnpm', ['exec', 'depcruise', 'web', '--output-type', 'json'], { cwd: layersRoot, encoding: 'utf8', shell: process.platform === 'win32' });
+  const violations = JSON.parse(run.stdout).summary.violations.map((v) => `${v.rule.name} ${v.from} -> ${v.to}`);
+  assert.deepEqual(violations.sort(), [
+    'app-only-via-feature-index web/pages/main.ts -> web/features/calc/model/add.ts',
+    'feature-internals-only-via-index web/features/report/model/bad.ts -> web/features/calc/model/add.ts',
+    'model-is-pure web/features/report/model/bad.ts -> web/app/api/client.ts',
+    'model-is-pure web/features/report/model/bad.ts -> web/app/ui/label.ts',
+    'model-is-pure web/features/report/model/bad.ts -> web/features/calc/model/add.ts',
+    'shared-is-leaf web/app/lib/leak.ts -> web/features/calc/index.ts',
+    'shared-is-leaf web/app/lib/leak.ts -> web/pages/main.ts',
+  ]);
 });
 
 test('depcruise: React のないフィクスチャでも構成の境界を止める', () => {

@@ -32,9 +32,14 @@ export interface BugyoConfig {
     specDir: string | null;
     /** spec のファイル名の末尾。既定は `.spec.ts` */
     specSuffix: string;
-    /** 機能のフォルダを並べる場所。既定は `src/features`。null で検査を飛ばす */
+    /** 機能のフォルダを並べる場所。既定は `layers.features`、layers がなければ `src/features`。null で検査を飛ばす */
     featuresDir: string | null;
   };
+  /**
+   * 層のフォルダの場所（プロジェクトのルートからの相対パス）。書いたときは bugyo new feature が雛形を作らず断り、
+   * bugyo doctor がどの層にも入っていないファイルを出す。ESLint と dependency-cruiser には同じ値を渡す
+   */
+  layers?: { app: string; features: string; shared: { ui: string; api: string; lib: string } } | undefined;
   /** bugyo task done が実行するコマンド。このキーがないときだけ、packageManager に合わせた既定値（pnpm なら pnpm check / pnpm test / bugyo verify {feature}）を使う */
   commands?: { check?: string | undefined; test?: string | undefined; verify?: string | undefined } | undefined;
   evidence: {

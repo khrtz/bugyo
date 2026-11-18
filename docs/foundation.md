@@ -52,9 +52,10 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, rea
 | 項目 | 既定 | 意味 |
 | --- | --- | --- |
 | `root` | 必須 | `import.meta.dirname` を渡す |
-| `src` | `src` | ソースの場所 |
-| `effectHooksDir` | `<src>/shared/lib` | `useEffect` を書いてよい場所 |
-| `apiClientDir` | `<src>/shared/api` | `fetch` を呼んでよい場所 |
+| `src` | `src` | ソースの場所。`layers` のフォルダはすべてこの中に置く |
+| `layers` | `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}` | 層のフォルダの場所（下の「層のフォルダ名を変える」） |
+| `effectHooksDir` | `layers.shared.lib` | `useEffect` を書いてよい場所 |
+| `apiClientDir` | `layers.shared.api` | `fetch` を呼んでよい場所 |
 | `ignores` | `[]` | lint から外すパス（`dist`、`artifacts`、`node_modules` などは最初から外れている） |
 | `extra` | `{}` | 独自の禁止を足す（下の「独自の禁止を足す」） |
 | `parts` | `[common, structure]` | 使う部品（下の「部品」）。`common` は必須 |
@@ -92,6 +93,37 @@ export default bugyo({ root: import.meta.dirname, explicitExtensions: true });
 | `src` の下の `*.test.ts(x)` | `fetch`、`setTimeout` などのタイマー、`React.useEffect` の形、`extra` の `restrictedProperties` / `restrictedSyntax` | `common`・`structure`・`react` |
 
 コメントは、公開 API の JSDoc（`/** */`）と、理由つきの `eslint-disable`（`-- 理由`）だけ書けます。`.js` / `.cjs` / `.mjs` には型を使うルールを当てません。
+
+#### 層のフォルダ名を変える
+
+層のフォルダが `src/app`・`src/features`・`src/shared` でないプロジェクトでは、`layers` で場所を渡します。値は `.bugyo/config.json` の `layers` に1回だけ書き、ESLint と dependency-cruiser はそこから読みます。
+
+```json
+{
+  "layers": {
+    "app": "web/pages",
+    "features": "web/features",
+    "shared": { "ui": "web/app/ui", "api": "web/app/api", "lib": "web/app/lib" }
+  }
+}
+```
+
+```js
+// eslint.config.js
+import { readFileSync } from 'node:fs';
+import { bugyo } from '@bugyo/lint';
+
+const { layers } = JSON.parse(readFileSync(new URL('./.bugyo/config.json', import.meta.url), 'utf8'));
+export default bugyo({ root: import.meta.dirname, src: 'web', layers });
+```
+
+```js
+// .dependency-cruiser.cjs
+const { layers } = require('./.bugyo/config.json');
+module.exports = require('@bugyo/lint/depcruise').config({ src: 'web', layers });
+```
+
+`layers` を渡すと、境界の判定は import の別名（`@/` など）に頼らず、解決したパスで行います（`~/app/ui/x` と `../../app/ui/x` のどちらで書いても同じに止まる）。他の feature の内部ファイルの import は、パスに `features` のフォルダ名（例では `features`）を含む書き方を ESLint が止めます。`.bugyo/config.json` の `layers` には5つの場所をすべて書きます。これを書いたプロジェクトでは、`featureMap.featuresDir` の既定が `layers.features` になり、`bugyo new feature` は雛形を作らずに断ります（雛形は `src/features` の形でしか作れないため）。`bugyo doctor` は、`layers` をまとめたフォルダ（例では `web`）の中で、どの層にも入っていないファイルを出します。
 
 ### 独自の禁止を足す
 
@@ -304,7 +336,8 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 | `verify.command` | なし | `runner` が `command` のときは必須 |
 | `featureMap.specDir` | `e2e` | 対応漏れを探す spec のフォルダ。`null` で検査を飛ばす |
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
-| `featureMap.featuresDir` | `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
+| `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
+| `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared.ui`・`shared.api`・`shared.lib`）。上の「層のフォルダ名を変える」 |
 
 同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 

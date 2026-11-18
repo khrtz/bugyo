@@ -41,6 +41,20 @@ export const common: BugyoPart;
 /** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止、fetch は apiClientDir だけ */
 export const structure: BugyoPart;
 
+export interface BugyoLayers {
+  /** 画面を組み立てる層。feature の index.ts だけを使える */
+  app?: string;
+  /** feature を1つずつフォルダに置く層 */
+  features?: string;
+  /** どの feature からも使える層。features と app には依存できない */
+  shared?: { ui?: string; api?: string; lib?: string };
+}
+
+export function resolveLayers(
+  src: string,
+  layers: BugyoLayers | undefined,
+): { app: string; features: string; shared: { ui: string; api: string; lib: string } };
+
 export interface BugyoOptions {
   /** eslint.config.js で `import.meta.dirname` を渡す */
   root: string;
@@ -51,11 +65,17 @@ export interface BugyoOptions {
    * `features/<id>/index.ts` をファイル名つきで import できるようにする。既定は false
    */
   explicitExtensions?: boolean;
-  /** ソースのルート。既定は `src` */
+  /** ソースのルート。既定は `src`。`layers` のフォルダはすべてこの中に置く */
   src?: string;
-  /** useEffect を書いてよい場所。既定は `<src>/shared/lib` */
+  /**
+   * 層のフォルダの場所（root からの相対パス）。既定は `<src>/app`・`<src>/features`・`<src>/shared/{ui,api,lib}`。
+   * 指定すると、import の別名（`@/` など）に頼らず、解決したパスで層の境界を確かめる。
+   * 例: `{ app: 'web/pages', features: 'web/features', shared: { ui: 'web/app/ui', api: 'web/app/api', lib: 'web/app/lib' } }`
+   */
+  layers?: BugyoLayers;
+  /** useEffect を書いてよい場所。既定は `layers.shared.lib`（`<src>/shared/lib`） */
   effectHooksDir?: string;
-  /** fetch を呼んでよい場所。既定は `<src>/shared/api` */
+  /** fetch を呼んでよい場所。既定は `layers.shared.api`（`<src>/shared/api`） */
   apiClientDir?: string;
   /** 追加で lint 対象から外すパス */
   ignores?: string[];

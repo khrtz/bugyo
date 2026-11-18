@@ -127,6 +127,8 @@ npx bugyo task done t-001
 
 ## lint を段階的に入れる
 
+層のフォルダが `src/app`・`src/features`・`src/shared` でなければ、先に `.bugyo/config.json` の `layers` に場所を書き、ESLint と dependency-cruiser にも渡します（[層のフォルダ名を変える](foundation.md#層のフォルダ名を変える)）。
+
 `@bugyo/lint` を入れると、既存のコードの違反がまとめて出ます。今ある違反はベースラインとして止めずに残し、新しい違反だけを止め、ベースラインは減らす方向にだけ動かします。
 
 ### 1. 入れる前に数える
@@ -135,7 +137,7 @@ npx bugyo task done t-001
 npx bugyo doctor --tsconfig tsconfig.json
 ```
 
-何も書き換えずに、禁止ごとの違反の件数を多い順に出します。ESLint の設定に `@bugyo/lint` を足してから実行すると、入れたあとの件数の見積もりになります。`--tsconfig` を付けると、その tsconfig での `tsc` のエラーの件数も出します（`@bugyo/lint/tsconfig` の厳しさを足したときの見積もり）。dependency-cruiser の設定があれば、依存のルールの違反も数えます。数えるフォルダは `--dirs web,server` で変えられます（既定は `src`）。理由を書いた `eslint-disable` のコメントで止めた違反は数えません。
+何も書き換えずに、禁止ごとの違反の件数を多い順に出します。`layers` を書いていれば、どの層にも入っていないファイル（層の境界のルールが当たらないもの）も出します。ESLint の設定に `@bugyo/lint` を足してから実行すると、入れたあとの件数の見積もりになります。`--tsconfig` を付けると、その tsconfig での `tsc` のエラーの件数も出します（`@bugyo/lint/tsconfig` の厳しさを足したときの見積もり）。dependency-cruiser の設定があれば、依存のルールの違反も数えます。数えるフォルダは `--dirs web,server` で変えられます（既定は `src`）。理由を書いた `eslint-disable` のコメントで止めた違反は数えません。
 
 ### 2. 今の違反をベースラインにする
 

@@ -4,13 +4,13 @@ import reactHooks from 'eslint-plugin-react-hooks';
  * React: `useEffect` の禁止と例外の場所（effectHooksDir）、react-hooks、feature の UI でのタイマー禁止、`model` から React への依存の禁止。
  * `@bugyo/lint` の `bugyo({ parts: [common, structure, react] })` に渡して使う。
  *
- * @type {import('@bugyo/lint').BugyoPart & { build: (context: { effectHooksDir: string }) => object }}
+ * @type {import('@bugyo/lint').BugyoPart & { build: (context: { effectHooksDir: string, featuresLabel?: string }) => object }}
  */
 export const react = {
   name: 'react',
   rank: 1,
   build: (context) => {
-    const effectMessage = `製品コードでuseEffectは使えません。データ取得は features/*/api の useXxxQuery、購読やタイマーは ${context.effectHooksDir} の専用フックを使ってください。該当するフックがなければ ${context.effectHooksDir} に追加してください。`;
+    const effectMessage = `製品コードでuseEffectは使えません。データ取得は ${context.featuresLabel ?? 'features'}/*/api の useXxxQuery、購読やタイマーは ${context.effectHooksDir} の専用フックを使ってください。該当するフックがなければ ${context.effectHooksDir} に追加してください。`;
     return {
       srcPlugins: { 'react-hooks': reactHooks },
       srcRules: { ...reactHooks.configs.recommended.rules },

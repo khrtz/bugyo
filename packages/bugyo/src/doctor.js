@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { commandEnv } from './run.js';
 
@@ -134,6 +134,34 @@ export function banCounts(cwd, dirs) {
     else errors.push(depcruise.error);
   }
   return { counts: Object.fromEntries([...merged].sort(([a], [b]) => a.localeCompare(b))), errors };
+}
+
+const codeFile = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
+
+/**
+ * 層のフォルダをまとめたフォルダ（`web` など）の中で、どの層にも入っていないコードのファイル。
+ * ここにあるファイルには、層の境界のルールが当たらない。
+ *
+ * @param {string} cwd
+ * @param {string[]} layers 層のフォルダ（プロジェクトのルートからの相対パス）
+ * @param {string} root 層のフォルダをまとめたフォルダ
+ */
+export function filesOutsideLayers(cwd, layers, root) {
+  /** @type {string[]} */
+  const found = [];
+  /** @param {string} dir */
+  const walk = (dir) => {
+    if (!existsSync(join(cwd, dir))) return;
+    for (const entry of readdirSync(join(cwd, dir), { withFileTypes: true })) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const path = dir === '.' ? entry.name : `${dir}/${entry.name}`;
+      if (layers.includes(path)) continue;
+      if (entry.isDirectory()) walk(path);
+      else if (codeFile.test(entry.name)) found.push(path);
+    }
+  };
+  walk(root);
+  return found.sort();
 }
 
 /**

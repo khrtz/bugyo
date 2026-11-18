@@ -16,7 +16,20 @@ const FeatureMap = z
   .object({
     specDir: z.string().nullable().default('e2e'),
     specSuffix: z.string().min(1).default('.spec.ts'),
-    featuresDir: z.string().nullable().default('src/features'),
+    featuresDir: z.string().nullable().optional(),
+  })
+  .strict();
+
+const LayerDir = z
+  .string()
+  .min(1)
+  .regex(/^(?!\.{1,2}(\/|$))(?!\/)[^\\]*[^/\\]$/,'プロジェクトのルートからの相対パス（先頭の ./ や末尾の / なし、区切りは /）にしてください');
+
+const Layers = z
+  .object({
+    app: LayerDir,
+    features: LayerDir,
+    shared: z.object({ ui: LayerDir, api: LayerDir, lib: LayerDir }).strict(),
   })
   .strict();
 
@@ -111,6 +124,7 @@ const Config = z
   .object({
     template: z.string().min(1).optional(),
     packageManager: z.enum(packageManagers).optional(),
+    layers: Layers.optional(),
     verify: Verify.prefault({}),
     featureMap: FeatureMap.prefault({}),
     commands: Commands.optional(),
@@ -144,7 +158,35 @@ export function loadConfig(cwd = process.cwd()) {
   if (parsed.data.verify.runner === 'command' && !parsed.data.verify.command?.trim()) {
     throw new Error(`${configFile}: verify.runner が "command" のときは verify.command にコマンドを書いてください（{id} と {spec} が置き換わります）`);
   }
-  return { ...parsed.data, packageManager: parsed.data.packageManager ?? detectPackageManager(cwd) };
+  const { featureMap, layers } = parsed.data;
+  return {
+    ...parsed.data,
+    featureMap: { ...featureMap, featuresDir: featureMap.featuresDir === undefined ? (layers?.features ?? 'src/features') : featureMap.featuresDir },
+    packageManager: parsed.data.packageManager ?? detectPackageManager(cwd),
+  };
+}
+
+/**
+ * 層のフォルダの一覧（app・features・shared の ui / api / lib）。`layers` がなければ src の下の既定の場所。
+ *
+ * @param {import('./index.js').BugyoConfig} config
+ */
+export function layerDirs(config) {
+  const layers = config.layers ?? { app: 'src/app', features: 'src/features', shared: { ui: 'src/shared/ui', api: 'src/shared/api', lib: 'src/shared/lib' } };
+  return [layers.app, layers.features, layers.shared.ui, layers.shared.api, layers.shared.lib];
+}
+
+/**
+ * 層のフォルダをすべて含む、いちばん深いフォルダ（`web/pages` と `web/app/ui` なら `web`）。
+ *
+ * @param {string[]} dirs
+ */
+export function commonDir(dirs) {
+  const split = dirs.map((dir) => dir.split('/'));
+  const first = split[0] ?? [];
+  let length = 0;
+  while (length < first.length && split.every((parts) => parts[length] === first[length])) length += 1;
+  return first.slice(0, Math.min(length, ...split.map((parts) => parts.length - 1))).join('/') || '.';
 }
 
 /**
