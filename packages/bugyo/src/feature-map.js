@@ -75,7 +75,7 @@ export function loadFeatures(cwd = process.cwd()) {
 }
 
 /**
- * 4つの見出しのうち、中身が空か雛形のまま（`（…）` だけの項目や、`：` の後が空の項目が残っている。英語の見出しでは `(…)` と `:`）のものを、日本語の名前で返す。
+ * 4つの見出しのうち、中身が空か雛形のまま（`（…）` だけの項目や、`：` の後が空の項目が残っている。英語の見出しでは、それに加えて `(…)` と `:`）のものを、日本語の名前で返す。
  *
  * @param {import('./index.js').Feature} feature
  * @returns {string[]}
@@ -90,7 +90,7 @@ export function unfilledSections(feature) {
       const end = rest.findIndex((line) => /^#{1,2} /.test(line));
       const content = (end < 0 ? rest : rest.slice(0, end)).map((line) => line.trim()).filter((line) => line !== '');
       const english = lines[start]?.trim() === `## ${heading.en}`;
-      const placeholder = english ? (/** @type {string} */ line) => /^- \([^)]*\)$/.test(line) || /^- [^:]+:$/.test(line) : (/** @type {string} */ line) => /^- （[^）]*）$/.test(line) || /^- [^：]+：$/.test(line);
+      const placeholder = (/** @type {string} */ line) => /^- （[^）]*）$/.test(line) || /^- [^：]+：$/.test(line) || (english && (/^- \([^)]*\)$/.test(line) || /^- [^:]+:$/.test(line)));
       return content.length === 0 || content.some(placeholder);
     })
     .map((heading) => heading.ja);

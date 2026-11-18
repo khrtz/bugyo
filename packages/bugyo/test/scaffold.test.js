@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { loadConfig } from '../src/config.js';
 import { featureMapChecks } from '../src/feature-map-checks.js';
-import { loadFeatures, loadSweepOrder, requiredSections, unfilledSections } from '../src/feature-map.js';
+import { loadFeatures, loadSweepOrder, requiredSections, sectionHeadings, unfilledSections } from '../src/feature-map.js';
 import { init, newFeature } from '../src/scaffold.js';
 
 function emptyProject() {
@@ -51,6 +51,13 @@ test('feature map の見出しは英語でも書け、雛形のままかどう�
   const [placeholder] = loadFeatures(cwd);
   assert.ok(placeholder);
   assert.deepEqual(unfilledSections(placeholder), ['何があるか', 'どう操作して確かめるか']);
+
+  const scaffolded = newFeature('hello', { cwd }).created.find((path) => path.endsWith('hello.md')) ?? '';
+  const translated = sectionHeadings.reduce((text, heading) => text.replace(`## ${heading.ja}`, `## ${heading.en}`), readFileSync(join(cwd, scaffolded), 'utf8'));
+  writeFileSync(join(cwd, scaffolded), translated);
+  const renamed = loadFeatures(cwd).find((feature) => feature.id === 'hello');
+  assert.ok(renamed && !renamed.body.includes('## 何があるか'));
+  assert.deepEqual(unfilledSections(renamed), requiredSections, '雛形の見出しを英語に替えただけでは、埋めたことにならない');
 
   write('## 何があるか\n- 挨拶\n\n## How to reach it\n- greet()\n\n## どう操作して確かめるか\n- 手順: README を見る\n');
   const [mixed] = loadFeatures(cwd);
