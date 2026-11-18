@@ -4,7 +4,32 @@ import { z } from 'zod';
 import { parseFrontmatter } from './frontmatter.js';
 
 export const featureDir = 'docs/features';
-export const requiredSections = ['何があるか', 'どう辿り着くか', 'どう操作して確かめるか', 'よく嘘をつくところ'];
+/** feature map の4つの見出し。日本語と英語のどちらで書いてもよい */
+export const sectionHeadings = Object.freeze([
+  Object.freeze({ ja: '何があるか', en: 'What is there' }),
+  Object.freeze({ ja: 'どう辿り着くか', en: 'How to reach it' }),
+  Object.freeze({ ja: 'どう操作して確かめるか', en: 'How to check it' }),
+  Object.freeze({ ja: 'よく嘘をつくところ', en: 'Where it lies' }),
+]);
+export const requiredSections = sectionHeadings.map((heading) => heading.ja);
+
+/**
+ * 見出しが本文の何行目にあるか。日本語と英語のどちらかの `## <見出し>` の行。なければ -1。
+ *
+ * @param {string[]} lines
+ * @param {{ ja: string, en: string }} heading
+ */
+const headingLine = (lines, heading) => lines.findIndex((line) => line.trim() === `## ${heading.ja}` || line.trim() === `## ${heading.en}`);
+
+/**
+ * 4つの見出しのうち、本文にないもの（日本語の名前で返す）。
+ *
+ * @param {import('./index.js').Feature} feature
+ * @returns {string[]}
+ */
+export function missingSections(feature) {
+  return sectionHeadings.filter((heading) => !feature.body.includes(`## ${heading.ja}`) && !feature.body.includes(`## ${heading.en}`)).map((heading) => heading.ja);
+}
 
 const relativePath = z
   .string()
@@ -50,21 +75,25 @@ export function loadFeatures(cwd = process.cwd()) {
 }
 
 /**
- * 4つの見出しのうち、中身が空か雛形のまま（`（…）` だけの項目や、`：` の後が空の項目が残っている）のものを返す。
+ * 4つの見出しのうち、中身が空か雛形のまま（`（…）` だけの項目や、`：` の後が空の項目が残っている。英語の見出しでは `(…)` と `:`）のものを、日本語の名前で返す。
  *
  * @param {import('./index.js').Feature} feature
  * @returns {string[]}
  */
 export function unfilledSections(feature) {
   const lines = feature.body.split(/\r?\n/);
-  return requiredSections.filter((section) => {
-    const start = lines.findIndex((line) => line.trim() === `## ${section}`);
-    if (start < 0) return true;
-    const rest = lines.slice(start + 1);
-    const end = rest.findIndex((line) => /^#{1,2} /.test(line));
-    const content = (end < 0 ? rest : rest.slice(0, end)).map((line) => line.trim()).filter((line) => line !== '');
-    return content.length === 0 || content.some((line) => /^- （[^）]*）$/.test(line) || /^- [^：]+：$/.test(line));
-  });
+  return sectionHeadings
+    .filter((heading) => {
+      const start = headingLine(lines, heading);
+      if (start < 0) return true;
+      const rest = lines.slice(start + 1);
+      const end = rest.findIndex((line) => /^#{1,2} /.test(line));
+      const content = (end < 0 ? rest : rest.slice(0, end)).map((line) => line.trim()).filter((line) => line !== '');
+      const english = lines[start]?.trim() === `## ${heading.en}`;
+      const placeholder = english ? (/** @type {string} */ line) => /^- \([^)]*\)$/.test(line) || /^- [^:]+:$/.test(line) : (/** @type {string} */ line) => /^- （[^）]*）$/.test(line) || /^- [^：]+：$/.test(line);
+      return content.length === 0 || content.some(placeholder);
+    })
+    .map((heading) => heading.ja);
 }
 
 /** @param {string} [cwd] */

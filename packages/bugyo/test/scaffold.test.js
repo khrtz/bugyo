@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { loadConfig } from '../src/config.js';
 import { featureMapChecks } from '../src/feature-map-checks.js';
-import { loadFeatures, loadSweepOrder, requiredSections } from '../src/feature-map.js';
+import { loadFeatures, loadSweepOrder, requiredSections, unfilledSections } from '../src/feature-map.js';
 import { init, newFeature } from '../src/scaffold.js';
 
 function emptyProject() {
@@ -34,6 +34,29 @@ test('new feature は ui/model/api/index・spec・feature map・回帰順をそ�
   assert.equal(feature?.spec, 'e2e/user-settings.spec.ts');
   for (const section of requiredSections) assert.ok(feature?.body.includes(`## ${section}`));
   assert.deepEqual(loadSweepOrder(cwd), ['user-settings']);
+});
+
+test('feature map の見出しは英語でも書け、雛形のままかどうかも同じように見る', () => {
+  const cwd = emptyProject();
+  const write = (/** @type {string} */ body) => writeFileSync(join(cwd, 'docs/features/greet.md'), `---\nid: greet\nspec: checks/greet.js\n---\n\n# greet\n\n${body}`);
+  const headingsProblems = () => featureMapChecks({ cwd, specDir: null }).find((check) => check.title === 'すべての機能に4つの見出しがある')?.problems() ?? [];
+
+  write('## What is there\n- A greeting\n\n## How to reach it\n- greet()\n\n## How to check it\n- `pnpm verify greet`\n- Success: returns "hi"\n\n## Where it lies\n- Empty names\n');
+  const [english] = loadFeatures(cwd);
+  assert.ok(english);
+  assert.deepEqual(headingsProblems(), []);
+  assert.deepEqual(unfilledSections(english), []);
+
+  write('## What is there\n- (what users see)\n\n## How to reach it\n- greet()\n\n## How to check it\n- Success:\n\n## Where it lies\n- Empty names\n');
+  const [placeholder] = loadFeatures(cwd);
+  assert.ok(placeholder);
+  assert.deepEqual(unfilledSections(placeholder), ['何があるか', 'どう操作して確かめるか']);
+
+  write('## 何があるか\n- 挨拶\n\n## How to reach it\n- greet()\n\n## どう操作して確かめるか\n- 手順: README を見る\n');
+  const [mixed] = loadFeatures(cwd);
+  assert.ok(mixed);
+  assert.deepEqual(unfilledSections(mixed), ['よく嘘をつくところ'], '日本語の見出しでは、半角の : で終わる項目を雛形として扱わない');
+  assert.deepEqual(headingsProblems(), ['docs/features/greet.md に「## よく嘘をつくところ」（英語なら「## Where it lies」）がありません']);
 });
 
 test('new feature は既存ファイルを上書きしない', () => {
