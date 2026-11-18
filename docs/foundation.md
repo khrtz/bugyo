@@ -225,7 +225,19 @@ export default defineBugyoConfig({ port: 5173 });
 - `e2e/**/*.spec.ts` を Chromium で実行する。dev サーバーの起動と停止は Playwright に任せる
 - すべてのテストで動画・スクリーンショット・トレースを取り、`artifacts/test-results` に置く
 - スクリーンショットの基準画像は `e2e/__screenshots__/<OS>/` に OS ごとに分けて置く
-- 基準画像がないとき、手元では新しく作り、CI（環境変数 `CI` があるとき）では失敗にする
+- 基準画像がないとき、手元では新しく作り、CI（環境変数 `CI` があるとき）では失敗にする（飛ばさない）
+
+このリポジトリの CI（[.github/workflows/ci.yml](../.github/workflows/ci.yml)）は、PR と main への push のたびに Linux で次を実行します。
+
+| ジョブ | 実行するもの |
+| --- | --- |
+| `pnpm check / test` | `pnpm check` と `pnpm test` |
+| `verify（証拠つき）` | `pnpm verify`（todo-app は Playwright、node-lib は機能ごとのコマンド）。`artifacts/` を成果物として上げ、PR に合否と証拠のリンクを載せる |
+
+Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあります。画面を変えて作り直すときは次の手順です。
+
+1. 作業中のブランチで、Actions の CI を `update_snapshots` を有効にして手動で実行する（`gh workflow run CI --ref <ブランチ> -f update_snapshots=true`）
+2. できた成果物 `linux-screenshots` を取り出し（`gh run download <run id> -n linux-screenshots -D examples/todo-app/e2e/__screenshots__/linux`）、人が画像を見てからコミットする
 
 ## CLI
 
