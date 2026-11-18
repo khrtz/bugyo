@@ -2,6 +2,7 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSyn
 import { basename, dirname, join, posix, resolve } from 'node:path';
 import { configFile, loadConfig } from './config.js';
 import { featureDir } from './feature-map.js';
+import { tr } from './locale.js';
 
 const templateRoot = resolve(import.meta.dirname, '..', 'template');
 export const defaultTemplate = 'react-vite';
@@ -20,7 +21,7 @@ function pascal(id) {
  */
 function writeAll(cwd, files) {
   for (const path of Object.keys(files)) {
-    if (existsSync(join(cwd, path))) throw new Error(`${path} はすでにあります。上書きしません`);
+    if (existsSync(join(cwd, path))) throw new Error(tr({ en: `${path} already exists. It will not be overwritten`, ja: `${path} はすでにあります。上書きしません` }));
   }
   for (const [path, content] of Object.entries(files)) {
     const full = join(cwd, path);
@@ -39,7 +40,30 @@ function writeAll(cwd, files) {
  * @param {string} reach
  */
 function featureMapDoc(id, spec, route, reach) {
-  return `---
+  return tr({
+    en: `---
+id: ${id}
+${route === undefined ? '' : `route: ${route}\n`}spec: ${spec}
+---
+
+# ${id}
+
+## What is there
+- (what users can see and do, as a list)
+
+## How to reach it
+- (${reach})
+
+## How to check it
+- \`pnpm verify ${id}\`
+- Success:
+- Error:
+- Empty:
+${route === undefined ? '' : '- Persistence:\n'}
+## Where it lies
+- (where it looks fine but is broken)
+`,
+    ja: `---
 id: ${id}
 ${route === undefined ? '' : `route: ${route}\n`}spec: ${spec}
 ---
@@ -60,7 +84,8 @@ ${route === undefined ? '' : `route: ${route}\n`}spec: ${spec}
 ${route === undefined ? '' : '- 永続化：\n'}
 ## よく嘘をつくところ
 - （見た目は通るのに壊れている、が起きやすい点）
-`;
+`,
+  });
 }
 
 /**
@@ -70,7 +95,7 @@ ${route === undefined ? '' : '- 永続化：\n'}
  */
 function appendSweepOrder(cwd, id, created) {
   appendFileSync(join(cwd, featureDir, 'README.md'), `1. [${id}](${id}.md)\n`);
-  created.push(`${featureDir}/README.md（回帰の順番に追記）`);
+  created.push(tr({ en: `${featureDir}/README.md (appended to the sweep order)`, ja: `${featureDir}/README.md（回帰の順番に追記）` }));
 }
 
 /**
@@ -83,6 +108,7 @@ function appendSweepOrder(cwd, id, created) {
 function reactFeature(id, cwd, src) {
   const P = pascal(id);
   const base = `${src}/features/${id}`;
+  const sample = tr({ en: 'Sample', ja: 'サンプル' });
 
   const created = writeAll(cwd, {
     [`${base}/model/${id}.ts`]: `import { z } from 'zod';
@@ -104,7 +130,7 @@ import { count${P}, ${P}Item } from './${id}';
 const itemArb = fc.record({ id: fc.string({ minLength: 1 }), name: fc.string() }).map((raw) => ${P}Item.parse(raw));
 
 describe('${id} model', () => {
-  it('件数は配列の長さと一致する', () => {
+  it('${tr({ en: 'counts as many items as the array has', ja: '件数は配列の長さと一致する' })}', () => {
     fc.assert(
       fc.property(fc.array(itemArb), (items) => {
         expect(count${P}(items)).toBe(items.length);
@@ -128,14 +154,14 @@ export function ${P}View() {
   const query = use${P}Query();
   switch (query.status) {
     case 'loading':
-      return <p role="status">読み込み中…</p>;
+      return <p role="status">${tr({ en: 'Loading…', ja: '読み込み中…' })}</p>;
     case 'error':
-      return <p role="alert">読み込みに失敗しました: {query.error.message}</p>;
+      return <p role="alert">${tr({ en: 'Failed to load:', ja: '読み込みに失敗しました:' })} {query.error.message}</p>;
     case 'ready':
       return (
         <section aria-label="${id}">
           <h2>${id}</h2>
-          <p>{count${P}(query.data)} 件</p>
+          <p>{count${P}(query.data)} ${tr({ en: 'items', ja: '件' })}</p>
           <ul>
             {query.data.map((item) => (
               <li key={item.id}>{item.name}</li>
@@ -149,27 +175,30 @@ export function ${P}View() {
     [`${base}/index.ts`]: `export { ${P}View } from './ui/${P}View';
 `,
     [`public/api/${id}.json`]: `[
-  { "id": "1", "name": "サンプル" }
+  { "id": "1", "name": "${sample}" }
 ]
 `,
     [`e2e/${id}.spec.ts`]: `import { expect, test } from '@playwright/test';
 
-test('${id} を表示できる', async ({ page }) => {
+test('${tr({ en: `shows ${id}`, ja: `${id} を表示できる` })}', async ({ page }) => {
   await page.goto('/');
   const section = page.getByRole('region', { name: '${id}' });
   await expect(section).toBeVisible();
-  await expect(section.getByText('1 件')).toBeVisible();
+  await expect(section.getByText('1 ${tr({ en: 'items', ja: '件' })}')).toBeVisible();
 });
 `,
-    [`${featureDir}/${id}.md`]: featureMapDoc(id, `e2e/${id}.spec.ts`, '/', 'どの画面から、どの操作で着くか'),
+    [`${featureDir}/${id}.md`]: featureMapDoc(id, `e2e/${id}.spec.ts`, '/', tr({ en: 'from which screen, by which action', ja: 'どの画面から、どの操作で着くか' })),
   });
 
   appendSweepOrder(cwd, id, created);
   return {
     created,
     next: [
-      `画面に組み込む: import { ${P}View } from '@/features/${id}'; を src/app から使う（使うまで knip が「未使用」と止めます）`,
-      `docs/features/${id}.md の4つの見出しを埋める`,
+      tr({
+        en: `Put it on a screen: use import { ${P}View } from '@/features/${id}'; in src/app (knip reports it as unused until then)`,
+        ja: `画面に組み込む: import { ${P}View } from '@/features/${id}'; を src/app から使う（使うまで knip が「未使用」と止めます）`,
+      }),
+      tr({ en: `Fill the four headings of docs/features/${id}.md`, ja: `docs/features/${id}.md の4つの見出しを埋める` }),
       `pnpm check && pnpm test && pnpm verify ${id}`,
     ],
   };
@@ -185,13 +214,19 @@ test('${id} を表示できる', async ({ page }) => {
 function nodeLibFeature(id, cwd, config) {
   const { featuresDir, specDir, specSuffix } = config.featureMap;
   if (featuresDir === null || specDir === null) {
-    throw new Error(`${configFile} の featureMap.featuresDir と featureMap.specDir がないと、node-lib の機能を置く場所が決まりません`);
+    throw new Error(
+      tr({
+        en: `Without featureMap.featuresDir and featureMap.specDir in ${configFile}, there is no place for a node-lib feature`,
+        ja: `${configFile} の featureMap.featuresDir と featureMap.specDir がないと、node-lib の機能を置く場所が決まりません`,
+      }),
+    );
   }
   const P = pascal(id);
   const run = `run${P}`;
   const base = `${featuresDir}/${id}`;
   const spec = `${specDir}/${id}${specSuffix}`;
   const fromSpec = posix.relative(specDir, `${base}/index.ts`);
+  const sample = tr({ en: 'sample', ja: 'サンプル' });
 
   const created = writeAll(cwd, {
     [`${base}/model/${id}.ts`]: `export function ${run}(input: string): string {
@@ -202,8 +237,8 @@ function nodeLibFeature(id, cwd, config) {
 import { test } from 'node:test';
 import { ${run} } from './${id}.ts';
 
-await test('前後の空白を取り除く', () => {
-  assert.equal(${run}('  サンプル  '), 'サンプル');
+await test('${tr({ en: 'trims surrounding spaces', ja: '前後の空白を取り除く' })}', () => {
+  assert.equal(${run}('  ${sample}  '), '${sample}');
 });
 `,
     [`${base}/index.ts`]: `export { ${run} } from './model/${id}.ts';
@@ -211,20 +246,23 @@ await test('前後の空白を取り除く', () => {
     [spec]: `import assert from 'node:assert/strict';
 import { ${run} } from '${fromSpec.startsWith('.') ? fromSpec : `./${fromSpec}`}';
 
-assert.equal(${run}('  サンプル  '), 'サンプル');
+assert.equal(${run}('  ${sample}  '), '${sample}');
 
 console.log('${id}: ok');
 `,
-    [`${featureDir}/${id}.md`]: featureMapDoc(id, spec, undefined, 'どの関数・どのコマンドから使うか'),
+    [`${featureDir}/${id}.md`]: featureMapDoc(id, spec, undefined, tr({ en: 'from which function or command', ja: 'どの関数・どのコマンドから使うか' })),
   });
 
   appendSweepOrder(cwd, id, created);
   return {
     created,
     next: [
-      `${base}/model/${id}.ts を本当の振る舞いに書き換え、そのテストと ${spec}（実際に動かして確かめるスクリプト）も合わせる`,
-      `外に見せるなら src/index.ts から、コマンドなら src/app から ${base}/index.ts を使う`,
-      `docs/features/${id}.md の4つの見出しを埋める`,
+      tr({
+        en: `Rewrite ${base}/model/${id}.ts with the real behavior, and update its test and ${spec} (the script that runs it for real)`,
+        ja: `${base}/model/${id}.ts を本当の振る舞いに書き換え、そのテストと ${spec}（実際に動かして確かめるスクリプト）も合わせる`,
+      }),
+      tr({ en: `Use ${base}/index.ts from src/index.ts to expose it, or from src/app for a command`, ja: `外に見せるなら src/index.ts から、コマンドなら src/app から ${base}/index.ts を使う` }),
+      tr({ en: `Fill the four headings of docs/features/${id}.md`, ja: `docs/features/${id}.md の4つの見出しを埋める` }),
       `pnpm check && pnpm test && pnpm verify ${id}`,
     ],
   };
@@ -238,17 +276,25 @@ console.log('${id}: ok');
  * @returns {{ created: string[], next: string[] }}
  */
 export function newFeature(id, options = {}) {
-  if (!/^[a-z][a-z0-9-]*$/.test(id)) throw new Error(`feature 名 "${id}" は小文字・数字・ハイフンにしてください（例: user-settings）`);
+  if (!/^[a-z][a-z0-9-]*$/.test(id)) throw new Error(tr({ en: `The feature name "${id}" must use lowercase letters, digits, and hyphens (e.g. user-settings)`, ja: `feature 名 "${id}" は小文字・数字・ハイフンにしてください（例: user-settings）` }));
   const cwd = options.cwd ?? process.cwd();
   const config = loadConfig(cwd);
   if (config.layers !== undefined) {
     throw new Error(
-      `${configFile} に layers があるので、new feature は雛形を作りません（雛形は src/features の形でしか作れないため）。${config.layers.features}/${id} を手で作り、docs/features/${id}.md を足してください`,
+      tr({
+        en: `${configFile} has layers, so new feature creates no scaffold (scaffolds only fit src/features). Create ${config.layers.features}/${id} by hand and add docs/features/${id}.md`,
+        ja: `${configFile} に layers があるので、new feature は雛形を作りません（雛形は src/features の形でしか作れないため）。${config.layers.features}/${id} を手で作り、docs/features/${id}.md を足してください`,
+      }),
     );
   }
   if (config.sources !== undefined) {
     const dirs = Object.values(config.sources).map((source) => `${source.layers.features}/${id}`);
-    throw new Error(`${configFile} に sources があるので、new feature は雛形を作りません。${dirs.join('・')} のうち使うものを手で作り、docs/features/${id}.md を足してください`);
+    throw new Error(
+      tr({
+        en: `${configFile} has sources, so new feature creates no scaffold. Create the ones you need of ${dirs.join(', ')} by hand and add docs/features/${id}.md`,
+        ja: `${configFile} に sources があるので、new feature は雛形を作りません。${dirs.join('・')} のうち使うものを手で作り、docs/features/${id}.md を足してください`,
+      }),
+    );
   }
   const template = config.template ?? defaultTemplate;
   switch (template) {
@@ -258,7 +304,10 @@ export function newFeature(id, options = {}) {
       return nodeLibFeature(id, cwd, config);
     default:
       throw new Error(
-        `${configFile} の template "${template}" には new feature の雛形がありません（雛形があるのは react-vite と node-lib）。src/features/${id} は手で作り、docs/features/${id}.md を足してください`,
+        tr({
+          en: `The template "${template}" in ${configFile} has no new feature scaffold (react-vite and node-lib have one). Create src/features/${id} by hand and add docs/features/${id}.md`,
+          ja: `${configFile} の template "${template}" には new feature の雛形がありません（雛形があるのは react-vite と node-lib）。src/features/${id} は手で作り、docs/features/${id}.md を足してください`,
+        }),
       );
   }
 }
@@ -281,10 +330,10 @@ export function templates() {
 export function init(target, options = {}) {
   const template = options.template ?? defaultTemplate;
   const names = templates();
-  if (names.length === 0) throw new Error(`テンプレートが見つかりません: ${templateRoot}`);
-  if (!names.includes(template)) throw new Error(`テンプレート "${template}" はありません。使える名前: ${names.join(', ')}`);
+  if (names.length === 0) throw new Error(tr({ en: `No templates found: ${templateRoot}`, ja: `テンプレートが見つかりません: ${templateRoot}` }));
+  if (!names.includes(template)) throw new Error(tr({ en: `There is no template "${template}". Known: ${names.join(', ')}`, ja: `テンプレート "${template}" はありません。使える名前: ${names.join(', ')}` }));
   const dir = resolve(target);
-  if (existsSync(dir) && readdirSync(dir).length > 0) throw new Error(`${dir} は空ではありません`);
+  if (existsSync(dir) && readdirSync(dir).length > 0) throw new Error(tr({ en: `${dir} is not empty`, ja: `${dir} は空ではありません` }));
   cpSync(join(templateRoot, template), dir, { recursive: true });
 
   const pkgPath = join(dir, 'package.json');

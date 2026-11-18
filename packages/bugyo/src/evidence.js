@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { featureRoots, taskCommands } from './config.js';
-import { featureDir, loadFeatures, unfilledSections } from './feature-map.js';
+import { featureDir, loadFeatures, sectionHeadings, unfilledSections } from './feature-map.js';
+import { tr } from './locale.js';
 import { runCommand, tail } from './run.js';
 import { evidenceDir } from './tasks.js';
 import { summaryFile } from './verify.js';
@@ -89,29 +90,29 @@ export function requirements(task, config) {
   const command = (name) => {
     const template = commands[name];
     const resolved = template?.replaceAll('{feature}', task.feature).replaceAll('{task}', task.id);
-    return /** @type {Step} */ ({ kind: 'command', name, label: resolved ?? `commands.${name}（未設定）`, command: resolved });
+    return /** @type {Step} */ ({ kind: 'command', name, label: resolved ?? tr({ en: `commands.${name} (not set)`, ja: `commands.${name}（未設定）` }), command: resolved });
   };
   const modelDirs = featureRoots(config)
     .flatMap(({ featuresDir, parts }) => parts.model.map((name) => `${featuresDir}/${task.feature}/${name}/`))
-    .join(' か ');
+    .join(tr({ en: ' or ', ja: ' か ' }));
   switch (task.type) {
     case 'feature':
-      return [{ kind: 'condition', name: 'feature-map', label: `${featureDir}/${task.feature}.md の4見出しを埋める` }, command('check'), command('test'), command('verify')];
+      return [{ kind: 'condition', name: 'feature-map', label: tr({ en: `fill the four headings of ${featureDir}/${task.feature}.md`, ja: `${featureDir}/${task.feature}.md の4見出しを埋める` }) }, command('check'), command('test'), command('verify')];
     case 'ui-flow':
       return [command('check'), command('test'), command('verify')];
     case 'ui-look':
       return [command('check'), command('verify')];
     case 'logic':
-      return [{ kind: 'condition', name: 'model-test', label: `${modelDirs || '機能のフォルダの model/'} にテストがある` }, command('check'), command('test')];
+      return [{ kind: 'condition', name: 'model-test', label: tr({ en: `tests exist in ${modelDirs || 'model/ of the feature folder'}`, ja: `${modelDirs || '機能のフォルダの model/'} にテストがある` }) }, command('check'), command('test')];
     case 'bugfix':
       return [
-        { kind: 'condition', name: 'repro-recorded', label: 'repro の記録' },
-        { kind: 'command', name: 'repro', label: '同じテストが通る', command: task.repro },
+        { kind: 'condition', name: 'repro-recorded', label: tr({ en: 'a recorded repro', ja: 'repro の記録' }) },
+        { kind: 'command', name: 'repro', label: tr({ en: 'the same test passes', ja: '同じテストが通る' }), command: task.repro },
         command('check'),
         command('test'),
       ];
     case 'refactor':
-      return [{ kind: 'condition', name: 'tests-unchanged', label: 'テストファイルを start のときから変えない' }, command('check'), command('test')];
+      return [{ kind: 'condition', name: 'tests-unchanged', label: tr({ en: 'test files unchanged since start', ja: 'テストファイルを start のときから変えない' }) }, command('check'), command('test')];
     case 'chore':
       return [command('check')];
   }
@@ -130,20 +131,25 @@ function checkCondition(step, task, config, cwd) {
   switch (step.name) {
     case 'feature-map': {
       const feature = loadFeatures(cwd).find((candidate) => candidate.id === task.feature);
-      if (feature === undefined) return `${featureDir}/${task.feature}.md がありません`;
+      if (feature === undefined) return tr({ en: `${featureDir}/${task.feature}.md does not exist`, ja: `${featureDir}/${task.feature}.md がありません` });
       const unfilled = unfilledSections(feature);
-      return unfilled.length === 0 ? null : `${feature.file} の見出しが空か雛形のままです: ${unfilled.join('、')}`;
+      return unfilled.length === 0
+        ? null
+        : tr({ en: `${feature.file} has empty or template headings: ${unfilled.map((ja) => sectionHeadings.find((heading) => heading.ja === ja)?.en ?? ja).join(', ')}`, ja: `${feature.file} の見出しが空か雛形のままです: ${unfilled.join('、')}` });
     }
     case 'model-test': {
-      if (config.featureMap.featuresDir === null) return 'featureMap.featuresDir が null なので model/ を探せません';
+      if (config.featureMap.featuresDir === null) return tr({ en: 'featureMap.featuresDir is null, so model/ cannot be found', ja: 'featureMap.featuresDir が null なので model/ を探せません' });
       const dirs = featureRoots(config).flatMap(({ featuresDir, parts }) => parts.model.map((name) => `${featuresDir}/${task.feature}/${name}`));
-      return dirs.some((dir) => walk(cwd, dir).some((file) => testFilePattern.test(file))) ? null : `${dirs.join(' と ')} にテスト（*.test.*）がありません`;
+      return dirs.some((dir) => walk(cwd, dir).some((file) => testFilePattern.test(file))) ? null : tr({ en: `no tests (*.test.*) in ${dirs.join(' or ')}`, ja: `${dirs.join(' と ')} にテスト（*.test.*）がありません` });
     }
     case 'repro-recorded':
-      return task.repro === undefined ? `直す前に bugyo task repro ${task.id} -- <テストコマンド> で失敗を記録してください` : null;
+      return task.repro === undefined ? tr({ en: `Before fixing, record the failure with bugyo task repro ${task.id} -- <test command>`, ja: `直す前に bugyo task repro ${task.id} -- <テストコマンド> で失敗を記録してください` }) : null;
     case 'tests-unchanged':
-      if (task['tests-hash'] === undefined) return 'start のときのテストファイルのハッシュがありません';
-      return testsHash(cwd, config.evidence.tree) === task['tests-hash'] ? null : `テストファイルが start のときから変わっています（${config.evidence.tree.join(', ')} の *.test.* / *.spec.*）`;
+      if (task['tests-hash'] === undefined) return tr({ en: 'There is no hash of the test files from start', ja: 'start のときのテストファイルのハッシュがありません' });
+      return testsHash(cwd, config.evidence.tree) === task['tests-hash'] ? null : tr({
+            en: `Test files changed since start (*.test.* / *.spec.* in ${config.evidence.tree.join(', ')})`,
+            ja: `テストファイルが start のときから変わっています（${config.evidence.tree.join(', ')} の *.test.* / *.spec.*）`,
+          });
   }
 }
 
@@ -197,15 +203,24 @@ export function collectEvidence(task, config, cwd, options = {}) {
     }
     records.push(record);
     if (run.status !== 0) {
-      const what = step.label === command ? '' : `${command} が`;
-      return { ok: false, step, reason: `${what}終了コード ${run.status} で落ちました`, output: tail(run.output) };
+      const same = step.label === command;
+      const reason = tr({
+        en: `${same ? 'failed' : `${command} failed`} with exit code ${run.status}`,
+        ja: `${same ? '' : `${command} が`}終了コード ${run.status} で落ちました`,
+      });
+      return { ok: false, step, reason, output: tail(run.output) };
     }
   }
   const tree = treeHash(cwd, config.evidence.tree);
   /** @type {string[]} */
   const warnings = [];
   if (task['repro-tests-hash'] !== undefined && testsHash(cwd, config.evidence.tree) !== task['repro-tests-hash']) {
-    warnings.push(`repro のあとにテストファイルが変わっています。直す前に落ちたテストを弱めていないか、差分を確かめてください（${config.evidence.tree.join(', ')} の *.test.* / *.spec.*）`);
+    warnings.push(
+      tr({
+        en: `Test files changed after the repro. Check the diff to make sure the test that failed before the fix was not weakened (*.test.* / *.spec.* in ${config.evidence.tree.join(', ')})`,
+        ja: `repro のあとにテストファイルが変わっています。直す前に落ちたテストを弱めていないか、差分を確かめてください（${config.evidence.tree.join(', ')} の *.test.* / *.spec.*）`,
+      }),
+    );
   }
   const file = `${evidenceDir}/${task.id}.json`;
   const evidence = {

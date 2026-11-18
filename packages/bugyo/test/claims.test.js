@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { openClaims } from '../src/claims.js';
 
+/** このファイルは日本語の出力を確かめる（英語の既定は locale.test.js で確かめる）。子プロセスにも引き継がれる */
+process.env['BUGYO_LOCALE'] = 'ja';
+
 test('ref の置き場所は、別の名前のパス（リンクや Windows の短い名前）から開いても同じになる', () => {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'bugyo-claims-')));
   const repo = join(base, 'repo');

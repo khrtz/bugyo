@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
+/** このファイルは日本語の出力を確かめる（英語の既定は locale.test.js で確かめる）。子プロセスにも引き継がれる */
+process.env['BUGYO_LOCALE'] = 'ja';
+
 const bin = join(import.meta.dirname, '..', 'bin', 'bugyo.js');
 const fixture = join(import.meta.dirname, 'fixtures', 'plain');
 const verifyCommand = `node "${bin}" verify {feature}`;
@@ -169,7 +172,7 @@ test('done: verify が落ちる状態だと断られて作業中のまま、直�
 
   fixGreet(cwd);
   const closed = ok(cwd, 'task', 'done', 't-001');
-  assert.match(closed.stdout, /^DONE t-001 \[done\/ui-flow\] あいさつ .*evidence: \.bugyo\/evidence\/t-001\.json$/m);
+  assert.match(closed.stdout, /^DONE t-001 \[done\/ui-flow\] あいさつ .*証拠: \.bugyo\/evidence\/t-001\.json$/m);
   assert.ok(existsSync(join(cwd, '.bugyo/tasks/archive/t-001.md')));
   assert.equal(field(cwd, 't-001', 'gate-attempts'), '2');
 

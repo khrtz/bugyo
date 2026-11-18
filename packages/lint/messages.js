@@ -39,6 +39,19 @@ function configLocale(root) {
 }
 
 /**
+ * 設定の書き方の誤りを知らせるエラーの文を、言語に合わせて選ぶ。言語は `BUGYO_LOCALE`、今のフォルダの `.bugyo/config.json` の順に見る。
+ *
+ * @param {{ en: string, ja: string }} text
+ */
+export function say(text) {
+  try {
+    return text[resolveLocale(process.cwd())];
+  } catch {
+    return text.en;
+  }
+}
+
+/**
  * 場所の名前をいくつも並べるときのつなぎ。
  *
  * @param {Locale} locale

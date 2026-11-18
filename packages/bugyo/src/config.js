@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import { z } from 'zod';
+import { tr } from './locale.js';
 import { types } from './tasks.js';
 
 export const configFile = '.bugyo/config.json';
@@ -8,14 +9,14 @@ export const configFile = '.bugyo/config.json';
 /** runners に付けられない名前。playwright と command は決まった確かめ方、残りは artifacts/ の下の証拠の置き場所 */
 const reservedRunnerNames = ['playwright', 'command', 'report', 'test-results', 'verify'];
 
-const RunnerName = z.string().regex(/^[a-z][a-z0-9-]*$/, '小文字・数字・ハイフンの名前にしてください');
+const RunnerName = z.string().regex(/^[a-z][a-z0-9-]*$/, { error: () => tr({ en: 'use lowercase letters, digits, and hyphens', ja: '小文字・数字・ハイフンの名前にしてください' }) });
 
 /** 名前を付けた確かめ方。feature map の frontmatter の runner で選ぶか、match の glob に当たる spec に使う */
 const NamedRunner = z
   .object({
     runner: z.enum(['playwright', 'command']),
     command: z.string().optional(),
-    env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/, '環境変数の名前にしてください'), z.string()).optional(),
+    env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/, { error: () => tr({ en: 'use an environment variable name', ja: '環境変数の名前にしてください' }) }), z.string()).optional(),
     match: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     evidence: z.array(z.string().min(1)).min(1).optional(),
     requires: z.literal('sandbox').optional(),
@@ -31,7 +32,13 @@ const Verify = z
       .record(RunnerName, NamedRunner)
       .refine(
         (runners) => !Object.keys(runners).some((name) => reservedRunnerNames.includes(name)),
-        `${reservedRunnerNames.join('・')} は決まった名前か証拠の置き場所なので、別の名前にしてください`,
+        {
+          error: () =>
+            tr({
+              en: `${reservedRunnerNames.join(', ')} are built-in names or evidence folders. Use another name`,
+              ja: `${reservedRunnerNames.join('・')} は決まった名前か証拠の置き場所なので、別の名前にしてください`,
+            }),
+        },
       )
       .optional(),
   })
@@ -48,7 +55,13 @@ const FeatureMap = z
 const LayerDir = z
   .string()
   .min(1)
-  .regex(/^(?!\.{1,2}(\/|$))(?!\/)[^\\]*[^/\\]$/,'プロジェクトのルートからの相対パス（先頭の ./ や末尾の / なし、区切りは /）にしてください');
+  .regex(/^(?!\.{1,2}(\/|$))(?!\/)[^\\]*[^/\\]$/, {
+    error: () =>
+      tr({
+        en: 'use a path relative to the project root (no leading ./ or trailing /, separated by /)',
+        ja: 'プロジェクトのルートからの相対パス（先頭の ./ や末尾の / なし、区切りは /）にしてください',
+      }),
+  });
 
 /** shared の場所。1つなら文字列、いくつもあれば配列で書ける */
 const SharedDirs = z.union([LayerDir.transform((dir) => [dir]), z.array(LayerDir).min(1)]);
@@ -56,8 +69,8 @@ const OptionalDirs = z.union([LayerDir.transform((dir) => [dir]), z.array(LayerD
 
 const PartName = z
   .string()
-  .regex(/^[A-Za-z0-9._-]+$/, 'feature の中のフォルダ名（/ を含まない）にしてください')
-  .refine((name) => name !== '.' && name !== '..', 'feature の中のフォルダ名（/ を含まない）にしてください');
+  .regex(/^[A-Za-z0-9._-]+$/, { error: () => tr({ en: 'use a folder name inside a feature (no /)', ja: 'feature の中のフォルダ名（/ を含まない）にしてください' }) })
+  .refine((name) => name !== '.' && name !== '..', { error: () => tr({ en: 'use a folder name inside a feature (no /)', ja: 'feature の中のフォルダ名（/ を含まない）にしてください' }) });
 const PartNames = z.array(PartName).min(1);
 
 /** 層の既定の場所。layers で書かなかったところはこれで埋める */
@@ -82,7 +95,7 @@ const Layers = z
       .refine((parts) => {
         const all = [...(parts.ui ?? ['ui']), ...(parts.api ?? ['api']), ...(parts.model ?? ['model'])];
         return new Set(all).size === all.length;
-      }, '1つのフォルダ名は1つの役割（ui・api・model）にしてください')
+      }, { error: () => tr({ en: 'each folder name can have only one role (ui, api, model)', ja: '1つのフォルダ名は1つの役割（ui・api・model）にしてください' }) })
       .optional(),
   })
   .strict();
@@ -151,7 +164,7 @@ const Gate = z
     maxRework: z.int().nonnegative().default(2),
     minFirstPass: z.int().nonnegative().default(16),
     maxDropped: z.int().nonnegative().default(2),
-    scopes: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/, '小文字・数字・ハイフンの名前にしてください'), Scope).optional(),
+    scopes: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/, { error: () => tr({ en: 'use lowercase letters, digits, and hyphens', ja: '小文字・数字・ハイフンの名前にしてください' }) }), Scope).optional(),
   })
   .strict();
 
@@ -217,14 +230,16 @@ const Config = z
         z
           .object({
             command: z.string().trim().min(1).optional(),
-            file: z.string().min(1).refine((path) => !isAbsolute(path) && !path.split(/[\\/]/).includes('..'), 'プロジェクトのルートからの相対パスを書いてください（.. と絶対パスは使えません）'),
+            file: z.string().min(1).refine((path) => !isAbsolute(path) && !path.split(/[\\/]/).includes('..'), {
+                error: () => tr({ en: 'use a path relative to the project root (no .. and no absolute paths)', ja: 'プロジェクトのルートからの相対パスを書いてください（.. と絶対パスは使えません）' }),
+              }),
           })
           .strict(),
       )
       .optional(),
     locale: z.enum(['ja', 'en']).optional(),
     layers: Layers.optional(),
-    sources: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/, '小文字・数字・ハイフンの名前にしてください'), Source).optional(),
+    sources: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/, { error: () => tr({ en: 'use lowercase letters, digits, and hyphens', ja: '小文字・数字・ハイフンの名前にしてください' }) }), Source).optional(),
     verify: Verify.prefault({}),
     featureMap: FeatureMap.prefault({}),
     commands: Commands.optional(),
@@ -254,31 +269,52 @@ export function loadConfig(cwd = process.cwd()) {
     try {
       raw = JSON.parse(readFileSync(path, 'utf8'));
     } catch (error) {
-      throw new Error(`${configFile} を JSON として読めません: ${error instanceof Error ? error.message : String(error)}`);
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(tr({ en: `Cannot read ${configFile} as JSON: ${reason}`, ja: `${configFile} を JSON として読めません: ${reason}` }));
     }
   }
   const parsed = Config.safeParse(raw);
-  if (!parsed.success) throw new Error(`${configFile} が不正です: ${parsed.error.message}`);
+  if (!parsed.success) throw new Error(tr({ en: `${configFile} is invalid: ${parsed.error.message}`, ja: `${configFile} が不正です: ${parsed.error.message}` }));
   const { verify } = parsed.data;
   if (verify.runner === 'command' && !verify.command?.trim()) {
-    throw new Error(`${configFile}: verify.runner が "command" のときは verify.command にコマンドを書いてください（{id} と {spec} が置き換わります）`);
+    throw new Error(
+      tr({
+        en: `${configFile}: with verify.runner "command", write the command in verify.command ({id} and {spec} are replaced)`,
+        ja: `${configFile}: verify.runner が "command" のときは verify.command にコマンドを書いてください（{id} と {spec} が置き換わります）`,
+      }),
+    );
   }
   const names = ['playwright', 'command', ...Object.keys(verify.runners ?? {})];
-  if (!names.includes(verify.runner)) throw new Error(`${configFile}: verify.runner の ${verify.runner} がありません（使えるのは ${names.join(', ')}）`);
+  if (!names.includes(verify.runner)) throw new Error(tr({ en: `${configFile}: there is no verify.runner ${verify.runner} (known: ${names.join(', ')})`, ja: `${configFile}: verify.runner の ${verify.runner} がありません（使えるのは ${names.join(', ')}）` }));
   for (const [name, runner] of Object.entries(verify.runners ?? {})) {
     if (runner.runner === 'command' && !runner.command?.trim()) {
-      throw new Error(`${configFile}: verify.runners.${name} は command なので、command にコマンドを書いてください（{id} と {spec} が置き換わります）`);
+      throw new Error(
+        tr({
+          en: `${configFile}: verify.runners.${name} is a command runner, so write the command in command ({id} and {spec} are replaced)`,
+          ja: `${configFile}: verify.runners.${name} は command なので、command にコマンドを書いてください（{id} と {spec} が置き換わります）`,
+        }),
+      );
     }
     if (runner.requires === 'sandbox' && verify.sandbox === undefined) {
-      throw new Error(`${configFile}: verify.runners.${name} は requires が "sandbox" なので、隔離環境かどうかを確かめるコマンドを verify.sandbox に書いてください`);
+      throw new Error(
+        tr({
+          en: `${configFile}: verify.runners.${name} requires "sandbox", so write a command that checks for the sandbox in verify.sandbox`,
+          ja: `${configFile}: verify.runners.${name} は requires が "sandbox" なので、隔離環境かどうかを確かめるコマンドを verify.sandbox に書いてください`,
+        }),
+      );
     }
     if (runner.evidence !== undefined && runner.runner !== 'command') {
-      throw new Error(`${configFile}: verify.runners.${name} の evidence は、runner が "command" のときだけ書けます（playwright は証拠を決まった場所に残します）`);
+      throw new Error(
+        tr({
+          en: `${configFile}: verify.runners.${name}.evidence is only for runner "command" (playwright keeps its evidence in fixed places)`,
+          ja: `${configFile}: verify.runners.${name} の evidence は、runner が "command" のときだけ書けます（playwright は証拠を決まった場所に残します）`,
+        }),
+      );
     }
   }
   const { featureMap } = parsed.data;
   if (parsed.data.sources !== undefined && parsed.data.layers !== undefined) {
-    throw new Error(`${configFile}: sources と layers は一緒に書けません。layers は sources のそれぞれに書いてください`);
+    throw new Error(tr({ en: `${configFile}: sources and layers cannot be used together. Write layers inside each source`, ja: `${configFile}: sources と layers は一緒に書けません。layers は sources のそれぞれに書いてください` }));
   }
   const layers = parsed.data.layers === undefined ? undefined : fillLayers(parsed.data.layers, 'src');
   const sources =
@@ -292,9 +328,9 @@ export function loadConfig(cwd = process.cwd()) {
         );
   if (sources !== undefined) {
     const srcs = Object.values(sources).map((source) => source.src);
-    if (srcs.length === 0) throw new Error(`${configFile}: sources には1つ以上のソースを書いてください`);
+    if (srcs.length === 0) throw new Error(tr({ en: `${configFile}: sources needs at least one source`, ja: `${configFile}: sources には1つ以上のソースを書いてください` }));
     const nested = srcs.filter((src, index) => srcs.some((other, at) => at !== index && (other === src || src.startsWith(`${other}/`))));
-    if (nested.length > 0) throw new Error(`${configFile}: sources の src が重なっています: ${nested.join(', ')}`);
+    if (nested.length > 0) throw new Error(tr({ en: `${configFile}: the src of sources overlap: ${nested.join(', ')}`, ja: `${configFile}: sources の src が重なっています: ${nested.join(', ')}` }));
   }
   const firstFeatures = sources === undefined ? undefined : Object.values(sources)[0]?.layers.features;
   return {

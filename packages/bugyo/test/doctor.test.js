@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { banOf, compareCounts } from '../src/doctor.js';
 
+/** このファイルは日本語の出力を確かめる（英語の既定は locale.test.js で確かめる）。子プロセスにも引き継がれる */
+process.env['BUGYO_LOCALE'] = 'ja';
+
 const bin = join(import.meta.dirname, '..', 'bin', 'bugyo.js');
 
 /**

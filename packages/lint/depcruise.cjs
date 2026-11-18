@@ -1,8 +1,31 @@
 /**
+ * @param {unknown} option
+ * @returns {'en' | 'ja'}
+ */
+function resolveLocale(option) {
+  const chosen = option ?? (process.env['BUGYO_LOCALE'] || undefined) ?? configLocale();
+  if (chosen === undefined) return 'en';
+  if (chosen === 'en' || chosen === 'ja') return chosen;
+  throw new Error(`locale must be one of en, ja / locale は en / ja のどれかです: ${String(chosen)}`);
+}
+
+function configLocale() {
+  const file = require('node:path').join(process.cwd(), '.bugyo', 'config.json');
+  try {
+    const locale = JSON.parse(require('node:fs').readFileSync(file, 'utf8')).locale;
+    return typeof locale === 'string' ? locale : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * bugyo の dependency-cruiser 設定を作る。
  * 利用側の .dependency-cruiser.cjs で `module.exports = require('@bugyo/lint/depcruise').config()` とする。
  *
  * React を使うなら `react: true` にする。`model-is-pure` が React とその周辺（react・react-dom・@tanstack）への依存も止める。既定は false。
+ *
+ * `locale` でルールの説明の言語を選ぶ（`en` か `ja`）。なければ環境変数 `BUGYO_LOCALE`、今のフォルダの `.bugyo/config.json` の `locale` の順に見て、どれもなければ `en`。
  *
  * `layers` で層のフォルダの場所を変えられる（ESLint の `bugyo({ layers })` と同じ形。指定のないところは `<src>/app` などで埋める）。
  *
@@ -11,6 +34,7 @@
  *   tsConfig?: string,
  *   forbidden?: object[],
  *   react?: boolean,
+ *   locale?: 'en' | 'ja',
  *   layers?: {
  *     app?: string,
  *     features?: string,
@@ -20,6 +44,8 @@
  * }} [options]
  */
 function config(options = {}) {
+  const locale = resolveLocale(options.locale);
+  const t = (/** @type {{ en: string, ja: string }} */ text) => text[locale];
   const src = options.src ?? 'src';
   const react = options.react ?? false;
   const escape = (/** @type {string} */ text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -68,14 +94,14 @@ function config(options = {}) {
       {
         name: 'no-circular',
         severity: 'error',
-        comment: '循環依存は設計の崩れです。共通部分を shared に切り出すか、依存の向きを揃えてください。',
+        comment: t({ en: 'A circular dependency breaks the design. Move the common part into shared, or make the dependencies point one way.', ja: '循環依存は設計の崩れです。共通部分を shared に切り出すか、依存の向きを揃えてください。' }),
         from: {},
         to: { circular: true },
       },
       {
         name: 'feature-internals-only-via-index',
         severity: 'error',
-        comment: '他のfeatureの内部には依存できません。features/<名前>/index.ts から公開されたものを使ってください。',
+        comment: t({ en: 'Do not depend on another feature\'s internals. Use what features/<name>/index.ts exports.', ja: '他のfeatureの内部には依存できません。features/<名前>/index.ts から公開されたものを使ってください。' }),
         from: { path: `^${p.features}/([^/]+)/` },
         to: {
           path: `^${p.features}/([^/]+)/.+`,
@@ -85,28 +111,28 @@ function config(options = {}) {
       {
         name: 'app-only-via-feature-index',
         severity: 'error',
-        comment: 'app は features/<名前>/index.ts だけをimportできます。',
+        comment: t({ en: 'app can only import features/<name>/index.ts.', ja: 'app は features/<名前>/index.ts だけをimportできます。' }),
         from: { path: p.app },
         to: { path: `^${p.features}/[^/]+/.+`, pathNot: `^${p.features}/[^/]+/index[.]ts$` },
       },
       {
         name: 'shared-is-leaf',
         severity: 'error',
-        comment: 'shared は features や app に依存できません。',
+        comment: t({ en: 'shared cannot depend on features or app.', ja: 'shared は features や app に依存できません。' }),
         from: { path: `^${p.shared}/` },
         to: { path: p.sharedTo },
       },
       {
         name: 'features-not-to-app',
         severity: 'error',
-        comment: 'features は app に依存できません。',
+        comment: t({ en: 'features cannot depend on app.', ja: 'features は app に依存できません。' }),
         from: { path: `^${p.features}/` },
         to: { path: p.app },
       },
       {
         name: 'model-is-pure',
         severity: 'error',
-        comment: 'model/ が使えるのは自分のmodel、shared/lib、純粋なライブラリだけです。',
+        comment: t({ en: 'model/ can only use its own model, shared/lib, and pure libraries.', ja: 'model/ が使えるのは自分のmodel、shared/lib、純粋なライブラリだけです。' }),
         from: { path: `^${p.features}/([^/]+)/${p.model}/` },
         to: {
           path: react ? `(${p.modelTo}|${reactLibs})` : p.modelTo,
@@ -119,7 +145,7 @@ function config(options = {}) {
             {
               name: 'shared-model-is-pure',
               severity: 'error',
-              comment: '共有の model が使えるのは shared の lib と model、純粋なライブラリだけです。',
+              comment: t({ en: 'A shared model can only use the shared lib and model, and pure libraries.', ja: '共有の model が使えるのは shared の lib と model、純粋なライブラリだけです。' }),
               from: { path: `^${p.sharedModel}/` },
               to: { path: react ? `(${p.sharedModelTo}|${reactLibs})` : p.sharedModelTo },
             },

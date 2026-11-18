@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { commandEnv, runCommand } from './run.js';
+import { tr } from './locale.js';
 
 /** bugyo が禁止ごとに数えるファイル。禁止ごとの件数を持ち、件数が変わったら baseline save で書き直す */
 export const baselineFile = '.bugyo/baseline.json';
@@ -92,7 +93,7 @@ export function eslintCounts(cwd) {
   try {
     results = JSON.parse(run.stdout);
   } catch {
-    return { error: `eslint . --format json の出力を読めません（終了コード ${run.status}）: ${run.stderr.trim().slice(0, 500)}` };
+    return { error: `${tr({ en: `Cannot read the output of eslint . --format json (exit code ${run.status})`, ja: `eslint . --format json の出力を読めません（終了コード ${run.status}）` })}: ${run.stderr.trim().slice(0, 500)}` };
   }
   /** @type {Map<string, number>} */
   const counts = new Map();
@@ -163,7 +164,7 @@ export function depcruiseCounts(cwd, dirs) {
     }
     return counts;
   } catch {
-    return { error: `depcruise の出力を読めません（終了コード ${run.status}）: ${run.stderr.trim().slice(0, 500)}` };
+    return { error: `${tr({ en: `Cannot read the output of depcruise (exit code ${run.status})`, ja: `depcruise の出力を読めません（終了コード ${run.status}）` })}: ${run.stderr.trim().slice(0, 500)}` };
   }
 }
 
@@ -196,13 +197,18 @@ export function sarifCounts(cwd, inputs) {
       rmSync(path, { force: true });
       runCommand(input.command, cwd);
     }
-    if (!existsSync(path)) return { error: `${input.file} がありません${input.command === undefined ? '' : `（${input.command} が書くはずのファイル）`}` };
+    if (!existsSync(path)) return {
+      error: tr({
+        en: `${input.file} does not exist${input.command === undefined ? '' : ` (${input.command} should write it)`}`,
+        ja: `${input.file} がありません${input.command === undefined ? '' : `（${input.command} が書くはずのファイル）`}`,
+      }),
+    };
     /** @type {any} */
     let log;
     try {
       log = JSON.parse(readFileSync(path, 'utf8'));
     } catch {
-      return { error: `${input.file} を SARIF（JSON）として読めません` };
+      return { error: tr({ en: `Cannot read ${input.file} as SARIF (JSON)`, ja: `${input.file} を SARIF（JSON）として読めません` }) };
     }
     for (const run of Array.isArray(log?.runs) ? log.runs : []) {
       const tool = String(run?.tool?.driver?.name ?? 'unknown');
@@ -385,12 +391,12 @@ function parseBaseline(text) {
 export function saveBaseline(cwd, dirs, sarif = []) {
   rmSync(join(cwd, eslintSuppressionsFile), { force: true });
   const suppress = runTool(cwd, 'eslint', ['.', '--suppress-all']);
-  if (suppress.status === 2) throw new Error(`eslint . --suppress-all が失敗しました: ${`${suppress.stdout}${suppress.stderr}`.trim().slice(0, 500)}`);
+  if (suppress.status === 2) throw new Error(`${tr({ en: 'eslint . --suppress-all failed', ja: 'eslint . --suppress-all が失敗しました' })}: ${`${suppress.stdout}${suppress.stderr}`.trim().slice(0, 500)}`);
   const config = depcruiseConfig(cwd);
   if (config !== undefined && dirs.length > 0) {
     rmSync(join(cwd, depcruiseKnownFile), { force: true });
     const known = runTool(cwd, 'depcruise', [...dirs, '--config', config, '--baseline', depcruiseKnownFile]);
-    if (!existsSync(join(cwd, depcruiseKnownFile))) throw new Error(`depcruise の既知の違反を書けませんでした（終了コード ${known.status}）: ${known.stderr.trim().slice(0, 500)}`);
+    if (!existsSync(join(cwd, depcruiseKnownFile))) throw new Error(`${tr({ en: `Could not write the known depcruise violations (exit code ${known.status})`, ja: `depcruise の既知の違反を書けませんでした（終了コード ${known.status}）` })}: ${known.stderr.trim().slice(0, 500)}`);
   }
   const { counts, errors } = banCounts(cwd, dirs, sarif);
   if (errors.length > 0) throw new Error(errors.join('\n'));
@@ -450,7 +456,12 @@ export function baselineGrowth(cwd, base) {
   const before = parseBaseline(atBase(baselineFile));
   const after = parseBaseline(now(baselineFile));
   if (after.version < before.version) {
-    grown.push(`${baselineFile}: 形式が ${base} の ${before.version} から ${after.version} に戻っています（古い形式では、同じルールの中の入れ替えを見つけられません）。bugyo baseline save で作り直してください`);
+    grown.push(
+      `${baselineFile}: ${tr({
+        en: `the format went back from ${before.version} in ${base} to ${after.version} (the old format cannot find swaps within the same rule). Recreate it with bugyo baseline save`,
+        ja: `形式が ${base} の ${before.version} から ${after.version} に戻っています（古い形式では、同じルールの中の入れ替えを見つけられません）。bugyo baseline save で作り直してください`,
+      })}`,
+    );
   }
   const sameVersion = before.version === after.version;
   const bans = compareCounts(sameVersion ? before.counts : byRule(before.counts), sameVersion ? after.counts : byRule(after.counts));

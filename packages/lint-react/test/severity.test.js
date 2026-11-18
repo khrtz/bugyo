@@ -54,7 +54,7 @@ test('ルール ID で指定すると、そのルールが warn になる', asyn
 });
 
 test('知らない名前と、warn 以外の値は断る', () => {
-  assert.throws(() => bugyo({ root, parts, severity: { 'no-such-ban': 'warn' } }), /no-such-ban は、禁止の名前（comments, feature-internals, fetch, model-layers, model-react, ui-timers, use-effect）/);
+  assert.throws(() => bugyo({ root, parts, severity: { 'no-such-ban': 'warn' } }), /no-such-ban in bugyo\(\{ severity \}\) is neither a ban name \(comments, feature-internals, fetch, model-layers, model-react, ui-timers, use-effect\)/);
   // @ts-expect-error off には下げられない
-  assert.throws(() => bugyo({ root, parts, severity: { fetch: 'off' } }), /'warn' だけです/);
+  assert.throws(() => bugyo({ root, parts, severity: { fetch: 'off' } }), /can only lower to 'warn'/);
 });

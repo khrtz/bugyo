@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { z } from 'zod';
 import { parseFrontmatter } from './frontmatter.js';
+import { tr } from './locale.js';
 
 export const featureDir = 'docs/features';
 /** feature map の4つの見出し。日本語と英語のどちらで書いてもよい */
@@ -35,11 +36,11 @@ const relativePath = z
   .string()
   .min(1)
   .refine((path) => !isAbsolute(path) && !path.startsWith('/') && !path.includes('\\') && !path.split('/').includes('..'), {
-    message: 'プロジェクトのルートからの相対パスを / 区切りで書いてください（.. と絶対パスは使えません）',
+    error: () => tr({ en: 'use a path relative to the project root, separated by / (no .. and no absolute paths)', ja: 'プロジェクトのルートからの相対パスを / 区切りで書いてください（.. と絶対パスは使えません）' }),
   });
 
 /** spec はコマンドの {spec} にそのまま入るので、パスに使う文字だけにする */
-const specPath = relativePath.pipe(z.string().regex(/^[A-Za-z0-9._@+/-]+$/, 'spec のパスは英数字と . _ @ + / - だけにしてください'));
+const specPath = relativePath.pipe(z.string().regex(/^[A-Za-z0-9._@+/-]+$/, { error: () => tr({ en: 'a spec path may use only letters, digits, and . _ @ + / -', ja: 'spec のパスは英数字と . _ @ + / - だけにしてください' }) }));
 
 const Frontmatter = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -59,7 +60,7 @@ const Frontmatter = z.object({
 function parse(file, text) {
   const { fields, body } = parseFrontmatter(file, text);
   const parsed = Frontmatter.safeParse(fields);
-  if (!parsed.success) throw new Error(`${file}: frontmatter が不正です: ${parsed.error.message}`);
+  if (!parsed.success) throw new Error(tr({ en: `${file}: invalid frontmatter: ${parsed.error.message}`, ja: `${file}: frontmatter が不正です: ${parsed.error.message}` }));
   const { id, route, spec: specs, runner } = parsed.data;
   const spec = /** @type {string} */ (specs[0]);
   return { id, ...(route === undefined ? {} : { route }), spec, specs, ...(runner === undefined ? {} : { runner }), file, body };

@@ -128,7 +128,8 @@ bugyo の禁止のメッセージは、英語（`en`、既定）と日本語（`
 ```
 
 - メッセージの頭の禁止の名前（`[bugyo:use-effect]`）は、言語によらず同じです。`bugyo baseline` はこの名前までで数えるので、言語を変えても件数は変わりません
-- 言語が変わるのは、`@bugyo/lint` と `@bugyo/lint-react` の禁止のメッセージ（コメントの禁止を含む）と、`bugyo verify` の出力、`bugyo task done` の結果の行です。CLI のほかの出力、設定の書き方の誤りを知らせるエラー、dependency-cruiser のルールの説明は日本語のままです。CLI は `BUGYO_LOCALE` と `.bugyo/config.json` の `locale` を見ます
+- 言語が変わるのは、`@bugyo/lint` と `@bugyo/lint-react` の禁止のメッセージ（コメントの禁止を含む）、設定の書き方の誤りを知らせるエラー、dependency-cruiser のルールの説明、`bugyo` CLI の出力です
+- CLI と、設定の誤りのエラーと、dependency-cruiser の説明は、`BUGYO_LOCALE`、今のフォルダの `.bugyo/config.json` の `locale` の順に見ます。dependency-cruiser の説明は `config({ locale: 'ja' })` でも選べます
 - `defineBan` で作った禁止のメッセージは書いたとおりに出ます。言語ごとに変えたいときは、`build(context)` で `context.locale` を見ます
 - `.bugyo/baseline.json` が名前で数える前の形式（`version` のないもの）なら、言語を変える前に `bugyo baseline save` で作り直します。古い形式はメッセージの文で数えるので、言語を変えると件数が合わなくなります
 - どれもなければ英語です

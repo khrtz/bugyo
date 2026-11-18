@@ -50,9 +50,9 @@ test('sources: 1つのソースの部品と範囲の禁止は、ほかのソー�
 });
 
 test('sources: 外に書いたソースの項目と、重なる src は断る', () => {
-  assert.throws(() => bugyo({ root, src: 'web', sources: [{ src: 'server/src' }] }), /src を sources のそれぞれに書いてください/);
-  assert.throws(() => bugyo({ root, sources: [] }), /1つ以上/);
-  assert.throws(() => bugyo({ root, sources: [{ src: 'web' }, { src: 'web/admin' }] }), /src が重なっています/);
-  assert.throws(() => bugyo({ root, sources: [{ src: 'web', parts: [structure] }] }), /common を必ず入れて/);
+  assert.throws(() => bugyo({ root, src: 'web', sources: [{ src: 'server/src' }] }), /write src inside each source/);
+  assert.throws(() => bugyo({ root, sources: [] }), /one or more sources/);
+  assert.throws(() => bugyo({ root, sources: [{ src: 'web' }, { src: 'web/admin' }] }), /src of bugyo\(\{ sources \}\) overlap/);
+  assert.throws(() => bugyo({ root, sources: [{ src: 'web', parts: [structure] }] }), /must include common/);
   assert.doesNotThrow(() => bugyo({ root, sources: [{ src: 'web', parts: [common, structure] }, { src: 'server/src', parts: [common, structure] }] }));
 });

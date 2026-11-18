@@ -124,10 +124,10 @@ test('defineBan: 決めた入口だけで使える import を、allow に場所�
 });
 
 test('defineBan: 書き方の誤りと、同じ名前の禁止は断る', () => {
-  assert.throws(() => defineBan({ name: 'No Spaces', globals: ['x'] }), /小文字・数字・ハイフン/);
+  assert.throws(() => defineBan({ name: 'No Spaces', globals: ['x'] }), /lowercase letters, digits, and hyphens/);
   // @ts-expect-error 知らない項目
-  assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'typo', global: ['x'] })] }), /知らない項目があります: global/);
-  assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'empty' })] }), /何も止めていません/);
+  assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'typo', global: ['x'] })] }), /unknown keys: global/);
+  assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'empty' })] }), /stops nothing/);
   for (const [spec, where] of /** @type {const} */ ([
     [{ imports: { paths: ['moment'] } }, 'imports.paths[0]'],
     [{ imports: { paths: [{ name: 'lodash', message: 'x' }, { name: 'moment' }] } }, 'imports.paths[1]'],
@@ -139,20 +139,26 @@ test('defineBan: 書き方の誤りと、同じ名前の禁止は断る', () => 
     assert.throws(
       // @ts-expect-error message のない項目
       () => bugyo({ root, parts: [common, defineBan({ name: 'no-message', ...spec })] }),
-      (error) => error instanceof Error && error.message.startsWith(`禁止 no-message の ${where} に message がありません。`) && error.message.includes('代わりに使うもの'),
+      (error) => error instanceof Error && error.message.startsWith(`${where} of the ban no-message has no message.`) && error.message.includes('what to use instead'),
       where,
     );
   }
   assert.throws(
     () => bugyo({ root, parts: [common, structure, defineBan({ name: 'calc-only', scope: 'src/features/calc/**/*.ts', imports: { paths: [{ name: 'lodash', message: 'x' }] } })] }),
-    /scope を src \/ ui \/ model のどれかにしてください/,
+    /need a scope of src \/ ui \/ model/,
     'glob の範囲の合成する禁止は、model/ の禁止を上書きしてしまうので断る',
   );
   assert.throws(
     () => bugyo({ root, parts: [common, fetchOnlyInApi, defineBan({ name: 'e2e-only', scope: 'e2e/**/*.ts', globals: [{ name: 'alert', message: 'x' }] })] }),
-    /scope を src \/ ui \/ model のどれかにしてください/,
+    /need a scope of src \/ ui \/ model/,
     'src の外の glob に合成する禁止を置くと、src の禁止が漏れるので断る',
   );
-  assert.throws(() => bugyo({ root, parts: [common, structure, fetchOnlyInApi, defineBan({ name: 'fetch', globals: [{ name: 'x', message: 'x' }] })] }), /同じ名前の禁止が2つ以上あります: fetch/);
-  assert.throws(() => bugyo({ root, severity: { fetch: 'warn' } }), /fetch は、禁止の名前/, '入れていない禁止は下げられない');
+  assert.throws(() => bugyo({ root, parts: [common, structure, fetchOnlyInApi, defineBan({ name: 'fetch', globals: [{ name: 'x', message: 'x' }] })] }), /More than one ban has the same name: fetch/);
+  process.env['BUGYO_LOCALE'] = 'ja';
+  try {
+    assert.throws(() => defineBan({ name: 'No Spaces', globals: ['x'] }), /小文字・数字・ハイフン/, 'BUGYO_LOCALE=ja なら日本語で断る');
+  } finally {
+    delete process.env['BUGYO_LOCALE'];
+  }
+  assert.throws(() => bugyo({ root, severity: { fetch: 'warn' } }), /fetch in bugyo\(\{ severity \}\) is neither a ban name/, '入れていない禁止は下げられない');
 });

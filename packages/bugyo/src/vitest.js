@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { featureMapChecks } from './feature-map-checks.js';
 import { featureDir } from './feature-map.js';
+import { tr } from './locale.js';
 
 /**
  * feature map（docs/features/*.md）と、spec・機能のフォルダ・README の回帰順の整合を検査するテストを Vitest に登録する。
@@ -12,7 +13,7 @@ export function registerFeatureMapTests(options = {}) {
 
   describe(`feature map (${featureDir})`, () => {
     for (const check of checks) {
-      const title = check.skip === null ? check.title : `${check.title}（対象なし: ${check.skip}）`;
+      const title = check.skip === null ? check.title : `${check.title}${tr({ en: ` (nothing to check: ${check.skip})`, ja: `（対象なし: ${check.skip}）` })}`;
       it.skipIf(check.skip !== null)(title, () => {
         expect(check.problems()).toEqual([]);
       });
