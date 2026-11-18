@@ -36,10 +36,14 @@ export interface BugyoPart {
   readonly rank: number;
 }
 
-/** 共通: 厳しい型検査、any・型アサーション・非 null アサーション・待っていない Promise・switch の漏れ、理由のない eslint-disable、コメント、extra の合成。必須 */
+/** 共通: 厳しい型検査、any・型アサーション・非 null アサーション・待っていない Promise・switch の漏れ、理由のない eslint-disable。必須 */
 export const common: BugyoPart;
-/** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止、fetch は apiClientDir だけ */
+/** 構成: app / features/<id> / shared の境界、feature の外からは index.ts だけ、model から ui・api・shared/ui・shared/api への依存の禁止 */
 export const structure: BugyoPart;
+/** 禁止 `comments`: コメントは公開 API の JSDoc と理由つきの eslint-disable だけ */
+export const noComments: BugyoPart;
+/** 禁止 `fetch`: fetch は apiClientDir とテストでだけ呼べる */
+export const fetchOnlyInApi: BugyoPart;
 
 /** 禁止が、build のときに受け取る bugyo の設定 */
 export interface BugyoContext {

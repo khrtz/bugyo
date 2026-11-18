@@ -5,7 +5,7 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import { noComments } from './rules/no-comments.js';
+import { noComments as noCommentsRule } from './rules/no-comments.js';
 
 /**
  * @typedef {import('./index.js').BugyoOptions} BugyoOptions
@@ -114,8 +114,29 @@ export function defineBan(spec) {
 }
 
 /**
+ * コメントの禁止。公開 API の JSDoc（`/** *\/`）と、理由つきの `eslint-disable` だけを書ける。src の下の .ts / .tsx に当てる。
+ */
+export const noComments = defineBan({ name: 'comments', rules: { 'bugyo/no-comments': 'error' } });
+
+/**
+ * `fetch` の禁止。apiClientDir（既定は `shared/api`）のクライアントとテストでだけ呼べる。
+ */
+export const fetchOnlyInApi = defineBan({
+  name: 'fetch',
+  allow: ['api', 'tests'],
+  build: (context) => ({
+    globals: [
+      {
+        name: 'fetch',
+        message: `fetchを直接呼ばないでください。${context.apiClientDir} のクライアントを使い、スキーマで応答を検証してください。`,
+      },
+    ],
+  }),
+});
+
+/**
  * 共通: TypeScript の厳しい検査、`any`・型アサーション・非 null アサーション・待っていない Promise・`switch` の漏れ、
- * 理由のない `eslint-disable`、コメント、`extra` の合成。どの構成のプロジェクトにも当てる。
+ * 理由のない `eslint-disable`。どの構成のプロジェクトにも当てる。
  *
  * @type {Part}
  */
@@ -135,7 +156,7 @@ export const common = {
     },
     plugins: {
       '@eslint-community/eslint-comments': comments,
-      bugyo: { rules: { 'no-comments': noComments } },
+      bugyo: { rules: { 'no-comments': noCommentsRule } },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -149,7 +170,6 @@ export const common = {
       '@eslint-community/eslint-comments/require-description': ['error', { ignore: [] }],
       '@eslint-community/eslint-comments/no-unlimited-disable': 'error',
     },
-    bans: [normalizeBan({ name: 'comments', rules: { 'bugyo/no-comments': 'error' } })],
     trailing: [
       { files: ['**/*.{js,cjs,mjs}'], ...tseslint.configs.disableTypeChecked },
       { files: ['**/*.cjs'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
@@ -159,7 +179,7 @@ export const common = {
 
 /**
  * 構成: `app` / `features/<id>` / `shared` の境界、feature の外からは `index.ts` だけを通す決まり、
- * `model` から `ui` / `api` / `shared/ui` / `shared/api` への依存の禁止、`fetch` は apiClientDir だけ。React に依存しない。
+ * `model` から `ui` / `api` / `shared/ui` / `shared/api` への依存の禁止。React に依存しない。
  *
  * @type {Part}
  */
@@ -210,16 +230,6 @@ export const structure = {
               },
             ],
           },
-        }),
-        normalizeBan({
-          name: 'fetch',
-          allow: ['api', 'tests'],
-          globals: [
-            {
-              name: 'fetch',
-              message: `fetchを直接呼ばないでください。${context.apiClientDir} のクライアントを使い、スキーマで応答を検証してください。`,
-            },
-          ],
         }),
         normalizeBan({
           name: 'model-layers',

@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import { join, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
-import { bugyo, common, structure } from '@bugyo/lint';
-import { react } from '../eslint.js';
+import { bugyo, common, fetchOnlyInApi, noComments, structure } from '@bugyo/lint';
+import { noUiTimers, noUseEffect, react } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture');
 const eslint = new ESLint({
   cwd: root,
   overrideConfigFile: true,
   baseConfig: bugyo({
-    parts: [common, structure, react],
+    parts: [common, structure, react, noComments, fetchOnlyInApi, noUseEffect, noUiTimers],
     root,
     extra: {
       restrictedProperties: [{ object: 'Date', property: 'now', message: 'shared/lib の systemClock を使ってください' }],

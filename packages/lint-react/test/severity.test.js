@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { join, sep } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
-import { bugyo, common, structure } from '@bugyo/lint';
-import { react } from '../eslint.js';
+import { bugyo, common, fetchOnlyInApi, noComments, structure } from '@bugyo/lint';
+import { noUiTimers, noUseEffect, react } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture');
-const parts = [common, structure, react];
+const parts = [common, structure, react, noComments, fetchOnlyInApi, noUseEffect, noUiTimers];
 
 /** @param {Record<string, 'warn'>} severity */
 async function lint(severity) {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { ESLint } from 'eslint';
-import { bugyo, common, defineBan, structure } from '../eslint.js';
+import { bugyo, common, defineBan, fetchOnlyInApi, noComments, structure } from '../eslint.js';
 
 const root = join(import.meta.dirname, 'fixture-node');
 
@@ -63,7 +63,7 @@ test('defineBan: 名前で warn に下げられ、rules の禁止も下がる', 
 });
 
 test('comments も名前で warn に下げられる', async () => {
-  const config = bugyo({ root, explicitExtensions: true, severity: { comments: 'warn' } });
+  const config = bugyo({ root, explicitExtensions: true, parts: [common, structure, noComments], severity: { comments: 'warn' } });
   assert.equal((await rulesFor(config, 'src/features/calc/model/add.ts'))['bugyo/no-comments'][0], 1);
 });
 
@@ -90,5 +90,6 @@ test('defineBan: 書き方の誤りと、同じ名前の禁止は断る', () => 
   // @ts-expect-error 知らない項目
   assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'typo', global: ['x'] })] }), /知らない項目があります: global/);
   assert.throws(() => bugyo({ root, parts: [common, defineBan({ name: 'empty' })] }), /何も止めていません/);
-  assert.throws(() => bugyo({ root, parts: [common, structure, defineBan({ name: 'fetch', globals: ['x'] })] }), /同じ名前の禁止が2つ以上あります: fetch/);
+  assert.throws(() => bugyo({ root, parts: [common, structure, fetchOnlyInApi, defineBan({ name: 'fetch', globals: ['x'] })] }), /同じ名前の禁止が2つ以上あります: fetch/);
+  assert.throws(() => bugyo({ root, severity: { fetch: 'warn' } }), /fetch は、禁止の名前/, '入れていない禁止は下げられない');
 });
