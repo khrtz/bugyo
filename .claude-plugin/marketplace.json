@@ -1,12 +1,16 @@
 {
   "name": "bugyo",
-  "owner": { "name": "bugyo" },
-  "metadata": { "description": "エージェント開発の土台 bugyo のプラグイン" },
+  "owner": {
+    "name": "bugyo"
+  },
+  "metadata": {
+    "description": "Plugin for bugyo, a foundation for agent development"
+  },
   "plugins": [
     {
       "name": "bugyo",
       "source": "./plugin",
-      "description": "bugyo の土台で作業するためのスキル集（進め方の選択、新機能、ミスのルール化、批判的レビュー、仕組みの説明）"
+      "description": "Skills for working on the bugyo foundation (picking the way of working, new features, turning mistakes into rules, critical review, explaining how things work) and hooks that keep the task ledger honest"
     }
   ]
 }
