@@ -269,6 +269,41 @@ console.log('${id}: ok');
 }
 
 /**
+ * 言語を問わないテンプレート: feature map と、確かめるスクリプトの雛形だけ。雛形のスクリプトは、書くまで落ちる。
+ *
+ * @param {string} id
+ * @param {string} cwd
+ * @param {import('./index.js').BugyoConfig} config
+ */
+function genericFeature(id, cwd, config) {
+  const { specDir, specSuffix } = config.featureMap;
+  if (specDir === null) {
+    throw new Error(tr({ en: `Without featureMap.specDir in ${configFile}, there is no place for the feature's check`, ja: `${configFile} の featureMap.specDir がないと、機能を確かめるスクリプトを置く場所が決まりません` }));
+  }
+  const spec = `${specDir}/${id}${specSuffix}`;
+  const script = specSuffix.endsWith('.mjs') || specSuffix.endsWith('.js');
+  const stub = tr({
+    en: `${id}: write how to check this feature for real in ${spec} (exit code 0 means it passed)`,
+    ja: `${id}: この機能を実際に確かめる手順を ${spec} に書いてください（終了コード 0 で通ったとみなします）`,
+  });
+  const created = writeAll(cwd, {
+    ...(script ? { [spec]: `console.error(${JSON.stringify(stub)});\nprocess.exitCode = 1;\n` } : {}),
+    [`${featureDir}/${id}.md`]: featureMapDoc(id, spec, undefined, tr({ en: 'where users reach it: a page, a command, an endpoint', ja: '利用者がどこから使うか: ページ・コマンド・エンドポイントなど' })),
+  });
+  appendSweepOrder(cwd, id, created);
+  return {
+    created,
+    next: [
+      script
+        ? tr({ en: `Rewrite ${spec} so it really runs the feature and fails when it is broken (it fails until you do)`, ja: `${spec} を、機能を実際に動かし、壊れていれば落ちるように書き換える（書き換えるまで落ちます）` })
+        : tr({ en: `Write ${spec}, the check that verify.command runs for this feature`, ja: `verify.command がこの機能で実行する ${spec} を書く` }),
+      tr({ en: `Fill the four headings of docs/features/${id}.md`, ja: `docs/features/${id}.md の4つの見出しを埋める` }),
+      `pnpm check && pnpm test && pnpm verify ${id}`,
+    ],
+  };
+}
+
+/**
  * 新しい feature を作る。何を作るかは `.bugyo/config.json` の template で決まる（ないときは react-vite）。
  *
  * @param {string} id
@@ -302,11 +337,13 @@ export function newFeature(id, options = {}) {
       return reactFeature(id, cwd, options.src ?? 'src');
     case 'node-lib':
       return nodeLibFeature(id, cwd, config);
+    case 'generic':
+      return genericFeature(id, cwd, config);
     default:
       throw new Error(
         tr({
-          en: `The template "${template}" in ${configFile} has no new feature scaffold (react-vite and node-lib have one). Create src/features/${id} by hand and add docs/features/${id}.md`,
-          ja: `${configFile} の template "${template}" には new feature の雛形がありません（雛形があるのは react-vite と node-lib）。src/features/${id} は手で作り、docs/features/${id}.md を足してください`,
+          en: `The template "${template}" in ${configFile} has no new feature scaffold (react-vite, node-lib, and generic have one). Create src/features/${id} by hand and add docs/features/${id}.md`,
+          ja: `${configFile} の template "${template}" には new feature の雛形がありません（雛形があるのは react-vite・node-lib・generic）。src/features/${id} は手で作り、docs/features/${id}.md を足してください`,
         }),
       );
   }

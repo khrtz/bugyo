@@ -86,8 +86,9 @@ export function featureMapChecks(options = {}) {
       title: tr({ en: `every folder in ${featuresDir ?? 'the features folder'} is in the feature map`, ja: `${featuresDir ?? '機能のフォルダ'} のフォルダがすべて feature map に載っている` }),
       skip: missing(featuresDir),
       problems: () => {
+        if (featuresDir === null || missing(featuresDir) !== null) return [];
         const ids = new Set(features.map((feature) => feature.id));
-        return readdirSync(join(cwd, featuresDir ?? ''))
+        return readdirSync(join(cwd, featuresDir))
           .filter((dir) => !ids.has(dir))
           .map((dir) => tr({ en: `no ${featureDir}/${dir}.md for ${featuresDir}/${dir}`, ja: `${featuresDir}/${dir} に対応する ${featureDir}/${dir}.md がありません` }));
       },

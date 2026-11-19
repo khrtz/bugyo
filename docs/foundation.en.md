@@ -8,12 +8,13 @@ The foundation is the layer that keeps agents from picking the wrong way to writ
 
 The feature map and `bugyo verify` do not care about the tech stack. How a feature is checked is set in `.bugyo/config.json` (see "Config file" below). Lint and the dependency rules assume TypeScript. The parts and bans for React live in a separate package, `@bugyo/lint-react`, which only React projects install (see "Parts and bans" below).
 
-There are two templates (`bugyo init --template <name>`).
+There are three templates (`bugyo init --template <name>`).
 
 | Template | Example | Assumes |
 | --- | --- | --- |
 | `react-vite` (default) | [examples/todo-app](../examples/todo-app) | pnpm, Vite, React, Playwright, Vitest, and a path alias `@/` pointing to `src/` |
 | `node-lib` | [examples/node-lib](../examples/node-lib) | pnpm, Node 24 type stripping (runs `.ts` directly), `node:test`. Imports carry the `.ts` extension. No React, Vite, or Playwright |
+| `generic` | [examples/generic](../examples/generic) | Any language. No lint, types, or dependency rules; only the feature map, `bugyo verify` (the `command` way), and the task ledger. The example product is a static page, checked by scripts run with `node`. To check with another language's tests, change `verify.command` (e.g. `pytest {spec}`) and `featureMap.specSuffix` |
 
 ## Folder structure
 
@@ -484,7 +485,7 @@ This repository's CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) r
 | Job | What it runs |
 | --- | --- |
 | `pnpm check / test` | `pnpm check` and `pnpm test` |
-| `verify（証拠つき）` | `pnpm verify` (Playwright for todo-app, per-feature commands for node-lib). Uploads `artifacts/` and posts the result and evidence links on the PR |
+| `verify（証拠つき）` | `pnpm verify` (Playwright for todo-app, per-feature commands for node-lib and generic). Uploads `artifacts/` and posts the result and evidence links on the PR |
 | `npm で入れたプロジェクト（pnpm なし）` | packs the packages, installs a `react-vite` project with npm, removes pnpm from `PATH`, and passes check, test, `verify --all`, and `task done` |
 
 The Linux baselines are in `examples/todo-app/e2e/__screenshots__/linux/`. To rebuild them after a screen change:
@@ -507,18 +508,18 @@ The Linux baselines are in `examples/todo-app/e2e/__screenshots__/linux/`. To re
 
 The commands for the task ledger and the gate (`bugyo task`, `bugyo mistake`, `bugyo gate`) are in [tasks.en.md](tasks.en.md), and how to use baselines is in [adopt.en.md](adopt.en.md#adding-lint-step-by-step).
 
-`new feature <id>` creates the following. Both templates create `docs/features/<id>.md` as a template and add a line to the README's order.
+`new feature <id>` creates the following. Every template creates `docs/features/<id>.md` as a template and adds a line to the README's order.
 
-| `react-vite` | `node-lib` |
-| --- | --- |
-| `src/features/<id>/model/<id>.ts` and its test (Vitest and fast-check) | `src/features/<id>/model/<id>.ts` and its test (`node:test`) |
-| `src/features/<id>/api/use<Id>Query.ts` | — |
-| `src/features/<id>/ui/<Id>View.tsx` | — |
-| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` |
-| `public/api/<id>.json` (sample data) | — |
-| `e2e/<id>.spec.ts` | `checks/<id>.ts` (follows `featureMap.specDir` and `specSuffix`) |
+| `react-vite` | `node-lib` | `generic` |
+| --- | --- | --- |
+| `src/features/<id>/model/<id>.ts` and its test (Vitest and fast-check) | `src/features/<id>/model/<id>.ts` and its test (`node:test`) | — |
+| `src/features/<id>/api/use<Id>Query.ts` | — | — |
+| `src/features/<id>/ui/<Id>View.tsx` | — | — |
+| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` | — |
+| `public/api/<id>.json` (sample data) | — | — |
+| `e2e/<id>.spec.ts` | `checks/<id>.ts` (follows `featureMap.specDir` and `specSuffix`) | `checks/<id>.mjs` (the same; fails until rewritten; not created unless `specSuffix` is `.mjs` or `.js`) |
 
-With `react-vite`, wiring it into the screen remains after creation (until then, knip stops it as "unused"). With `node-lib`, check, test, and verify pass right after creation; rewriting the behavior and filling the feature map remain.
+With `react-vite`, wiring it into the screen remains after creation (until then, knip stops it as "unused"). With `node-lib`, check, test, and verify pass right after creation; rewriting the behavior and filling the feature map remain. With `generic`, verify fails until you write how to really check the feature.
 
 `verify` works as follows, with either way of running.
 

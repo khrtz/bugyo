@@ -12,6 +12,7 @@ description: The steps for adding a new feature (a user-visible unit such as a s
    - What it creates (depends on `template` in `.bugyo/config.json`)
      - `react-vite` (default): `src/features/<id>/{ui,model,api}/`, `index.ts`, a property test for model, `e2e/<id>.spec.ts`, `docs/features/<id>.md`, `public/api/<id>.json`, and an entry in the README's regression order
      - `node-lib`: `src/features/<id>/model/` and its test, `index.ts`, `checks/<id>.ts` (a script that really runs it to check), `docs/features/<id>.md`, and an entry in the README's regression order. There is no screen, so skip the UI items of steps 3 and 4; make `checks/<id>.ts` match the real behavior, and use `index.ts` from `src/index.ts` to expose it, or from `src/app` for a command
+     - `generic`: `checks/<id>.mjs` (a script that fails until you write how to really check the feature) and `docs/features/<id>.md`, plus the entry in the regression order. No product code is created; write it where the project keeps it, and make the check run it
    - For a template without a skeleton, `bugyo new feature` refuses and says why. Then do not create it by hand; tell the user
    - Do not create folders by hand. The match with the feature map goes missing and `pnpm test` fails
 3. **Shape it.** Rewrite the skeleton's `Item` schema, view, and spec to the real requirements

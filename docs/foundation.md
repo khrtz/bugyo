@@ -8,12 +8,13 @@
 
 feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提です。React 用の部品と禁止は別のパッケージ `@bugyo/lint-react` に分かれていて、React を使うプロジェクトだけが入れます（下の「部品と禁止」）。
 
-雛形（`bugyo init --template <名前>`）は2つです。
+雛形（`bugyo init --template <名前>`）は3つです。
 
 | テンプレート | 見本 | 前提 |
 | --- | --- | --- |
 | `react-vite`（既定） | [examples/todo-app](../examples/todo-app) | pnpm、Vite、React、Playwright、Vitest、`@/` を `src/` に向けたパスの別名 |
 | `node-lib` | [examples/node-lib](../examples/node-lib) | pnpm、Node 24 の型除去（`.ts` をそのまま実行する）、`node:test`。import に拡張子 `.ts` を書く。React・Vite・Playwright は使わない |
+| `generic` | [examples/generic](../examples/generic) | 言語を問わない。lint・型・依存ルールは入れず、feature map・`bugyo verify`（`command` の確かめ方）・タスク台帳だけを使う。見本の製品は静的なページで、確かめるスクリプトは `node` で動かす。ほかの言語のテストで確かめるなら `verify.command`（例: `pytest {spec}`）と `featureMap.specSuffix` を変える |
 
 ## フォルダ構成
 
@@ -483,7 +484,7 @@ export default defineBugyoConfig({ port: 5173 });
 | ジョブ | 実行するもの |
 | --- | --- |
 | `pnpm check / test` | `pnpm check` と `pnpm test` |
-| `verify（証拠つき）` | `pnpm verify`（todo-app は Playwright、node-lib は機能ごとのコマンド）。`artifacts/` を成果物として上げ、PR に合否と証拠のリンクを載せる |
+| `verify（証拠つき）` | `pnpm verify`（todo-app は Playwright、node-lib と generic は機能ごとのコマンド）。`artifacts/` を成果物として上げ、PR に合否と証拠のリンクを載せる |
 | `npm で入れたプロジェクト（pnpm なし）` | パッケージを作り、`react-vite` のプロジェクトを npm で入れ、pnpm を `PATH` から外して、check・test・`verify --all`・`task done` を通す |
 
 Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあります。画面を変えて作り直すときは次の手順です。
@@ -506,18 +507,18 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) に、ベースラインの使い方は [adopt.md](adopt.md#lint-を段階的に入れる) にあります。
 
-`new feature <id>` が作るものは次のとおりです。どちらも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
+`new feature <id>` が作るものは次のとおりです。どれも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
 
-| `react-vite` | `node-lib` |
-| --- | --- |
-| `src/features/<id>/model/<id>.ts` と、そのテスト（Vitest と fast-check） | `src/features/<id>/model/<id>.ts` と、そのテスト（`node:test`） |
-| `src/features/<id>/api/use<Id>Query.ts` | — |
-| `src/features/<id>/ui/<Id>View.tsx` | — |
-| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` |
-| `public/api/<id>.json`（サンプルデータ） | — |
-| `e2e/<id>.spec.ts` | `checks/<id>.ts`（`featureMap.specDir` と `specSuffix` に従う） |
+| `react-vite` | `node-lib` | `generic` |
+| --- | --- | --- |
+| `src/features/<id>/model/<id>.ts` と、そのテスト（Vitest と fast-check） | `src/features/<id>/model/<id>.ts` と、そのテスト（`node:test`） | — |
+| `src/features/<id>/api/use<Id>Query.ts` | — | — |
+| `src/features/<id>/ui/<Id>View.tsx` | — | — |
+| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` | — |
+| `public/api/<id>.json`（サンプルデータ） | — | — |
+| `e2e/<id>.spec.ts` | `checks/<id>.ts`（`featureMap.specDir` と `specSuffix` に従う） | `checks/<id>.mjs`（同じ。書き換えるまで落ちる。`specSuffix` が `.mjs` か `.js` でなければ作らない） |
 
-`react-vite` では、作ったあとに画面への組み込みが残ります（組み込むまで knip が「未使用」として止めます）。`node-lib` では、作った直後から check・test・verify が通り、振る舞いの書き換えと feature map の記入が残ります。
+`react-vite` では、作ったあとに画面への組み込みが残ります（組み込むまで knip が「未使用」として止めます）。`node-lib` では、作った直後から check・test・verify が通り、振る舞いの書き換えと feature map の記入が残ります。`generic` では、機能を実際に確かめる手順を書くまで verify が落ちます。
 
 `verify` は次のように動きます。どちらの実行方法でも同じです。
 

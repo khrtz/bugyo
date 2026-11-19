@@ -7,11 +7,12 @@ A CLI for the feature map, verification, the task ledger and gate, and scaffoldi
 ```bash
 npx bugyo init my-app                     # React + Vite (default)
 npx bugyo init my-lib --template node-lib # TypeScript library / CLI with no UI
+npx bugyo init my-site --template generic # any language: feature map, verify, and the ledger, no lint
 ```
 
 | Command | What it does |
 | --- | --- |
-| `bugyo init <dir> [--template <name>]` | Create a new project with the foundation in place. Templates: `react-vite` (default) or `node-lib` |
+| `bugyo init <dir> [--template <name>]` | Create a new project with the foundation in place. Templates: `react-vite` (default), `node-lib`, or `generic` |
 | `bugyo new feature <id>` | Create a feature with the template's scaffold, a feature map entry, and a spec |
 | `bugyo verify <id>` / `--all` | Run the feature for real and print only pass/fail and where the evidence is. Checks with Playwright or with any command set in `.bugyo/config.json` |
 | `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | The task ledger. Only `done` collects evidence and closes a task ([docs/tasks.en.md](https://github.com/khrtz/bugyo/blob/main/docs/tasks.en.md)) |

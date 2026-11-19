@@ -99,6 +99,7 @@ PASS todos  確認手順: docs/features/todos.md
 | [plugin](plugin/README.ja.md) | Claude Code プラグイン（スキル5つ、レビュー用サブエージェント、セッションの始めにタスクを見せ、完了の判定を決めるファイルの直接の書き換えを断り、終わる前に `bugyo task lint` を実行するフック） |
 | [examples/todo-app](examples/todo-app) | React（Vite）の見本。`bugyo init --template react-vite`（既定）のテンプレートの元 |
 | [examples/node-lib](examples/node-lib) | 画面のない TypeScript のライブラリ／CLI の見本。React・Vite・Playwright を使わない。`bugyo init --template node-lib` のテンプレートの元 |
+| [examples/generic](examples/generic) | 言語を問わない見本（製品は静的なページ）。lint は入れず、feature map・verify・タスク台帳だけを使う。`bugyo init --template generic` のテンプレートの元 |
 
 ## 始め方
 
@@ -118,6 +119,7 @@ pnpm --filter bugyo pack && pnpm --filter @bugyo/lint pack && pnpm --filter @bug
 | --- | --- | --- |
 | `react-vite` | React + Vite の画面。lint は共通・構成・React（`@bugyo/lint-react`）の部品と、コメント・`fetch`・`useEffect`・UI のタイマーの禁止 | Playwright で画面を操作し、動画・スクリーンショット・トレースを残す |
 | `node-lib` | 画面のない TypeScript のライブラリ／CLI。Node の型除去で `.ts` をそのまま動かす。lint は共通と構成の部品と、コメント・`fetch` の禁止だけで、`@bugyo/lint-react` は入らない | 機能ごとの確かめるスクリプトを `node` で実行し、出力を残す |
+| `generic` | 言語を問わない。lint・型・依存ルールは入れず、feature map・verify・タスク台帳だけ | 設定に書いたコマンド（既定は `node {spec}`）を機能ごとに実行し、出力を残す |
 
 ```bash
 node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib

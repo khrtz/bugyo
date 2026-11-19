@@ -101,6 +101,7 @@ Details are in [docs/foundation.en.md](docs/foundation.en.md) and [docs/tasks.en
 | [plugin](plugin) | Claude Code plugin (five skills, a review subagent, and hooks that show the tasks when a session starts, refuse direct edits to the files that decide completion, and run `bugyo task lint` before the agent stops) |
 | [examples/todo-app](examples/todo-app) | A React (Vite) sample; the source of `bugyo init --template react-vite` (the default) |
 | [examples/node-lib](examples/node-lib) | A TypeScript library / CLI sample with no UI and no React, Vite, or Playwright; the source of `bugyo init --template node-lib` |
+| [examples/generic](examples/generic) | A sample for any language (the product is a static page). No lint; only the feature map, verify, and the task ledger. The source of `bugyo init --template generic` |
 
 ## Getting started
 
@@ -120,6 +121,7 @@ Pick a template when you create the project. The default is `react-vite`.
 | --- | --- | --- |
 | `react-vite` | A React + Vite app. Lint uses the common, structure, and React (`@bugyo/lint-react`) parts, plus the comment, `fetch`, `useEffect`, and UI-timer bans | Drives the UI with Playwright and keeps video, screenshots, and a trace |
 | `node-lib` | A TypeScript library / CLI with no UI, run directly by Node's type stripping. Lint uses the `common` and `structure` parts plus the comment and `fetch` bans only; `@bugyo/lint-react` is not installed | Runs each feature's check script with `node` and keeps its output |
+| `generic` | Any language. No lint, types, or dependency rules; only the feature map, verify, and the task ledger | Runs the command in the config (by default `node {spec}`) per feature and keeps its output |
 
 ```bash
 node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib

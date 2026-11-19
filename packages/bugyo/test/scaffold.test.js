@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -123,7 +124,7 @@ test('init --template node-lib は React・Vite・Playwright を依存に入れ�
 
 test('init は存在しないテンプレート名を、使える名前の一覧つきで断る', () => {
   const dir = join(mkdtempSync(join(tmpdir(), 'bugyo-init-')), 'x');
-  assert.throws(() => init(dir, { template: 'vue' }), /テンプレート "vue" はありません。使える名前: node-lib, react-vite/);
+  assert.throws(() => init(dir, { template: 'vue' }), /テンプレート "vue" はありません。使える名前: generic, node-lib, react-vite/);
   assert.ok(!existsSync(dir));
 });
 
@@ -153,6 +154,32 @@ test('node-lib の new feature は model・index.ts・テスト・確かめる�
     featureMapChecks({ cwd: dir }).flatMap((check) => check.problems()),
     [],
   );
+});
+
+test('init --template generic は lint も TypeScript も入れず、command の確かめ方で feature map と台帳だけを使う', () => {
+  const dir = join(mkdtempSync(join(tmpdir(), 'bugyo-init-')), 'site');
+  init(dir, { template: 'generic' });
+  const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  assert.deepEqual(Object.keys(pkg.devDependencies), ['bugyo']);
+  for (const file of ['eslint.config.js', 'tsconfig.json', '.dependency-cruiser.cjs', 'src']) assert.ok(!existsSync(join(dir, file)), `${file} は作らない`);
+  const config = loadConfig(dir);
+  assert.equal(config.template, 'generic');
+  assert.equal(config.verify.runner, 'command');
+  assert.equal(config.featureMap.featuresDir, null);
+  assert.deepEqual(featureMapChecks({ cwd: dir }).flatMap((check) => check.problems()), []);
+});
+
+test('generic の new feature は feature map と、書くまで落ちる確かめるスクリプトだけを作る', () => {
+  const dir = join(mkdtempSync(join(tmpdir(), 'bugyo-init-')), 'site');
+  init(dir, { template: 'generic' });
+  const { created, next } = newFeature('contact', { cwd: dir });
+  assert.deepEqual(created.sort(), ['checks/contact.mjs', 'docs/features/README.md（回帰の順番に追記）', 'docs/features/contact.md']);
+  assert.match(next[0], /checks\/contact\.mjs を、機能を実際に動かし、壊れていれば落ちるように書き換える/);
+  const run = spawnSync(process.execPath, [join(dir, 'checks/contact.mjs')], { encoding: 'utf8' });
+  assert.equal(run.status, 1, '書くまでは通らない');
+  assert.match(run.stderr, /contact: この機能を実際に確かめる手順を checks\/contact\.mjs に書いてください/);
+  assert.deepEqual(loadSweepOrder(dir), ['hours', 'contact']);
+  assert.deepEqual(featureMapChecks({ cwd: dir }).flatMap((check) => check.problems()), []);
 });
 
 test('new feature は雛形のないテンプレートでは理由を言って断り、何も作らない', () => {

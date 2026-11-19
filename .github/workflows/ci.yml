@@ -134,7 +134,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
         working-directory: examples/todo-app
 
-      - name: verify（todo-app は Playwright、node-lib はコマンド）
+      - name: verify（todo-app は Playwright、node-lib と generic はコマンド）
         id: e2e
         if: ${{ !inputs.update_snapshots }}
         run: pnpm verify
@@ -145,7 +145,7 @@ jobs:
 
       - name: ベースのブランチと同じ id を振ったタスクがないか確かめる
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-        run: pnpm --filter todo-app --filter node-lib exec bugyo task lint --base "origin/${{ github.base_ref }}"
+        run: pnpm --filter todo-app --filter node-lib --filter generic exec bugyo task lint --base "origin/${{ github.base_ref }}"
 
       - name: Linuxの基準画像を作り直す
         if: ${{ inputs.update_snapshots }}
@@ -161,6 +161,7 @@ jobs:
           path: |
             examples/todo-app/artifacts/
             examples/node-lib/artifacts/
+            examples/generic/artifacts/
           retention-days: 14
 
       - name: Linuxの基準画像をアップロード

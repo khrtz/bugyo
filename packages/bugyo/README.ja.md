@@ -6,7 +6,7 @@ feature map、検証、タスク台帳と門番、雛形生成の CLI です。
 
 | コマンド | すること |
 | --- | --- |
-| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。テンプレートは `react-vite`（既定）か `node-lib` |
+| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。テンプレートは `react-vite`（既定）・`node-lib`・`generic` |
 | `bugyo new feature <id>` | feature を、テンプレートに合わせた雛形・feature map・spec つきで作る |
 | `bugyo verify <id>` / `--all` | 機能を実際に動かし、合否と証拠の場所だけを出す。Playwright か、`.bugyo/config.json` に書いた任意のコマンドで確かめる |
 | `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | タスク台帳。`done` だけが証拠を取って閉じる（[docs/tasks.md](../../docs/tasks.md)） |
@@ -29,4 +29,4 @@ registerFeatureMapTests();
 
 くわしい動きと設定項目は [docs/foundation.md](../../docs/foundation.md) にあります。
 
-`init` のテンプレートは、`react-vite` を [examples/todo-app](../../examples/todo-app) から、`node-lib` を [examples/node-lib](../../examples/node-lib) から作ります（`pnpm sync-template`。`pack` と `test` の前に自動で走ります）。`@playwright/test` と `vitest` は任意の peer 依存で、`node-lib` では入りません。
+`init` のテンプレートは、`react-vite` を [examples/todo-app](../../examples/todo-app) から、`node-lib` を [examples/node-lib](../../examples/node-lib) から、`generic` を [examples/generic](../../examples/generic) から作ります（`pnpm sync-template`。`pack` と `test` の前に自動で走ります）。`@playwright/test` と `vitest` は任意の peer 依存で、`node-lib` では入りません。
