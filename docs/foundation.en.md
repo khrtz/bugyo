@@ -618,7 +618,7 @@ The settings for how and where to check live in one file, `.bugyo/config.json` a
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `packageManager` | decided automatically | One of `pnpm`, `npm`, `yarn`, `bun`. If not written, it is decided by `packageManager` in `package.json`, then the lockfile (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`), searching upward from the project folder (not above the git root). `pnpm` if nothing is found. This decides the default commands when `commands` is not written |
+| `packageManager` | decided automatically | One of `pnpm`, `npm`, `yarn`, `bun`. If not written, it is decided by `packageManager` in `package.json`, then the lockfile (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`), searching upward from the project folder (not above the git root). `npm` if nothing is found (it always comes with Node). This decides the default commands when `commands` is not written |
 | `sarif` | none | Results of other linters to count together in `bugyo doctor` and `bugyo baseline`. `[{ command?, file }]` ([Counting results of other linters](adopt.en.md#counting-results-of-other-linters)) |
 | `locale` | `en` | The language of ban messages and the CLI: `en` or `ja`. The environment variable `BUGYO_LOCALE` and `bugyo({ locale })` come first ([Message language](#message-language)) |
 | `verify.runner` | `playwright` | The default check: `playwright`, `command`, or a name in `verify.runners` (see "CLI" above) |

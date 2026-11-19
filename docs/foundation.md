@@ -617,7 +617,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 
 | キー | 既定 | 意味 |
 | --- | --- | --- |
-| `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
+| `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `npm`（Node に必ず付いてくるため）。`commands` を書かないときの既定のコマンドがこれで決まる |
 | `sarif` | なし | `bugyo doctor` と `bugyo baseline` で一緒に数える、外の lint の結果。`[{ command?, file }]`（[外の lint の結果も数える](adopt.md#外の-lint-の結果も数える)） |
 | `locale` | `en` | 禁止のメッセージと CLI の出力の言語。`en` か `ja`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
 | `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |

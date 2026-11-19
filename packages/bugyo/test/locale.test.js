@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -107,6 +107,17 @@ test('既定は英語: stats のコストの行と書き出し', () => {
   assert.match(text, /^ {4}cost in tokens: 1,200 per done task, 1,200 per first pass \(recorded on 1 of 1 done tasks\)$/m);
   assert.match(text, /^ {4}cost in USD: 0\.500 per done task/m);
   assert.match(bugyo(cwd, ['stats', '--export', 'out.json']).stdout, /^stats: wrote 1 rows to out\.json$/m);
+});
+
+test('既定は英語: 機能のない feature map の verify と、機能のフォルダがないときの logic のタスクは、理由を言って断る', () => {
+  const cwd = project((config) => (/** @type {Record<string, unknown>} */ (config['featureMap'])['featuresDir'] = null));
+  rmSync(join(cwd, 'docs/features'), { recursive: true, force: true });
+  const run = bugyo(cwd, ['verify', '--all']);
+  assert.equal(run.status, 2);
+  assert.match(run.stdout + run.stderr, /There are no features in the feature map yet/);
+  const added = bugyo(cwd, ['task', 'add', 'Logic', '--type', 'logic', '--feature', 'x']);
+  assert.equal(added.status, 1);
+  assert.match(added.stderr, /A logic task needs tests in the feature's model\/, but featureMap\.featuresDir/);
 });
 
 test('init のあとのコマンドは、実行したパッケージマネージャーに合わせる', () => {

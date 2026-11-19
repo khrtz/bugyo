@@ -52,7 +52,11 @@ You can keep your own Playwright config. To keep video, screenshots, and traces 
 | `commands` | If not written, defaults that follow the package manager are used (for npm, `npm run check` / `npm test` / `bugyo verify {feature}`). You need `check` and `test` scripts in `package.json` |
 | `locale` | The language of the CLI output and rule messages: `en` (default) or `ja` |
 
-Only a person changes this file (it changes what `done` decides).
+Only a person changes this file (it changes what `done` decides). With bugyo's Claude Code plugin installed, agents are refused even when creating it, so a person writes the first version too.
+
+With settings that create no lockfile (`package-lock=false` in `.npmrc`, for example), the package manager cannot be told from a lockfile and defaults to npm. To use another, write it in `packageManager` of `package.json` or of `.bugyo/config.json`.
+
+In projects without feature folders (`featuresDir: null`), `logic` tasks (which need tests in the feature's `model/`) cannot be created. Use `bugfix` or `refactor`.
 
 ### 3. Put features on the map one at a time
 

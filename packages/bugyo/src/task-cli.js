@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { configFile, loadConfig, taskCommands } from './config.js';
+import { configFile, featureRoots, loadConfig, taskCommands } from './config.js';
 import { cliLocale, cliMessages, tr } from './locale.js';
 import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
@@ -160,6 +160,14 @@ function add(args, cwd) {
   if (!types.some((candidate) => candidate === type)) throw new UsageError(tr({ en: `--type must be one of ${types.join(' / ')}`, ja: `--type は ${types.join(' / ')} のどれかです` }));
   const feature = values.feature?.trim() ?? '';
   if (feature === '' && typesNeedingFeature.has(type)) throw new UsageError(tr({ en: `A ${type} task needs --feature <id>`, ja: `${type} のタスクには --feature <id> が要ります` }));
+  if (type === 'logic' && featureRoots(loadConfig(cwd)).length === 0) {
+    throw new Error(
+      tr({
+        en: `A logic task needs tests in the feature's model/, but featureMap.featuresDir in ${configFile} is null, so there is no feature folder. Use bugfix (a failing test first) or refactor instead`,
+        ja: `logic のタスクは機能の model/ にテストが要りますが、${configFile} の featureMap.featuresDir が null なので機能のフォルダがありません。bugfix（先に失敗するテスト）か refactor を使ってください`,
+      }),
+    );
+  }
   if (feature !== '') {
     const ids = featureIds(cwd);
     if (!ids.includes(feature)) throw new Error(tr({ en: `${feature} is not in the feature map (${featureDir}). Known: ${ids.join(', ')}`, ja: `${feature} は feature map（${featureDir}）にありません。候補: ${ids.join(', ')}` }));

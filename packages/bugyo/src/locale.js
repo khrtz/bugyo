@@ -65,6 +65,7 @@ export const tr = (text) => text[locale()];
 /**
  * @typedef {{
  *   verifyUsage: (p: { features: string }) => string,
+ *   noFeatures: string,
  *   playwrightEvidence: string,
  *   steps: string,
  *   evidence: string,
@@ -78,6 +79,7 @@ export const tr = (text) => text[locale()];
 const catalogs = {
   en: {
     verifyUsage: ({ features }) => `Usage: bugyo verify <feature>|--all  (features: ${features})`,
+    noFeatures: 'There are no features in the feature map yet. Add docs/features/<id>.md with id and spec (bugyo new feature <id> creates one where the template has a scaffold)',
     playwrightEvidence: ' (video, screenshots, traces)',
     steps: 'steps:',
     evidence: 'evidence:',
@@ -87,6 +89,7 @@ const catalogs = {
   },
   ja: {
     verifyUsage: ({ features }) => `使い方: bugyo verify <feature>|--all  (候補: ${features})`,
+    noFeatures: 'feature map に機能がまだありません。id と spec を書いた docs/features/<id>.md を足してください（雛形のあるテンプレートなら bugyo new feature <id> で作れます）',
     playwrightEvidence: '（動画・スクリーンショット・トレース）',
     steps: '確認手順:',
     evidence: '証拠:',
