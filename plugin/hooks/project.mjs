@@ -3,7 +3,7 @@
  * プロジェクトは .bugyo/tasks のあるフォルダ、CLI はそこから上へたどって最初に見つかる node_modules/bugyo。
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /**
@@ -41,6 +41,30 @@ export function findProject(cwd) {
       return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
     },
   };
+}
+
+/**
+ * フックの文の言語。環境変数 `BUGYO_LOCALE`、cwd から上へたどって最初に見つかる `.bugyo/config.json` の `locale` の順に見て、どれもなければ `en`。
+ * 知らない値は `en` にする（フックはエラーで止めない）。
+ *
+ * @param {string} cwd
+ * @returns {'en' | 'ja'}
+ */
+export function hookLocale(cwd) {
+  const chosen = process.env['BUGYO_LOCALE'] || configLocale(cwd);
+  return chosen === 'ja' ? 'ja' : 'en';
+}
+
+/** @param {string} cwd */
+function configLocale(cwd) {
+  const root = findUp(cwd, (dir) => existsSync(join(dir, '.bugyo', 'config.json')));
+  if (root === undefined) return undefined;
+  try {
+    const locale = JSON.parse(readFileSync(join(root, '.bugyo', 'config.json'), 'utf8')).locale;
+    return typeof locale === 'string' ? locale : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** 標準入力の JSON を読む。読めなければ undefined */

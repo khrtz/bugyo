@@ -83,3 +83,14 @@ test('ほかのファイルと、読めない入力は通す', () => {
   assert.equal(result.status, 0);
   assert.equal(result.stdout, '');
 });
+
+test('断る理由は既定で英語、.bugyo/config.json の locale で日本語', (t) => {
+  delete process.env['BUGYO_LOCALE'];
+  t.after(() => (process.env['BUGYO_LOCALE'] = 'ja'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bugyo-guard-'));
+  const evidence = join(cwd, '.bugyo', 'evidence', 't-001.json');
+  assert.match(run('Write', { file_path: evidence, content: '{}' }, cwd) ?? '', /^Only bugyo task done writes evidence files/);
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo', 'config.json'), JSON.stringify({ locale: 'ja' }));
+  assert.match(run('Write', { file_path: evidence, content: '{}' }, cwd) ?? '', /bugyo task done だけ/);
+});

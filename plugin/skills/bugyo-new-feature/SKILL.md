@@ -1,28 +1,28 @@
 ---
 name: bugyo-new-feature
-description: bugyo の土台を使うプロジェクトに、新しい機能（画面・一覧・フォームなど利用者から見えるまとまり）を足すときの手順。bugyo new feature で ui/model/api・feature map・E2E spec を作り、画面に組み込み、証拠つきで完了させる。「〜の画面を作って」「〜機能を追加して」と言われたら、src/features にフォルダを手で作る前にこれを使うこと。
+description: The steps for adding a new feature (a user-visible unit such as a screen, a list, or a form) to a project built on bugyo. Creates ui/model/api, the feature map, and an E2E spec with bugyo new feature, wires it into the screen, and finishes with evidence. When asked "build the X screen" or "add an X feature" (「〜の画面を作って」「〜機能を追加して」), use this before creating a folder in src/features by hand.
 ---
 
 # bugyo-new-feature
 
-## 手順
+## Steps
 
-1. **名前を決める。** 小文字とハイフン（例: `user-settings`）。既存の `src/features/` と重ならないこと
-2. **雛形を作る。** `pnpm exec bugyo new feature <id>`
-   - 作られるもの（`.bugyo/config.json` の `template` で変わる）
-     - `react-vite`（既定）: `src/features/<id>/{ui,model,api}/`、`index.ts`、model のプロパティテスト、`e2e/<id>.spec.ts`、`docs/features/<id>.md`、`public/api/<id>.json`、README の回帰順への追記
-     - `node-lib`: `src/features/<id>/model/` とそのテスト、`index.ts`、`checks/<id>.ts`（実際に動かして確かめるスクリプト）、`docs/features/<id>.md`、README の回帰順への追記。画面がないので下の 3・4 の UI の項目は飛ばし、`checks/<id>.ts` を本当の振る舞いに合わせ、外に見せるなら `src/index.ts` から、コマンドなら `src/app` から `index.ts` を使う
-   - 雛形のないテンプレートでは `bugyo new feature` が理由を言って断る。そのときは手で作らず、ユーザーに伝える
-   - 手でフォルダを作らない。作ると feature map との対応が漏れ、`pnpm test` が落ちる
-3. **形を合わせる。** 雛形の `Item` スキーマ、表示、spec を本当の要件に書き換える
-   - ドメインの計算は `model/` に純粋関数で書く（React を import できない）
-   - 通信は `api/` の `useXxxQuery` だけ。`fetch` は `shared/api` の `getJson` を通す
-   - 状態は判別共用体で表す。ID や金額は Zod の `.brand()` で専用の型にする
-4. **画面に組み込む。** `src/app` から `@/features/<id>` の公開窓口だけを import する。組み込むまで knip が「未使用」と止めるのは正しい挙動
-5. **feature map を埋める。** `docs/features/<id>.md` の4つの見出しに答える。特に「どう操作して確かめるか」には成功・エラー・空・永続化の経路を、「よく嘘をつくところ」には見た目は通るのに壊れやすい点を書く。挙動のレベルで短く
-6. **確かめる。** `pnpm check && pnpm test && pnpm verify <id>`。PASS と `artifacts/` の証拠を報告に載せる
+1. **Pick a name.** Lowercase letters and hyphens (e.g. `user-settings`). It must not clash with an existing one in `src/features/`
+2. **Create the skeleton.** `pnpm exec bugyo new feature <id>`
+   - What it creates (depends on `template` in `.bugyo/config.json`)
+     - `react-vite` (default): `src/features/<id>/{ui,model,api}/`, `index.ts`, a property test for model, `e2e/<id>.spec.ts`, `docs/features/<id>.md`, `public/api/<id>.json`, and an entry in the README's regression order
+     - `node-lib`: `src/features/<id>/model/` and its test, `index.ts`, `checks/<id>.ts` (a script that really runs it to check), `docs/features/<id>.md`, and an entry in the README's regression order. There is no screen, so skip the UI items of steps 3 and 4; make `checks/<id>.ts` match the real behavior, and use `index.ts` from `src/index.ts` to expose it, or from `src/app` for a command
+   - For a template without a skeleton, `bugyo new feature` refuses and says why. Then do not create it by hand; tell the user
+   - Do not create folders by hand. The match with the feature map goes missing and `pnpm test` fails
+3. **Shape it.** Rewrite the skeleton's `Item` schema, view, and spec to the real requirements
+   - Write domain calculations in `model/` as pure functions (model cannot import React)
+   - Talk to the network only through `useXxxQuery` in `api/`. `fetch` goes through `getJson` in `shared/api`
+   - Express state with discriminated unions. Give IDs and amounts their own types with Zod's `.brand()`
+4. **Wire it into the screen.** Import only the public entry point `@/features/<id>` from `src/app`. Until it is wired in, knip stops it as "unused", which is correct
+5. **Fill the feature map.** Answer the four headings of `docs/features/<id>.md` (in English: What is there / How to reach it / How to check it / Where it lies; in Japanese projects, the matching Japanese headings). Under how to check it, write the success, error, empty, and persistence paths; under where it lies, write what looks fine but breaks easily. Keep it short, at the level of behavior
+6. **Check it.** `pnpm check && pnpm test && pnpm verify <id>`. Put the PASS and the evidence in `artifacts/` into the report
 
-## うまくいかないとき
+## When it does not go well
 
-- `bugyo new feature` が「すでにあります」と言う → 同じ名前の機能がある。別名にするか、既存の機能を拡張する
-- 他の feature の中身を使いたい → その feature の `index.ts` に公開を足す。内部ファイルを直接 import しない（lint と dependency-cruiser が止める）
+- `bugyo new feature` says it already exists → a feature with the same name exists. Pick another name or extend the existing feature
+- You want to use the inside of another feature → add an export to that feature's `index.ts`. Do not import its internal files directly (lint and dependency-cruiser stop it)

@@ -1,22 +1,24 @@
 ---
 name: bugyo-explain
-description: このコードベースのある仕組み（機能、データの流れ、状態、ビルドや検証の仕組み）が「実際に」どう動いているかを、コードを辿って説明する。「〜はどう動いてる？」「どこで〜してる？」「〜を変えたらどこに影響する？」と聞かれたとき、また大きな変更の前に影響範囲を掴みたいときに使うこと。記憶や推測で答える前にこれを使う。
+description: Explain how a mechanism in this codebase (a feature, a data flow, state, the build or verification) "actually" works by tracing the code. Use when asked "how does X work?", "where does it do X?", "what is affected if I change X?" (「〜はどう動いてる？」「どこで〜してる？」「〜を変えたらどこに影響する？」), and before a large change to grasp its reach. Use this before answering from memory or guesses.
 ---
 
 # bugyo-explain
 
-説明は推測ではなく、辿ったコードに基づかせます。
+Base the explanation on code you traced, not on guesses.
 
-## 手順
+## Steps
 
-1. **入口を決める。** 機能なら `docs/features/<id>.md` の「どう辿り着くか」と `route`、コードなら `src/features/<id>/index.ts`（公開窓口）から始める
-2. **流れを辿る。** bugyo の層の向きに沿う: `app` → `features/<id>/ui` → `api`（`useXxxQuery` → `shared/api` の `getJson` とスキーマ） → `model`（純粋関数）。副作用は `shared/lib` のフックにしかない
-3. **主張ごとに根拠を付ける。** 「〜している」と書くたびに `path:line` を付ける。辿れなかった部分は「未確認」と書く
-4. **動かして確かめる（必要なら）。** 説明が挙動に関わるなら、テストか `pnpm verify <id>` で確かめる。読んだだけの説明と、動かして確かめた説明を区別して書く
+1. **Pick the entry point.** For a feature, start from "How to reach it" and `route` in `docs/features/<id>.md`; for code, start from `src/features/<id>/index.ts` (the public entry point)
+2. **Trace the flow.** Follow the direction of bugyo's layers: `app` → `features/<id>/ui` → `api` (`useXxxQuery` → `getJson` and the schema in `shared/api`) → `model` (pure functions). Side effects live only in the hooks of `shared/lib`
+3. **Back every claim.** Each time you write "it does X", add `path:line`. Mark the parts you could not trace as "not confirmed"
+4. **Run it to check (when needed).** If the explanation is about behavior, check it with a test or `pnpm verify <id>`. Keep explanations from reading apart from explanations you checked by running
 
-## 出力
+## Output
 
-- 3行の要約（何が、どこで、どう動くか）
-- 流れ（入口から出口まで、`path:line` つき）
-- 変えるとしたら触る場所と、壊れやすい点
-- feature map と食い違っていたら、その食い違い（`docs/features/<id>.md` を直す提案）
+Write it in the user's language.
+
+- A three-line summary (what works, where, and how)
+- The flow (from entry to exit, with `path:line`)
+- Where to touch to change it, and what breaks easily
+- Any disagreement with the feature map (and a proposal to fix `docs/features/<id>.md`)

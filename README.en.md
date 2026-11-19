@@ -139,7 +139,7 @@ To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depe
 
 ## Language
 
-The detailed docs and the plugin skills are written in Japanese. Rule messages and the CLI output are in English by default. This page is the English entry point.
+The detailed docs are written in Japanese. Rule messages, the CLI output, and the plugin are in English by default. This page is the English entry point.
 
 ## Developing this repository
 
