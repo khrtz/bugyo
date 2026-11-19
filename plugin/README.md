@@ -13,6 +13,8 @@ Skills that help Claude Code pick the right way of working in a project built on
 | skill | `bugyo-rule-from-mistake` | Turns repeated mistakes into types, lint, dependency rules, and tests |
 | skill | `bugyo-critique` | A critical review that looks at the evidence first |
 | skill | `bugyo-explain` | Explains how something works by tracing the code |
+| skill | `bugyo-map-features` | Drafts the feature map of an existing app from the real code and checks |
+| skill | `bugyo-sync-feature-map` | Keeps the feature map in step with a change to what users see or do |
 | agent | `slop-reviewer` | A subagent that reviews a diff with independent eyes |
 | hook | `SessionStart` (`hooks/session-start.mjs`) | Shows the active and ready tasks when a session starts (see below) |
 | hook | `PreToolUse` (`hooks/guard.mjs`) | Refuses direct edits to the files that decide completion (see below) |

@@ -10,7 +10,7 @@
     {
       "name": "bugyo",
       "source": "./plugin",
-      "description": "Skills for working on the bugyo foundation (picking the way of working, new features, turning mistakes into rules, critical review, explaining how things work) and hooks that keep the task ledger honest"
+      "description": "Skills for working on the bugyo foundation (picking the way of working, new features, turning mistakes into rules, critical review, explaining how things work, drafting and syncing the feature map) and hooks that keep the task ledger honest"
     }
   ]
 }

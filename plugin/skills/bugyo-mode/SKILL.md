@@ -24,6 +24,7 @@ Your job is to pick the way of working that fits the kind of work, and to show t
 | Learn how something works | Trace the real code with `bugyo-explain`. Do not answer from guesses |
 | Review something | Use `bugyo-critique`: look at the evidence first, then review critically |
 | The same mistake a second time | Turn it into a rule with `bugyo-rule-from-mistake` |
+| Write the feature map of an existing app | Draft it from the real code and checks with `bugyo-map-features` |
 
 ## While writing
 
@@ -45,4 +46,4 @@ Passing `pnpm check` alone is not done. Finish only after you show the evidence 
 | Refactor | Tests that passed before the change still pass after it, unchanged |
 
 In the report, write "which evidence confirmed it" before what you changed. Write down what you could not confirm as not confirmed. Write the report in the user's language.
-If you changed the UI, fix `docs/features/<id>.md` in the same change (`pnpm test` finds a missing match).
+If you changed the UI or behavior, fix `docs/features/<id>.md` in the same change with `bugyo-sync-feature-map` (`pnpm test` finds a missing match).

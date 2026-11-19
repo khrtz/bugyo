@@ -13,6 +13,8 @@ bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature ma
 | skill | `bugyo-rule-from-mistake` | 繰り返すミスを型・lint・依存ルール・テストに変える |
 | skill | `bugyo-critique` | 証拠を先に見る批判的レビュー |
 | skill | `bugyo-explain` | 仕組みをコードを辿って説明する |
+| skill | `bugyo-map-features` | 今あるアプリの feature map を、実際のコードと確かめ方から下書きする |
+| skill | `bugyo-sync-feature-map` | 利用者から見える変更に合わせて、feature map を直す |
 | agent | `slop-reviewer` | 差分を独立した目でレビューするサブエージェント |
 | hook | `SessionStart`（`hooks/session-start.mjs`） | セッションの始めに、作業中と着手できるタスクを見せる（下を参照） |
 | hook | `PreToolUse`（`hooks/guard.mjs`） | 完了の判定を決めるファイルの直接の書き換えを断る（下を参照） |
