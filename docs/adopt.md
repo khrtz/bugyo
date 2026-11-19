@@ -1,5 +1,7 @@
 # 既存のプロジェクトに入れる
 
+[English](adopt.en.md) ・ 日本語
+
 `bugyo init` を使わず、今あるプロジェクトに bugyo をあとから入れる手順です。pnpm・npm・yarn・bun のどれで入れても動きます。
 
 ## 検証と台帳だけを入れる

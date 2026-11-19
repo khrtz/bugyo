@@ -14,7 +14,7 @@ npx bugyo init my-lib --template node-lib # TypeScript library / CLI with no UI
 | `bugyo init <dir> [--template <name>]` | Create a new project with the foundation in place. Templates: `react-vite` (default) or `node-lib` |
 | `bugyo new feature <id>` | Create a feature with the template's scaffold, a feature map entry, and a spec |
 | `bugyo verify <id>` / `--all` | Run the feature for real and print only pass/fail and where the evidence is. Checks with Playwright or with any command set in `.bugyo/config.json` |
-| `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | The task ledger. Only `done` collects evidence and closes a task ([docs/tasks.md](https://github.com/khrtz/bugyo/blob/main/docs/tasks.md)) |
+| `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | The task ledger. Only `done` collects evidence and closes a task ([docs/tasks.en.md](https://github.com/khrtz/bugyo/blob/main/docs/tasks.en.md)) |
 | `bugyo mistake ls` / `rule` | Mistakes per kind, and which rule each became |
 | `bugyo gate` | Decide whether to widen what agents may do |
 | `bugyo stats` | Results of closed tasks per task type, model, and harness |
@@ -36,7 +36,7 @@ registerFeatureMapTests();
 
 `@playwright/test` and `vitest` are optional peer dependencies; `node-lib` installs neither. The CLI output is in English by default; set `"locale": "ja"` in `.bugyo/config.json` or `BUGYO_LOCALE=ja` for Japanese.
 
-How it all works and every option are in [docs/foundation.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.md); adding bugyo to an existing project is in [docs/adopt.md](https://github.com/khrtz/bugyo/blob/main/docs/adopt.md) (both in Japanese).
+How it all works and every option are in [docs/foundation.en.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.en.md); adding bugyo to an existing project is in [docs/adopt.en.md](https://github.com/khrtz/bugyo/blob/main/docs/adopt.en.md).
 
 ## License
 

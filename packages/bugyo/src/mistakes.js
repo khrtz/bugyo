@@ -121,12 +121,12 @@ export function recordRule(cwd, kind, at, name) {
 /** @param {Mistake} mistake */
 export function mistakeLine(mistake) {
   const state = mistakeState(mistake);
-  const where = mistake.ruleName === undefined ? mistake.rule : `${mistake.ruleName}（${mistake.rule}）`;
+  const where = mistake.ruleName === undefined ? mistake.rule : tr({ en: `${mistake.ruleName} (${mistake.rule})`, ja: `${mistake.ruleName}（${mistake.rule}）` });
   const ruled = String(mistake.ruledCount ?? 0);
   const rule =
     mistake.rule === ''
       ? tr({ en: 'rule: none', ja: 'ルール: なし' })
-      : tr({ en: `rule: ${where}  ${ruled} when ruled`, ja: `ルール: ${where}  ルール化のとき ${ruled}回` });
+      : tr({ en: `rule: ${where}  ${ruled}x when ruled`, ja: `ルール: ${where}  ルール化のとき ${ruled}回` });
   const note = {
     leak: tr({ en: '  ← the rule leaks (it happened again after the rule)', ja: '  ← ルールが漏れている（ルール化のあとにまた起きた）' }),
     unruled: tr({ en: '  ← needs a rule', ja: '  ← ルール化が必要' }),

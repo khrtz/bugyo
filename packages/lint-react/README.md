@@ -29,7 +29,7 @@ For dependency-cruiser, use the one from `@bugyo/lint` with `react: true`.
 module.exports = require('@bugyo/lint/depcruise').config({ react: true });
 ```
 
-What each rule stops and where the exceptions live are in [docs/foundation.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.md) (in Japanese).
+What each rule stops and where the exceptions live are in [docs/foundation.en.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.en.md).
 
 ## License
 
