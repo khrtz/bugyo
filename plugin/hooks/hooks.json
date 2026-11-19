@@ -1,6 +1,11 @@
 {
-  "description": "完了の判定を決めるファイル（.bugyo/config.json・証拠・ベースライン・タスク台帳の状態）を、エージェントが直接書き換えるのを断る。作業を終える前に bugyo task lint を実行し、落ちたら終わらせない",
+  "description": "完了の判定を決めるファイル（.bugyo/config.json・証拠・ベースライン・タスク台帳の状態）を、エージェントが直接書き換えるのを断る。セッションの始めに作業中と着手できるタスクを見せ、終える前に bugyo task lint を実行して落ちたら終わらせない。作業中のタスクが残っていれば知らせる",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs\"" }]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|Bash|PowerShell",
