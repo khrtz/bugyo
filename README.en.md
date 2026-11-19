@@ -89,7 +89,7 @@ The two lines say: the steps to check are in `docs/features/todos.md`, and the e
 - **Scaffold** — `bugyo init --template <name>` and `bugyo new feature` create projects and features that already follow these rules.
 - **Gradual adoption** — `bugyo doctor` counts violations per ban before you adopt the rules, and `bugyo baseline save` records the current violations as a baseline. `bugyo baseline check` fails whenever a ban's count goes up or down, so the baseline can only shrink.
 
-Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs/tasks.md) (Japanese).
+Details are in [docs/foundation.en.md](docs/foundation.en.md) and [docs/tasks.en.md](docs/tasks.en.md).
 
 ## What is in the box
 
@@ -135,11 +135,11 @@ cd ../my-app && pnpm install
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project is covered in [docs/adopt.md](docs/adopt.md), and every option in [docs/foundation.md](docs/foundation.md) (both in Japanese).
+To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project is covered in [docs/adopt.en.md](docs/adopt.en.md), and every option in [docs/foundation.en.md](docs/foundation.en.md).
 
 ## Language
 
-The detailed docs and the plugin skills are written in Japanese. Rule messages and the CLI output are in English by default. This page is the English entry point.
+The docs, rule messages, the CLI output, and the plugin are in English by default. Each doc links to its Japanese version. This page is the English entry point.
 
 ## Developing this repository
 

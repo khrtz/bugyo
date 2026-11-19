@@ -55,7 +55,7 @@ Rule messages are in English by default. Set `"locale": "ja"` in `.bugyo/config.
 
 If your layer folders are not `src/app`, `src/features`, and `src/shared`, pass their locations to `bugyo({ root, src, layers })` and `config({ src, layers })`. If the folders inside a feature are not `ui/`, `api/`, and `model/`, list the folder names per role in `layers.featureParts`.
 
-What each part and ban stops, every option, and how to write `defineBan` are in [docs/foundation.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.md) (in Japanese).
+What each part and ban stops, every option, and how to write `defineBan` are in [docs/foundation.en.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.en.md).
 
 ## License
 

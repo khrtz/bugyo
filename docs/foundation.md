@@ -1,5 +1,7 @@
 # 土台（実装済み）
 
+[English](foundation.en.md) ・ 日本語
+
 状態: 実装済み。このページの内容はすべて今のコードで動きます。
 
 土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
@@ -370,7 +372,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, pro
 module.exports = require('@bugyo/lint/depcruise').config({ react: true });
 ```
 
-`config({ src, tsConfig, forbidden, react })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: true` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存も止めます（既定は `false`）。
+`config({ src, tsConfig, forbidden, react, locale })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: true` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存も止めます（既定は `false`）。`locale` はルールの説明の言語です（上の「メッセージの言語」）。
 
 | ルール | 止めるもの |
 | --- | --- |
@@ -421,6 +423,7 @@ spec: e2e/todos.spec.ts
 - `route` は任意です。画面のある機能で、辿り着く URL のパスを `/` から書きます
 - 4つの見出しは必須です。「よく嘘をつくところ」には、見た目は通るのに壊れていることが起きやすい点を書きます
 - 見出しは英語でも書けます（`## What is there`・`## How to reach it`・`## How to check it`・`## Where it lies`）。見出しごとに日本語と英語を混ぜてもかまいません。雛形のままかどうかは、`（…）` だけの項目と `：` で終わる項目で見ます。英語の見出しの下では、`(…)` だけの項目と `:` で終わる項目も雛形のままとして扱います
+- `bugyo new feature` は、プロジェクトの言語（`locale`）の見出しで作ります
 - `docs/features/README.md` に、全体を確かめるときの順番を `[id](id.md)` の形で並べます
 
 対応漏れはテストで落とします。
@@ -492,7 +495,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 | コマンド | すること |
 | --- | --- |
-| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。既定のテンプレートは `react-vite`。使ったテンプレートの名前を `.bugyo/config.json` の `template` に残す。`<dir>` が空でなければ断り、存在しないテンプレート名は使える名前の一覧を出して断る |
+| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。既定のテンプレートは `react-vite`。使ったテンプレートの名前を `.bugyo/config.json` の `template` に残す。`<dir>` が空でなければ断り、存在しないテンプレート名は使える名前の一覧を出して断る。最後に出す次の手順は、実行したパッケージマネージャーに合わせる |
 | `bugyo new feature <id>` | feature を一式作る。何を作るかは `.bugyo/config.json` の `template` で決まる（ないときは `react-vite`）。同じ名前のファイルがあれば上書きせずに断る。雛形のないテンプレートでは理由を出して断り、何も作らない |
 | `bugyo verify <id>` | その機能の spec を実行し、合否と証拠の場所だけを出す |
 | `bugyo verify --all` | feature map にあるすべての機能を確かめる |
@@ -615,7 +618,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | --- | --- | --- |
 | `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
 | `sarif` | なし | `bugyo doctor` と `bugyo baseline` で一緒に数える、外の lint の結果。`[{ command?, file }]`（[外の lint の結果も数える](adopt.md#外の-lint-の結果も数える)） |
-| `locale` | `en` | `@bugyo/lint` の禁止のメッセージの言語。`en` か `ja`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
+| `locale` | `en` | 禁止のメッセージと CLI の出力の言語。`en` か `ja`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
 | `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
 | `verify.command` | なし | `command` で動かすときは必須 |
 | `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |
@@ -625,6 +628,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
 | `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared` の `ui`・`api`・`lib`・`model`・`other`）と、feature の中のフォルダ名（`featureParts`）。上の「層のフォルダ名を変える」 |
+| `pullRequests.allowBranches` | `[]` | `bugyo task pr-check` がタスクなしで通すブランチの glob（[tasks.md](tasks.md#設定)） |
 
 同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 
