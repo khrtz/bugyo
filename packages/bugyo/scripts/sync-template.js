@@ -2,7 +2,7 @@ import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs
 import { join, relative, resolve, sep } from 'node:path';
 
 /** テンプレートの名前と、元になる examples/ のフォルダ */
-const sources = { 'react-vite': 'todo-app', 'node-lib': 'node-lib' };
+const sources = { 'react-vite': 'todo-app', 'node-lib': 'node-lib', generic: 'generic' };
 const examples = resolve(import.meta.dirname, '..', '..', '..', 'examples');
 const target = resolve(import.meta.dirname, '..', 'template');
 const skip = new Set(['node_modules', 'artifacts', 'dist', 'test-results', 'playwright-report', '__screenshots__']);

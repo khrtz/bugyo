@@ -89,7 +89,7 @@ The two lines say: the steps to check are in `docs/features/todos.md`, and the e
 - **Scaffold** — `bugyo init --template <name>` and `bugyo new feature` create projects and features that already follow these rules.
 - **Gradual adoption** — `bugyo doctor` counts violations per ban before you adopt the rules, and `bugyo baseline save` records the current violations as a baseline. `bugyo baseline check` fails whenever a ban's count goes up or down, so the baseline can only shrink.
 
-Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs/tasks.md) (Japanese).
+Details are in [docs/foundation.en.md](docs/foundation.en.md) and [docs/tasks.en.md](docs/tasks.en.md).
 
 ## What is in the box
 
@@ -98,9 +98,10 @@ Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs
 | [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config (the common and structure parts, the comment and `fetch` bans, `defineBan` for your own bans), dependency-cruiser rules, a strict tsconfig. No React dependency |
 | [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | The React part (react-hooks) and bans (where `useEffect` may live, no timers in UI) added on top of `@bugyo/lint` |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify` / `task` / `mistake` / `gate`), feature map loader and consistency tests, Playwright config |
-| [plugin](plugin) | Claude Code plugin (five skills, a review subagent, and hooks that show the tasks when a session starts, refuse direct edits to the files that decide completion, and run `bugyo task lint` before the agent stops) |
+| [plugin](plugin) | Claude Code plugin (seven skills, a review subagent, and hooks that show the tasks when a session starts, refuse direct edits to the files that decide completion, and run `bugyo task lint` before the agent stops) |
 | [examples/todo-app](examples/todo-app) | A React (Vite) sample; the source of `bugyo init --template react-vite` (the default) |
 | [examples/node-lib](examples/node-lib) | A TypeScript library / CLI sample with no UI and no React, Vite, or Playwright; the source of `bugyo init --template node-lib` |
+| [examples/generic](examples/generic) | A sample for any language (the product is a static page). No lint; only the feature map, verify, and the task ledger. The source of `bugyo init --template generic` |
 
 ## Getting started
 
@@ -120,6 +121,7 @@ Pick a template when you create the project. The default is `react-vite`.
 | --- | --- | --- |
 | `react-vite` | A React + Vite app. Lint uses the common, structure, and React (`@bugyo/lint-react`) parts, plus the comment, `fetch`, `useEffect`, and UI-timer bans | Drives the UI with Playwright and keeps video, screenshots, and a trace |
 | `node-lib` | A TypeScript library / CLI with no UI, run directly by Node's type stripping. Lint uses the `common` and `structure` parts plus the comment and `fetch` bans only; `@bugyo/lint-react` is not installed | Runs each feature's check script with `node` and keeps its output |
+| `generic` | Any language. No lint, types, or dependency rules; only the feature map, verify, and the task ledger | Runs the command in the config (by default `node {spec}`) per feature and keeps its output |
 
 ```bash
 node packages/bugyo/bin/bugyo.js init ../my-app --template node-lib
@@ -135,11 +137,11 @@ cd ../my-app && pnpm install
 pnpm check && pnpm test && pnpm verify --all
 ```
 
-To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project is covered in [docs/adopt.md](docs/adopt.md), and every option in [docs/foundation.md](docs/foundation.md) (both in Japanese).
+To add a feature, run `pnpm exec bugyo new feature <id>`. What it generates depends on the template. Adding bugyo to an existing project is covered in [docs/adopt.en.md](docs/adopt.en.md), and every option in [docs/foundation.en.md](docs/foundation.en.md).
 
 ## Language
 
-The detailed docs and the plugin skills are written in Japanese. Rule messages and the CLI output are in English by default. This page is the English entry point.
+The docs, rule messages, the CLI output, and the plugin are in English by default. Each doc links to its Japanese version. This page is the English entry point.
 
 ## Developing this repository
 

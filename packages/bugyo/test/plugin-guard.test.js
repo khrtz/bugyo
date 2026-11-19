@@ -44,7 +44,7 @@ test('タスク台帳は、状態の項目の書き換えだけを断り、本�
   assert.match(run('Edit', { file_path: file, old_string: 'status: active', new_string: 'status: done' }, cwd) ?? '', /bugyo task のコマンドだけ/);
   assert.match(run('MultiEdit', { file_path: file, edits: [{ old_string: 'x', new_string: 'evidence-file: fake.json' }] }, cwd) ?? '', /bugyo task/);
   assert.match(run('Write', { file_path: file, content: taskText('done') }, cwd) ?? '', /bugyo task/);
-  for (const line of ['model: other-model', 'harness: other-harness']) {
+  for (const line of ['model: other-model', 'harness: other-harness', 'cost-tokens: 1', 'cost-usd: 0.01']) {
     assert.match(run('Edit', { file_path: file, old_string: 'assignee: agent-1', new_string: `assignee: agent-1\n${line}` }, cwd) ?? '', /bugyo task/, line);
   }
   assert.equal(run('Edit', { file_path: file, old_string: '# slug を直す', new_string: '# slug の区切りを直す' }, cwd), undefined);
@@ -82,4 +82,15 @@ test('ほかのファイルと、読めない入力は通す', () => {
   const result = spawnSync(process.execPath, [guard], { input: 'not json', encoding: 'utf8' });
   assert.equal(result.status, 0);
   assert.equal(result.stdout, '');
+});
+
+test('断る理由は既定で英語、.bugyo/config.json の locale で日本語', (t) => {
+  delete process.env['BUGYO_LOCALE'];
+  t.after(() => (process.env['BUGYO_LOCALE'] = 'ja'));
+  const cwd = mkdtempSync(join(tmpdir(), 'bugyo-guard-'));
+  const evidence = join(cwd, '.bugyo', 'evidence', 't-001.json');
+  assert.match(run('Write', { file_path: evidence, content: '{}' }, cwd) ?? '', /^Only bugyo task done writes evidence files/);
+  mkdirSync(join(cwd, '.bugyo'), { recursive: true });
+  writeFileSync(join(cwd, '.bugyo', 'config.json'), JSON.stringify({ locale: 'ja' }));
+  assert.match(run('Write', { file_path: evidence, content: '{}' }, cwd) ?? '', /bugyo task done だけ/);
 });

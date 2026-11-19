@@ -1,17 +1,20 @@
 # 土台（実装済み）
 
+[English](foundation.en.md) ・ 日本語
+
 状態: 実装済み。このページの内容はすべて今のコードで動きます。
 
 土台は、エージェントが間違った書き方を選べないようにする層です。フォルダ構成、lint、依存ルール、検証の4つでできています。
 
 feature map と `bugyo verify` は技術を問いません。確かめ方は `.bugyo/config.json` で決めます（下の「設定ファイル」）。lint と依存ルールは TypeScript が前提です。React 用の部品と禁止は別のパッケージ `@bugyo/lint-react` に分かれていて、React を使うプロジェクトだけが入れます（下の「部品と禁止」）。
 
-雛形（`bugyo init --template <名前>`）は2つです。
+雛形（`bugyo init --template <名前>`）は3つです。
 
 | テンプレート | 見本 | 前提 |
 | --- | --- | --- |
 | `react-vite`（既定） | [examples/todo-app](../examples/todo-app) | pnpm、Vite、React、Playwright、Vitest、`@/` を `src/` に向けたパスの別名 |
 | `node-lib` | [examples/node-lib](../examples/node-lib) | pnpm、Node 24 の型除去（`.ts` をそのまま実行する）、`node:test`。import に拡張子 `.ts` を書く。React・Vite・Playwright は使わない |
+| `generic` | [examples/generic](../examples/generic) | 言語を問わない。lint・型・依存ルールは入れず、feature map・`bugyo verify`（`command` の確かめ方）・タスク台帳だけを使う。見本の製品は静的なページで、確かめるスクリプトは `node` で動かす。ほかの言語のテストで確かめるなら `verify.command`（例: `pytest {spec}`）と `featureMap.specSuffix` を変える |
 
 ## フォルダ構成
 
@@ -370,7 +373,7 @@ export default bugyo({ root: import.meta.dirname, parts: [common, structure, pro
 module.exports = require('@bugyo/lint/depcruise').config({ react: true });
 ```
 
-`config({ src, tsConfig, forbidden, react })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: true` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存も止めます（既定は `false`）。
+`config({ src, tsConfig, forbidden, react, locale })` を受け取ります。`forbidden` に渡したルールは後ろに足されます。`react: true` にすると、`model-is-pure` は React とその周辺（`react`、`react-dom`、`@tanstack/*`）への依存も止めます（既定は `false`）。`locale` はルールの説明の言語です（上の「メッセージの言語」）。
 
 | ルール | 止めるもの |
 | --- | --- |
@@ -421,6 +424,7 @@ spec: e2e/todos.spec.ts
 - `route` は任意です。画面のある機能で、辿り着く URL のパスを `/` から書きます
 - 4つの見出しは必須です。「よく嘘をつくところ」には、見た目は通るのに壊れていることが起きやすい点を書きます
 - 見出しは英語でも書けます（`## What is there`・`## How to reach it`・`## How to check it`・`## Where it lies`）。見出しごとに日本語と英語を混ぜてもかまいません。雛形のままかどうかは、`（…）` だけの項目と `：` で終わる項目で見ます。英語の見出しの下では、`(…)` だけの項目と `:` で終わる項目も雛形のままとして扱います
+- `bugyo new feature` は、プロジェクトの言語（`locale`）の見出しで作ります
 - `docs/features/README.md` に、全体を確かめるときの順番を `[id](id.md)` の形で並べます
 
 対応漏れはテストで落とします。
@@ -480,7 +484,7 @@ export default defineBugyoConfig({ port: 5173 });
 | ジョブ | 実行するもの |
 | --- | --- |
 | `pnpm check / test` | `pnpm check` と `pnpm test` |
-| `verify（証拠つき）` | `pnpm verify`（todo-app は Playwright、node-lib は機能ごとのコマンド）。`artifacts/` を成果物として上げ、PR に合否と証拠のリンクを載せる |
+| `verify（証拠つき）` | `pnpm verify`（todo-app は Playwright、node-lib と generic は機能ごとのコマンド）。`artifacts/` を成果物として上げ、PR に合否と証拠のリンクを載せる |
 | `npm で入れたプロジェクト（pnpm なし）` | パッケージを作り、`react-vite` のプロジェクトを npm で入れ、pnpm を `PATH` から外して、check・test・`verify --all`・`task done` を通す |
 
 Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあります。画面を変えて作り直すときは次の手順です。
@@ -492,7 +496,7 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 | コマンド | すること |
 | --- | --- |
-| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。既定のテンプレートは `react-vite`。使ったテンプレートの名前を `.bugyo/config.json` の `template` に残す。`<dir>` が空でなければ断り、存在しないテンプレート名は使える名前の一覧を出して断る |
+| `bugyo init <dir> [--template <名前>]` | 土台入りの新しいプロジェクトを作る。既定のテンプレートは `react-vite`。使ったテンプレートの名前を `.bugyo/config.json` の `template` に残す。`<dir>` が空でなければ断り、存在しないテンプレート名は使える名前の一覧を出して断る。最後に出す次の手順は、実行したパッケージマネージャーに合わせる |
 | `bugyo new feature <id>` | feature を一式作る。何を作るかは `.bugyo/config.json` の `template` で決まる（ないときは `react-vite`）。同じ名前のファイルがあれば上書きせずに断る。雛形のないテンプレートでは理由を出して断り、何も作らない |
 | `bugyo verify <id>` | その機能の spec を実行し、合否と証拠の場所だけを出す |
 | `bugyo verify --all` | feature map にあるすべての機能を確かめる |
@@ -503,18 +507,18 @@ Linux の基準画像は `examples/todo-app/e2e/__screenshots__/linux/` にあ�
 
 タスク台帳と門番のコマンド（`bugyo task`・`bugyo mistake`・`bugyo gate`）は [tasks.md](tasks.md) に、ベースラインの使い方は [adopt.md](adopt.md#lint-を段階的に入れる) にあります。
 
-`new feature <id>` が作るものは次のとおりです。どちらも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
+`new feature <id>` が作るものは次のとおりです。どれも `docs/features/<id>.md` を雛形のまま作り、README の順番に1行足します。
 
-| `react-vite` | `node-lib` |
-| --- | --- |
-| `src/features/<id>/model/<id>.ts` と、そのテスト（Vitest と fast-check） | `src/features/<id>/model/<id>.ts` と、そのテスト（`node:test`） |
-| `src/features/<id>/api/use<Id>Query.ts` | — |
-| `src/features/<id>/ui/<Id>View.tsx` | — |
-| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` |
-| `public/api/<id>.json`（サンプルデータ） | — |
-| `e2e/<id>.spec.ts` | `checks/<id>.ts`（`featureMap.specDir` と `specSuffix` に従う） |
+| `react-vite` | `node-lib` | `generic` |
+| --- | --- | --- |
+| `src/features/<id>/model/<id>.ts` と、そのテスト（Vitest と fast-check） | `src/features/<id>/model/<id>.ts` と、そのテスト（`node:test`） | — |
+| `src/features/<id>/api/use<Id>Query.ts` | — | — |
+| `src/features/<id>/ui/<Id>View.tsx` | — | — |
+| `src/features/<id>/index.ts` | `src/features/<id>/index.ts` | — |
+| `public/api/<id>.json`（サンプルデータ） | — | — |
+| `e2e/<id>.spec.ts` | `checks/<id>.ts`（`featureMap.specDir` と `specSuffix` に従う） | `checks/<id>.mjs`（同じ。書き換えるまで落ちる。`specSuffix` が `.mjs` か `.js` でなければ作らない） |
 
-`react-vite` では、作ったあとに画面への組み込みが残ります（組み込むまで knip が「未使用」として止めます）。`node-lib` では、作った直後から check・test・verify が通り、振る舞いの書き換えと feature map の記入が残ります。
+`react-vite` では、作ったあとに画面への組み込みが残ります（組み込むまで knip が「未使用」として止めます）。`node-lib` では、作った直後から check・test・verify が通り、振る舞いの書き換えと feature map の記入が残ります。`generic` では、機能を実際に確かめる手順を書くまで verify が落ちます。
 
 `verify` は次のように動きます。どちらの実行方法でも同じです。
 
@@ -613,9 +617,9 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 
 | キー | 既定 | 意味 |
 | --- | --- | --- |
-| `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `pnpm`。`commands` を書かないときの既定のコマンドがこれで決まる |
+| `packageManager` | 自動で決める | `pnpm`・`npm`・`yarn`・`bun` のどれか。書かなければ、`package.json` の `packageManager`、lockfile（`pnpm-lock.yaml`・`package-lock.json`・`yarn.lock`・`bun.lock`）の順に、プロジェクトのフォルダから上へ探して決める（git のルートより上は見ない）。見つからなければ `npm`（Node に必ず付いてくるため）。`commands` を書かないときの既定のコマンドがこれで決まる |
 | `sarif` | なし | `bugyo doctor` と `bugyo baseline` で一緒に数える、外の lint の結果。`[{ command?, file }]`（[外の lint の結果も数える](adopt.md#外の-lint-の結果も数える)） |
-| `locale` | `en` | `@bugyo/lint` の禁止のメッセージの言語。`en` か `ja`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
+| `locale` | `en` | 禁止のメッセージと CLI の出力の言語。`en` か `ja`。環境変数 `BUGYO_LOCALE` と `bugyo({ locale })` のほうが先（[メッセージの言語](#メッセージの言語)） |
 | `verify.runner` | `playwright` | 既定の確かめ方。`playwright`・`command` か `verify.runners` の名前（上の「CLI」） |
 | `verify.command` | なし | `command` で動かすときは必須 |
 | `verify.runners` | なし | 名前を付けた確かめ方（上の「機能ごとに確かめ方を変える」） |
@@ -625,6 +629,7 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 | `featureMap.specSuffix` | `.spec.ts` | spec とみなすファイル名の末尾 |
 | `featureMap.featuresDir` | `layers.features`、なければ `src/features` | 機能のフォルダを並べる場所。`null` で検査を飛ばす |
 | `layers` | なし | 層のフォルダの場所（`app`・`features`・`shared` の `ui`・`api`・`lib`・`model`・`other`）と、feature の中のフォルダ名（`featureParts`）。上の「層のフォルダ名を変える」 |
+| `pullRequests.allowBranches` | `[]` | `bugyo task pr-check` がタスクなしで通すブランチの glob（[tasks.md](tasks.md#設定)） |
 
 同じファイルの `commands`・`evidence`・`gate` は、タスク台帳と門番の設定です（[tasks.md](tasks.md#設定)）。このファイルを変えるのは人だけです。
 
@@ -644,4 +649,4 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 
 ## Claude Code プラグイン
 
-進め方の助言は [plugin](../plugin) のスキルが受け持ちます。必ず守らせたいことはスキルに書かず、上の lint・テスト・検証で止めます。スキルは呼ばれないことがあるからです。
+進め方の助言は [plugin](../plugin/README.ja.md) のスキルが受け持ちます。必ず守らせたいことはスキルに書かず、上の lint・テスト・検証で止めます。スキルは呼ばれないことがあるからです。

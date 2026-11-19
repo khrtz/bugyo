@@ -278,7 +278,7 @@ test('設定がなければ playwright 方式と今までの場所になる', ()
   const cwd = plainProject();
   rmSync(join(cwd, '.bugyo'), { recursive: true });
   assert.deepEqual(loadConfig(cwd), {
-    packageManager: 'pnpm',
+    packageManager: 'npm',
     verify: { runner: 'playwright' },
     featureMap: { specDir: 'e2e', specSuffix: '.spec.ts', featuresDir: 'src/features' },
     evidence: { tree: ['src', 'e2e'] },

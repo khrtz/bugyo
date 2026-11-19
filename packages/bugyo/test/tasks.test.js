@@ -450,6 +450,65 @@ test('stats: start と done でモデルとハーネスを記録し、作業の�
   assert.match(bugyo(cwd, 'task', 'start', 't-005', '--as', 'x', '--model', 'a b').all, /英数字で始め/);
 });
 
+test('stats: done の --tokens / --usd でコストを足し、完了1件と1回で通った1件あたりを出す。失敗した done では足さない', () => {
+  const cwd = project();
+  for (const title of ['a', 'b', 'c']) ok(cwd, 'task', 'add', title, '--type', 'chore');
+  ok(cwd, 'task', 'start', 't-001', '--as', 'w1', '--model', 'model-a');
+  ok(cwd, 'task', 'done', 't-001', '--tokens', '1000', '--usd', '0.10');
+  ok(cwd, 'task', 'start', 't-002', '--as', 'w2', '--model', 'model-a');
+  editConfig(cwd, (config) => (config.commands.check = 'node -e "process.exit(1)"'));
+  assert.equal(bugyo(cwd, 'task', 'done', 't-002', '--tokens', '999').status, 1);
+  assert.equal(field(cwd, 't-002', 'cost-tokens'), undefined, '通らなかった done ではコストを記録しない');
+  editConfig(cwd, (config) => (config.commands.check = 'node scripts/check.js'));
+  const env = { ...process.env, BUGYO_TOKENS: '3000', BUGYO_USD: '0.3' };
+  assert.equal(spawnSync(process.execPath, [bin, 'task', 'done', 't-002'], { cwd, encoding: 'utf8', env }).status, 0);
+  ok(cwd, 'task', 'rework', 't-001', '-r', '直しが要った', '--kind', 'typo');
+  ok(cwd, 'task', 'done', 't-001', '--tokens', '500', '--usd', '0.05');
+  assert.equal(field(cwd, 't-001', 'cost-tokens'), '1500', '手直しのあとに閉じた分も足す');
+  assert.equal(field(cwd, 't-001', 'cost-usd'), '0.15');
+  ok(cwd, 'task', 'start', 't-003', '--as', 'w3', '--model', 'model-a');
+  ok(cwd, 'task', 'done', 't-003');
+
+  const { rows } = JSON.parse(ok(cwd, 'stats', '--json').stdout);
+  assert.deepEqual(rows[0].cost, { tokens: { tasks: 2, firstPass: 0, sum: 4500 }, usd: { tasks: 2, firstPass: 0, sum: 0.45 } });
+  const text = ok(cwd, 'stats').stdout;
+  assert.match(text, /^ {4}コスト（トークン）: 完了1件あたり 2,250、1回で通った1件あたり -（記録のある完了 2\/3件）$/m);
+  assert.match(text, /^ {4}コスト（USD）: 完了1件あたり 0\.225、/m);
+  assert.match(bugyo(cwd, 'task', 'done', 't-003', '--tokens', 'many').all, /0 以上の整数/);
+});
+
+test('stats --export で JSON に書き出し、--compare でいくつものプロジェクトを並べ、完了に要るコマンドの違いを知らせる', () => {
+  const a = project();
+  const b = project();
+  for (const cwd of [a, b]) {
+    ok(cwd, 'task', 'add', 'a', '--type', 'chore');
+    ok(cwd, 'task', 'start', 't-001', '--as', 'w1', '--model', 'model-a');
+    ok(cwd, 'task', 'done', 't-001', '--tokens', '100');
+  }
+  editConfig(b, (config) => (config.commands.check = 'node scripts/check.js --strict'));
+  assert.match(ok(a, 'stats', '--export', 'stats.json').stdout, /^stats: 1行を stats\.json に書き出しました$/m);
+  ok(b, 'stats', '--export', 'stats.json');
+  const exported = JSON.parse(readFileSync(join(a, 'stats.json'), 'utf8'));
+  assert.equal(exported.format, 'bugyo-stats');
+  assert.equal(exported.version, 1);
+  assert.equal(exported.commands.check, 'node scripts/check.js');
+  assert.equal(exported.rows[0].cost.tokens.sum, 100);
+
+  const absolute = join(b, 'stats-abs.json');
+  assert.equal(bugyo(a, 'stats', '--export', absolute).status, 0, '絶対パスにも書き出せる');
+  assert.equal(JSON.parse(readFileSync(absolute, 'utf8')).format, 'bugyo-stats');
+  assert.match(ok(a, 'stats', '--compare', join(a, 'stats.json'), absolute).stdout, /^stats: 2つのプロジェクトを比べます/m, '絶対パスでも比べられる');
+  const other = join(a, 'other.json');
+  writeFileSync(other, JSON.stringify({ ...JSON.parse(readFileSync(join(b, 'stats.json'), 'utf8')), project: 'other' }));
+  const compared = ok(a, 'stats', '--compare', 'stats.json', 'other.json').stdout;
+  assert.match(compared, /^stats: 2つのプロジェクトを比べます: .+, other$/m);
+  assert.match(compared, /^ {2}\[other\] chore {2}モデル: model-a/m);
+  assert.match(compared, /^warn {2}commands\.check がプロジェクトで違います/m);
+  writeFileSync(join(a, 'bad.json'), '{"rows": []}');
+  assert.match(bugyo(a, 'stats', '--compare', 'bad.json').all, /bugyo stats --export で書いたファイルではありません/);
+  assert.equal(bugyo(a, 'stats', '--compare').status, 2);
+});
+
 test('rework は戻す担当が別のタスクを作業中なら断り、--as で別の担当に渡せる', () => {
   const cwd = project();
   ok(cwd, 'task', 'add', 'a', '--type', 'chore');

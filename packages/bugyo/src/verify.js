@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, globSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { loadConfig } from './config.js';
-import { loadFeatures } from './feature-map.js';
+import { featureDir, loadFeatures } from './feature-map.js';
 import { cliLocale, cliMessages } from './locale.js';
 import { runCommand, tail } from './run.js';
 import { runsOf } from './runners.js';
@@ -114,12 +114,12 @@ function sandboxCheck(plan, command, cwd) {
 export function verify(target, cwd = process.cwd()) {
   const config = loadConfig(cwd);
   const m = cliMessages(cliLocale(config));
-  const features = loadFeatures(cwd);
+  const features = existsSync(join(cwd, featureDir)) ? loadFeatures(cwd) : [];
   const targets = target === '--all' ? features : features.filter((feature) => feature.id === target);
   if (targets.length === 0) {
     return {
       status: 2,
-      lines: [m.verifyUsage({ features: features.map((feature) => feature.id).join(', ') })],
+      lines: [features.length === 0 ? m.noFeatures : m.verifyUsage({ features: features.map((feature) => feature.id).join(', ') })],
       results: [],
       evidence: [],
     };

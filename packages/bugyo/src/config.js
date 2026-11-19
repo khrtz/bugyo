@@ -203,7 +203,7 @@ function packageManagerField(pkgPath) {
 
 /**
  * プロジェクトのパッケージマネージャーを決める。cwd から上へ、package.json の packageManager と lockfile を探す。
- * .git のあるフォルダより上は見ない。見つからなければ pnpm。
+ * .git のあるフォルダより上は見ない。見つからなければ npm（Node に必ず付いてくるため）。
  *
  * @param {string} cwd
  * @returns {typeof packageManagers[number]}
@@ -216,7 +216,7 @@ export function detectPackageManager(cwd) {
     const lock = lockfiles.find(([file]) => existsSync(join(dir, file)));
     if (lock !== undefined) return lock[1];
     const parent = dirname(dir);
-    if (existsSync(join(dir, '.git')) || parent === dir) return 'pnpm';
+    if (existsSync(join(dir, '.git')) || parent === dir) return 'npm';
     dir = parent;
   }
 }
@@ -435,7 +435,7 @@ export function commonDir(dirs) {
  * @returns {{ check?: string, test?: string, verify?: string }}
  */
 export function taskCommands(config) {
-  const source = config.commands ?? defaultCommandsBy[config.packageManager ?? 'pnpm'];
+  const source = config.commands ?? defaultCommandsBy[config.packageManager ?? 'npm'];
   return Object.fromEntries(
     Object.entries(source).filter(([, command]) => typeof command === 'string' && command.trim() !== ''),
   );

@@ -1,29 +1,29 @@
 ---
 name: bugyo-rule-from-mistake
-description: エージェント（自分や他のエージェント）や人が同じ種類のミスをしたとき、注意書きを足す代わりに lint・型・API・依存ルール・テストに変えて、二度と起きないようにする手順。「またこれ」「前も同じミス」「CLAUDE.md に書いておいて」「ルールにして」と言われたとき、またはレビューで同じ指摘が2回目になったときに使うこと。CLAUDE.md に1行足す前に必ずこれを通す。
+description: When an agent (you or another) or a person makes the same kind of mistake again, turn it into lint, types, an API, a dependency rule, or a test instead of adding a written note, so it never happens again. Use when told "this again", "same mistake as before", "write it in CLAUDE.md", "make it a rule" (「またこれ」「前も同じミス」「CLAUDE.md に書いておいて」「ルールにして」), or when the same review finding comes up a second time. Always go through this before adding a line to CLAUDE.md.
 ---
 
 # bugyo-rule-from-mistake
 
-文章の注意書きは読み飛ばされ、古くなります。機械が止めるルールは止め続けます。
-上から順に試し、**止められた最初の層で終わり**にします。
+Written notes get skipped and go stale. Rules that a machine enforces keep stopping the mistake.
+Try the layers from the top and **stop at the first layer that stops it**.
 
-## 1. また起きそうか
+## 1. Will it happen again?
 
-一度きりの事故なら、直して終わり。ルールは増やすほど重くなる。
-同じ形のミスが2回目、または既存コードにまねられそうな形で残っているなら次へ。
+If it was a one-off accident, fix it and stop. Every rule adds weight.
+If the same shape of mistake happened a second time, or it is left in a shape existing code would copy, go on.
 
-## 2. 型か API で起こせなくする
+## 2. Make it impossible with types or an API
 
-いちばん強い。ミスを書けない形にする。
+The strongest layer. Make the mistake impossible to write.
 
-- ありえない状態 → 判別共用体にする
-- 取り違えやすい値 → Zod の `.brand()` で専用の型にする
-- 誤用しやすい関数 → 正しい使い方しかできない専用フックや関数に包み、元の呼び方を lint で禁止する
+- Impossible states → use a discriminated union
+- Values that are easy to mix up → give them their own type with Zod's `.brand()`
+- Functions that are easy to misuse → wrap them in a dedicated hook or function that only allows correct use, and ban the original call with lint
 
-## 3. lint か依存ルールで止める
+## 3. Stop it with lint or a dependency rule
 
-lint の禁止は、`eslint.config.js` で `defineBan` を使って1つ作り、`bugyo({ parts })` に足す。何を止めたいかで、どの項目に書くかが決まる。
+Write a lint ban with `defineBan` in `eslint.config.js` and add it to `bugyo({ parts })`. What you want to stop decides which key to write.
 
 ```js
 import { bugyo, common, defineBan, structure } from '@bugyo/lint';
@@ -31,54 +31,56 @@ import { bugyo, common, defineBan, structure } from '@bugyo/lint';
 const clock = defineBan({
   name: 'clock',
   allow: ['effects', 'tests'],
-  properties: [{ object: 'Date', property: 'now', message: '製品コードで Date.now() は使えません。shared/lib の useClock() を使ってください。' }],
+  properties: [{ object: 'Date', property: 'now', message: 'Do not use Date.now() in product code. Use useClock() from shared/lib.' }],
 });
 
-export default bugyo({ root: import.meta.dirname, parts: [common, structure, /* 今ある禁止 */ clock] });
+export default bugyo({ root: import.meta.dirname, parts: [common, structure, /* existing bans */ clock] });
 ```
 
-| 止めたいもの | 書く項目 | 例 |
+| What to stop | Key | Example |
 | --- | --- | --- |
-| モジュールの import | `imports: { paths, patterns }` | `import moment from 'moment'` |
-| グローバル変数 | `globals: [{ name, message }]` | `localStorage`、`alert` |
-| オブジェクトのプロパティ参照 | `properties: [{ object, property, message }]` | `Date.now`、`Math.random`、`console.log` |
-| 構文の形 | `syntax: [{ selector, message }]` | 引数なしの `new Date()` は `"NewExpression[callee.name='Date'][arguments.length=0]"` |
-| ほかの ESLint のルール | `rules: { '<ルール ID>': 'error' }` | `no-console` |
-| 層や feature をまたぐ依存 | `.dependency-cruiser.cjs` の `config({ forbidden: [...] })` | — |
+| Importing a module | `imports: { paths, patterns }` | `import moment from 'moment'` |
+| A global variable | `globals: [{ name, message }]` | `localStorage`, `alert` |
+| An object property | `properties: [{ object, property, message }]` | `Date.now`, `Math.random`, `console.log` |
+| A syntax shape | `syntax: [{ selector, message }]` | `new Date()` with no arguments is `"NewExpression[callee.name='Date'][arguments.length=0]"` |
+| Other ESLint rules | `rules: { '<rule ID>': 'error' }` | `no-console` |
+| Dependencies across layers or features | `config({ forbidden: [...] })` in `.dependency-cruiser.cjs` | — |
 
-- `scope` で止める範囲を絞れる（`src`・`ui`・`model`）。既定は `src` の下すべて。glob の範囲は `rules` だけの禁止で使える
-- `allow` に、禁止したものの「正しい入口」を置く場所を書く（`effects` は `src/shared/lib`、`api` は `src/shared/api`、`tests` はテスト、または glob）。入口はそこに作る（例: `shared/lib/clock.ts` の `systemClock`）
-- `name` は小文字・数字・ハイフン。今ある禁止と同じ名前は断られる
+- `scope` narrows where it applies (`src`, `ui`, `model`). The default is everything under `src`. A glob scope works for bans that use only `rules`
+- `allow` lists where the "right entrance" to the banned thing lives (`effects` is `src/shared/lib`, `api` is `src/shared/api`, `tests` is tests, or a glob). Build the entrance there (e.g. `systemClock` in `shared/lib/clock.ts`)
+- `name` uses lowercase letters, digits, and hyphens. A name an existing ban already uses is refused
 
-`no-restricted-imports`・`no-restricted-globals`・`no-restricted-properties`・`no-restricted-syntax` を自分のブロックで直接設定しないこと。bugyo の禁止が上書きされて黙って消える。必ず `defineBan` で足す。
-`defineBan` で表せない禁止が必要なら、それは bugyo 側に拡張口が足りないということなので、ユーザーにそう伝える（自分のブロックで回避しない）。
+Do not set `no-restricted-imports`, `no-restricted-globals`, `no-restricted-properties`, or `no-restricted-syntax` directly in your own block. They override bugyo's bans, which then silently disappear. Always add them with `defineBan`.
+If you need a ban `defineBan` cannot express, bugyo is missing an extension point, so tell the user that (do not work around it in your own block).
 
-**エラー文には「代わりに何を使うか」まで書く。** エージェントはエラー文を読んで直すので、禁止だけだと抜け道を探される。`imports`・`globals`・`syntax`・`properties` の項目は `message` がないと `defineBan` が断る。
+**Write "what to use instead" in the error message.** Agents fix things by reading the error message, so a bare ban makes them hunt for a loophole. For `imports`, `globals`, `syntax`, and `properties`, `defineBan` refuses an item without `message`.
 
-良い例: `'製品コードで Date.now() は使えません。shared/lib の useClock() を使ってください。テストでは fakeClock を渡せます。'`
-悪い例: `'Date.now() は禁止です'`
+Good: `'Do not use Date.now() in product code. Use useClock() from shared/lib. Tests can pass fakeClock.'`
+Bad: `'Date.now() is banned'`
 
-## 4. 既存の違反をその場で全部直す
+Write the message in the project's language (the `locale` in `.bugyo/config.json`).
 
-ルールを足したら `pnpm check` を通し、出てきた既存の違反をその変更の中ですべて直す。
-例外リストや `eslint-disable` で残さない。残すと、次のエージェントがそれをお手本にする。
+## 4. Fix every existing violation right away
 
-## 5. 止められなければ検証で捕まえる
+After adding the rule, run `pnpm check` and fix every existing violation it finds, in the same change.
+Do not leave them in an exception list or with `eslint-disable`. Whatever you leave, the next agent takes as a model.
 
-型でも lint でも止められない（挙動の問題など）なら、テストか feature map で捕まえる。
+## 5. If it cannot be stopped, catch it with verification
 
-- 再現するテストを足す（先に失敗することを確かめる）
-- `docs/features/<id>.md` の「よく嘘をつくところ」に1行足す
+If neither types nor lint can stop it (a behavior problem, for example), catch it with a test or the feature map.
 
-## 6. どれも無理なときだけ CLAUDE.md
+- Add a test that reproduces it (check that it fails first)
+- Add a line to "Where it lies" in `docs/features/<id>.md`
 
-1〜5 のどれでも止められないときだけ、CLAUDE.md に1行足す。
-その行が後でルール化できたら、昇格させて文章から消す。
+## 6. CLAUDE.md only when nothing else works
 
-## 記録
+Only when none of 1–5 can stop it, add a line to CLAUDE.md.
+If that line can later become a rule, promote it and remove it from the text.
 
-`.bugyo/mistakes/<種類>.md` にそのミスがあれば、`bugyo mistake rule <種類> --at <ルールを書いたファイル> --name <ルールの名前>` で記録する（名前は `defineBan` の `name`、ルール ID、テストの名前など）。`bugyo mistake ls` に、種類ごとのルールとルール化済みの種類の数が出る。
+## Record
 
-## 報告
+If the mistake is in `.bugyo/mistakes/<kind>.md`, record it with `bugyo mistake rule <kind> --at <file with the rule> --name <rule name>` (the name is the `name` of `defineBan`, a rule ID, a test name, ...). `bugyo mistake ls` shows the rules per kind and how many kinds became rules.
 
-どの層で止めたか、追加したルールのエラー文、直した既存違反の数を書く。わざと違反するコードを一度書いてルールが実際にエラーを出すことを確かめ、その結果も載せる（確かめたら消す）。
+## Report
+
+Write which layer stopped it, the error message of the new rule, and how many existing violations you fixed. Write code that breaks the rule on purpose once, confirm that the rule really reports an error, and include that result (delete the code after checking). Write the report in the user's language.

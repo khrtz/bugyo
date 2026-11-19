@@ -1,0 +1,6 @@
+{
+  "template": "generic",
+  "verify": { "runner": "command", "command": "node {spec}" },
+  "featureMap": { "specDir": "checks", "specSuffix": ".mjs", "featuresDir": null },
+  "evidence": { "tree": ["site", "checks", "test"] }
+}

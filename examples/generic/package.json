@@ -1,0 +1,14 @@
+{
+  "name": "generic",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "check": "bugyo task lint",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "verify": "bugyo verify"
+  },
+  "devDependencies": {
+    "bugyo": "workspace:*"
+  }
+}

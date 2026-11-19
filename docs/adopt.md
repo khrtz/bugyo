@@ -1,5 +1,7 @@
 # 既存のプロジェクトに入れる
 
+[English](adopt.en.md) ・ 日本語
+
 `bugyo init` を使わず、今あるプロジェクトに bugyo をあとから入れる手順です。pnpm・npm・yarn・bun のどれで入れても動きます。
 
 ## 検証と台帳だけを入れる
@@ -49,7 +51,11 @@ Playwright の設定は自前のものをそのまま使えます。動画・ス
 | `evidence.tree` | 証拠のハッシュを取るパス。製品コードと、確かめるスクリプトのフォルダ |
 | `commands` | 書かなければ、パッケージマネージャーに合わせた既定（npm なら `npm run check` / `npm test` / `bugyo verify {feature}`）を使う。`package.json` の `check` と `test` のスクリプトが要る |
 
-このファイルを変えるのは人だけです（`done` の判定が変わるため）。
+このファイルを変えるのは人だけです（`done` の判定が変わるため）。bugyo の Claude Code プラグインを入れていると、エージェントはこのファイルを作ることも断られるので、最初の1回も人が書きます。
+
+lockfile を作らない設定（`.npmrc` の `package-lock=false` など）では、パッケージマネージャーを lockfile から決められず、既定の npm になります。ほかのものを使うなら、`package.json` の `packageManager` か `.bugyo/config.json` の `packageManager` に書きます。
+
+機能のフォルダがない（`featuresDir: null`）プロジェクトでは、`logic` のタスク（機能の `model/` にテストが要る）は作れません。`bugfix` か `refactor` を使います。
 
 ### 3. 機能を1つずつ地図に載せる
 

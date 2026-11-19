@@ -121,3 +121,17 @@ test('SessionStart: タスクがなければ、そう伝える', () => {
   const context = String(sessionStart({ cwd: project() })?.additionalContext);
   assert.match(context, /作業中のタスクも、着手できるタスクもありません。/);
 });
+
+test('フックの文は既定で英語、.bugyo/config.json の locale で日本語', (t) => {
+  delete process.env['BUGYO_LOCALE'];
+  t.after(() => (process.env['BUGYO_LOCALE'] = 'ja'));
+  const dir = project();
+  writeTask(dir, 't-001', 'status: active\ntype: chore\nassignee: w1', 'Halfway');
+  writeTask(dir, 't-002', 'status: open\ntype: chore', 'Ready one');
+  const context = String(sessionStart({ cwd: dir })?.additionalContext);
+  assert.match(context, /Active tasks:\n- t-001 \[chore\] Halfway {2}assignee: w1/);
+  assert.match(context, /Ready tasks:\n- t-002 \[chore\] Ready one/);
+  assert.match(stop({ cwd: dir, stop_hook_active: false })?.systemMessage, /^1 active tasks remain\./);
+  writeFileSync(join(dir, '.bugyo', 'config.json'), JSON.stringify({ locale: 'ja' }));
+  assert.match(String(sessionStart({ cwd: dir })?.additionalContext), /作業中のタスク:/);
+});

@@ -1,35 +1,36 @@
 ---
 name: bugyo-critique
-description: 変更やPRを、甘く見ずに批判的にレビューする。コードの行より先に証拠（pnpm verify の artifacts、テスト）を確かめ、その場しのぎの修正・まねされると困るパターン・ルール化すべきミスを探す。「レビューして」「これで大丈夫？」「マージしていい？」と聞かれたとき、また自分の作業を報告する直前のセルフレビューにも使うこと。
+description: Review a change or PR critically, without going easy on it. Check the evidence (pnpm verify artifacts, tests) before the lines of code, and look for stopgap fixes, patterns that would hurt if copied, and mistakes that should become rules. Use when asked "review this", "is this OK?", "can I merge?" (「レビューして」「これで大丈夫？」「マージしていい？」), and as a self-review right before reporting your own work.
 ---
 
 # bugyo-critique
 
-あなたの役目は、この変更が**まねされても困らないか**を確かめることです。動くかどうかだけではありません。
-褒めるところを探さない。問題が見つからなければ、それで構いません。
+Your job is to check that this change **does no harm if copied**, not only that it works.
+Do not look for things to praise. If you find no problems, that is fine.
 
-## 1. 証拠を先に見る
+## 1. Look at the evidence first
 
-コードを読む前に、変更の種類に合う証拠があるかを確かめる（`bugyo-mode` の「完了の条件」の表）。
+Before reading the code, check that the evidence fits the kind of change (the "When work is done" table in `bugyo-mode`).
 
-- UI の変更なのに `pnpm verify <id>` の結果がない → それだけで差し戻す理由になる
-- バグ修正なのに、修正前に失敗するテストがない → 差し戻す
-- 証拠があれば、主張と一致しているかを見る（動画で本当にその操作をしているか、スクショの差分は意図どおりか）
+- A UI change with no `pnpm verify <id>` result → that alone is a reason to send it back
+- A bug fix with no test that fails before the fix → send it back
+- If there is evidence, check that it matches the claim (does the video really do that operation, is the screenshot diff the intended one)
 
-## 2. 独立した目で見る
+## 2. Use independent eyes
 
-自分で書いた変更は、自分の思い込みで正しく見えます。`slop-reviewer` サブエージェントに、変更の差分と「何をする変更か」だけを渡してレビューさせる。結論は渡さない。
-大きな変更なら、観点を分けて複数走らせる（正しさ／設計の境界／検証の十分さ）。
+A change you wrote looks right to you because of your own assumptions. Give the `slop-reviewer` subagent only the diff and what the change is for, and let it review. Do not hand over your conclusion.
+For a large change, run several with separate angles (correctness / design boundaries / enough verification).
 
-## 3. 探すもの
+## 3. What to look for
 
-- **その場しのぎ**: 根本原因の手前で症状だけ止めている、`setTimeout` でタイミングを合わせている、`?.` や `?? []` でエラーを握りつぶしている
-- **まねされると困る形**: 新しく持ち込まれたパターンが、次のエージェントのお手本になって増えないか
-- **境界の崩れ**: 公開窓口を通らない依存、model に紛れ込んだ副作用
-- **黙った無効化**: 理由の薄い `eslint-disable`、テストの `skip`、閾値の緩和
-- **feature map のずれ**: UI を変えたのに `docs/features/<id>.md` が古いまま
+- **Stopgaps**: stopping the symptom short of the root cause, matching timing with `setTimeout`, swallowing errors with `?.` or `?? []`
+- **Shapes that hurt if copied**: whether a newly introduced pattern becomes a model for the next agent and spreads
+- **Broken boundaries**: dependencies that skip the public entry point, side effects slipped into model
+- **Silent disabling**: `eslint-disable` with a thin reason, skipped tests, loosened thresholds
+- **Feature map drift**: the UI changed but `docs/features/<id>.md` is still old
 
-## 4. 報告
+## 4. Report
 
-見つけたものを重い順に並べ、それぞれに「どの入力・状態で、何が壊れるか」を具体的に書く。推測は推測と書く。
-同じ種類の指摘が2回目なら、指摘で終わらせず `bugyo-rule-from-mistake` でルール化を提案する。
+List the findings, heaviest first, and for each write concretely which input or state breaks what. Mark guesses as guesses.
+If the same kind of finding comes up a second time, do not stop at pointing it out: propose a rule with `bugyo-rule-from-mistake`.
+Write the report in the user's language.
