@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { collectEvidence, readEvidence, requirements } from './evidence.js';
+import { tr } from './locale.js';
 import { runCommand, tail } from './run.js';
 import { archiveDir } from './tasks.js';
 
@@ -16,7 +17,7 @@ export function changedArchiveIds(cwd, base) {
     cwd,
     encoding: 'utf8',
   });
-  if (run.status !== 0) throw new Error(`git diff ${base}...HEAD が失敗しました: ${(run.stderr ?? '').trim()}`);
+  if (run.status !== 0) throw new Error(tr({ en: `git diff ${base}...HEAD failed: ${(run.stderr ?? '').trim()}`, ja: `git diff ${base}...HEAD が失敗しました: ${(run.stderr ?? '').trim()}` }));
   return run.stdout
     .split('\n')
     .map((line) => line.trim())
@@ -31,7 +32,7 @@ export function changedArchiveIds(cwd, base) {
  */
 function gitOut(cwd, args) {
   const run = spawnSync('git', args, { cwd, encoding: 'utf8' });
-  if (run.status !== 0) throw new Error(`git ${args.join(' ')} が失敗しました: ${(run.stderr ?? '').trim()}`);
+  if (run.status !== 0) throw new Error(tr({ en: `git ${args.join(' ')} failed: ${(run.stderr ?? '').trim()}`, ja: `git ${args.join(' ')} が失敗しました: ${(run.stderr ?? '').trim()}` }));
   return run.stdout;
 }
 
@@ -70,7 +71,12 @@ export function duplicateIdsAgainst(cwd, base) {
     if (before === undefined) continue;
     const ours = createdOf(gitOut(cwd, ['show', `HEAD:./${file}`]));
     const theirs = createdOf(gitOut(cwd, ['show', `${base}:./${before}`]));
-    if (ours !== theirs) errors.push(`${file}: ${id} は ${base} の ${before} と同じ id の別のタスクです（作った日時 ${ours} / ${theirs}）。id を振り直してください`);
+    if (ours !== theirs) errors.push(
+        `${file}: ${tr({
+          en: `${id} is a different task with the same id as ${before} in ${base} (created ${ours} / ${theirs}). Give it a new id`,
+          ja: `${id} は ${base} の ${before} と同じ id の別のタスクです（作った日時 ${ours} / ${theirs}）。id を振り直してください`,
+        })}`,
+      );
   }
   return errors;
 }
@@ -94,12 +100,12 @@ const safeValue = /^[A-Za-z0-9.][A-Za-z0-9#._:/-]*$/;
 export function notifyVerified(task, command, cwd) {
   const issue = task.issue ?? '';
   const evidence = task['evidence-file'] ?? '';
-  if (!safeValue.test(issue) || !safeValue.test(evidence)) return { ok: false, message: `${task.id} の issue か evidence-file に、コマンドに埋め込めない文字があります` };
+  if (!safeValue.test(issue) || !safeValue.test(evidence)) return { ok: false, message: tr({ en: `The issue or evidence-file of ${task.id} has characters that cannot go into a command`, ja: `${task.id} の issue か evidence-file に、コマンドに埋め込めない文字があります` }) };
   const filled = command.replaceAll('{issue}', issue).replaceAll('{task}', task.id).replaceAll('{evidence}', evidence);
   const run = runCommand(filled, cwd, { BUGYO_ISSUE: issue, BUGYO_TASK: task.id, BUGYO_EVIDENCE: evidence, BUGYO_TITLE: task.title });
   return run.status === 0
-    ? { ok: true, message: `${task.id} を ${issue} に知らせました` }
-    : { ok: false, message: `${task.id} を ${issue} に知らせられませんでした（終了コード ${run.status}）: ${tail(run.output, 5)}` };
+    ? { ok: true, message: tr({ en: `Notified ${issue} about ${task.id}`, ja: `${task.id} を ${issue} に知らせました` }) }
+    : { ok: false, message: `${tr({ en: `Could not notify ${issue} about ${task.id} (exit code ${run.status})`, ja: `${task.id} を ${issue} に知らせられませんでした（終了コード ${run.status}）` })}: ${tail(run.output, 5)}` };
 }
 
 /**
@@ -113,10 +119,10 @@ export function notifyVerified(task, command, cwd) {
  */
 export function recheckTask(task, config, cwd) {
   const fail = (/** @type {string} */ reason, output = '') => ({ id: task.id, ok: false, reason, output });
-  if (task.status !== 'done') return { id: task.id, ok: true, reason: `${task.status} なので照合しません`, output: '' };
+  if (task.status !== 'done') return { id: task.id, ok: true, reason: tr({ en: `${task.status}, so not checked`, ja: `${task.status} なので照合しません` }), output: '' };
   const file = task['evidence-file'];
   const evidence = file === undefined ? undefined : readEvidence(cwd, file);
-  if (file === undefined || evidence === undefined) return fail('証拠ファイルがありません');
+  if (file === undefined || evidence === undefined) return fail(tr({ en: 'No evidence file', ja: '証拠ファイルがありません' }));
 
   const recorded = Array.isArray(evidence['steps'])
     ? evidence['steps'].map((/** @type {{ command?: unknown }} */ step) => String(step.command))
@@ -125,13 +131,23 @@ export function recheckTask(task, config, cwd) {
     .filter((step) => step.kind === 'command')
     .map((step) => step.command ?? '');
   if (JSON.stringify(recorded) !== JSON.stringify(expected)) {
-    return fail(`証拠に記録されたコマンド（${recorded.join(' → ') || 'なし'}）が、今の設定で必要なコマンド（${expected.join(' → ')}）と違います`);
+    return fail(
+      tr({
+        en: `The commands in the evidence (${recorded.join(' → ') || 'none'}) differ from the commands the current config requires (${expected.join(' → ')})`,
+        ja: `証拠に記録されたコマンド（${recorded.join(' → ') || 'なし'}）が、今の設定で必要なコマンド（${expected.join(' → ')}）と違います`,
+      }),
+    );
   }
 
   const outcome = collectEvidence(task, config, cwd, { write: false });
-  if (!outcome.ok) return fail(`取り直すと ${outcome.step.label} が通りません: ${outcome.reason}`, outcome.output);
+  if (!outcome.ok) return fail(tr({ en: `${outcome.step.label} does not pass when re-run: ${outcome.reason}`, ja: `取り直すと ${outcome.step.label} が通りません: ${outcome.reason}` }), outcome.output);
   if (outcome.tree !== task['evidence-tree']) {
-    return fail(`今のコードのハッシュ（${outcome.tree}）が evidence-tree（${task['evidence-tree'] ?? 'なし'}）と違います。閉じたあとにコードが変わったか、証拠が手で書かれています`);
+    return fail(
+      tr({
+        en: `The hash of the current code (${outcome.tree}) differs from evidence-tree (${task['evidence-tree'] ?? 'none'}). The code changed after closing, or the evidence was written by hand`,
+        ja: `今のコードのハッシュ（${outcome.tree}）が evidence-tree（${task['evidence-tree'] ?? 'なし'}）と違います。閉じたあとにコードが変わったか、証拠が手で書かれています`,
+      }),
+    );
   }
-  return { id: task.id, ok: true, reason: '手順が通り、ハッシュが一致しました', output: '' };
+  return { id: task.id, ok: true, reason: tr({ en: 'the steps pass and the hash matches', ja: '手順が通り、ハッシュが一致しました' }), output: '' };
 }

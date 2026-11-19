@@ -8,6 +8,9 @@ import { featureMapChecks } from '../src/feature-map-checks.js';
 import { loadFeatures, loadSweepOrder, requiredSections, sectionHeadings, unfilledSections } from '../src/feature-map.js';
 import { init, newFeature } from '../src/scaffold.js';
 
+/** このファイルは日本語の出力を確かめる（英語の既定は locale.test.js で確かめる）。子プロセスにも引き継がれる */
+process.env['BUGYO_LOCALE'] = 'ja';
+
 function emptyProject() {
   const cwd = mkdtempSync(join(tmpdir(), 'bugyo-'));
   mkdirSync(join(cwd, 'docs/features'), { recursive: true });

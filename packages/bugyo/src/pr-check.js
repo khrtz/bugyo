@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { matchesGlob } from 'node:path';
+import { tr } from './locale.js';
 import { tasksDir } from './tasks.js';
 
 /** タスクのブランチ名。`task/t-001` か、後ろに説明を付けた `task/t-001-login` */
@@ -16,7 +17,7 @@ const taskBranch = /^task\/(t-\d{3,})(?:[-/].*)?$/;
  */
 function changedTaskIds(cwd, base) {
   const run = spawnSync('git', ['diff', '--name-only', '--relative', `${base}...HEAD`, '--', tasksDir], { cwd, encoding: 'utf8' });
-  if (run.status !== 0) throw new Error(`git diff ${base}...HEAD が失敗しました: ${(run.stderr ?? '').trim()}`);
+  if (run.status !== 0) throw new Error(tr({ en: `git diff ${base}...HEAD failed: ${(run.stderr ?? '').trim()}`, ja: `git diff ${base}...HEAD が失敗しました: ${(run.stderr ?? '').trim()}` }));
   return [
     ...new Set(
       run.stdout
@@ -41,15 +42,30 @@ export function prCheck({ cwd, branch, base, allowBranches, tasks }) {
   const id = taskBranch.exec(branch)?.[1];
   if (id !== undefined) {
     const task = tasks.find((candidate) => candidate.id === id);
-    if (task === undefined) return { ok: false, message: `ブランチ ${branch} のタスク ${id} が台帳にありません。bugyo task add で作ってから、その id のブランチで作業してください` };
-    if (task.status === 'dropped') return { ok: false, message: `ブランチ ${branch} のタスク ${id} は中止されています。別のタスクのブランチで作業してください` };
+    if (task === undefined) return {
+        ok: false,
+        message: tr({
+          en: `The task ${id} of the branch ${branch} is not in the ledger. Create it with bugyo task add, then work on a branch with that id`,
+          ja: `ブランチ ${branch} のタスク ${id} が台帳にありません。bugyo task add で作ってから、その id のブランチで作業してください`,
+        }),
+      };
+    if (task.status === 'dropped') return {
+        ok: false,
+        message: tr({
+          en: `The task ${id} of the branch ${branch} was dropped. Work on the branch of another task`,
+          ja: `ブランチ ${branch} のタスク ${id} は中止されています。別のタスクのブランチで作業してください`,
+        }),
+      };
     return { ok: true, how: 'branch', ids: [id] };
   }
   const changed = base === undefined ? [] : changedTaskIds(cwd, base);
   if (changed.length > 0) return { ok: true, how: 'ledger', ids: changed };
   return {
     ok: false,
-    message: `ブランチ ${branch} の作業がタスクに紐づいていません。タスクを作って task/<id> のブランチで作業するか（git switch -c task/t-001）、この PR でタスクのファイルを変えてください。タスクのいらないブランチは、.bugyo/config.json の pullRequests.allowBranches に glob で書きます${base === undefined ? '（--base を渡すと、台帳の差分でも確かめます）' : ''}`,
+    message: tr({
+      en: `The work on the branch ${branch} is not linked to a task. Create a task and work on a task/<id> branch (git switch -c task/t-001), or change the task's file in this PR. Branches that need no task go in pullRequests.allowBranches of .bugyo/config.json as globs${base === undefined ? ' (with --base, ledger changes are checked too)' : ''}`,
+      ja: `ブランチ ${branch} の作業がタスクに紐づいていません。タスクを作って task/<id> のブランチで作業するか（git switch -c task/t-001）、この PR でタスクのファイルを変えてください。タスクのいらないブランチは、.bugyo/config.json の pullRequests.allowBranches に glob で書きます${base === undefined ? '（--base を渡すと、台帳の差分でも確かめます）' : ''}`,
+    }),
   };
 }
 
@@ -65,6 +81,6 @@ export function currentBranch(cwd, given) {
   if (fromCi !== undefined && fromCi !== '') return fromCi;
   const run = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, encoding: 'utf8' });
   const name = (run.stdout ?? '').trim();
-  if (run.status !== 0 || name === '' || name === 'HEAD') throw new Error('ブランチの名前が分かりません。--branch <名前> で渡してください');
+  if (run.status !== 0 || name === '' || name === 'HEAD') throw new Error(tr({ en: 'Cannot tell the branch name. Pass it with --branch <name>', ja: 'ブランチの名前が分かりません。--branch <名前> で渡してください' }));
   return name;
 }

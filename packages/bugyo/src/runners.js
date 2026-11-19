@@ -1,4 +1,5 @@
 import { posix } from 'node:path';
+import { tr } from './locale.js';
 
 /**
  * @typedef {{ name: string, runner: 'playwright' | 'command', command: string | undefined, env: Record<string, string>, match: string[], evidence: string[], sandbox: boolean }} Runner
@@ -54,15 +55,26 @@ export function runsOf(feature, verify) {
     let runner;
     if (feature.runner !== undefined) {
       runner = runners.get(feature.runner);
-      if (runner === undefined) return { error: `${feature.file}: runner の ${feature.runner} がありません（使えるのは ${known()}。.bugyo/config.json の verify.runners に書きます）` };
+      if (runner === undefined) return {
+          error: tr({
+            en: `${feature.file}: there is no runner ${feature.runner} (known: ${known()}; define runners in verify.runners of .bugyo/config.json)`,
+            ja: `${feature.file}: runner の ${feature.runner} がありません（使えるのは ${known()}。.bugyo/config.json の verify.runners に書きます）`,
+          }),
+        };
     } else {
       const matched = [...runners.values()].filter((candidate) => candidate.match.some((glob) => posix.matchesGlob(spec, glob)));
-      if (matched.length > 1) return { error: `${feature.file}: ${spec} が ${matched.map((candidate) => candidate.name).join(' と ')} の match の両方に当たります。frontmatter に runner を書くか、match を直してください` };
+      if (matched.length > 1) return {
+          error: tr({
+            en: `${feature.file}: ${spec} matches the match of both ${matched.map((candidate) => candidate.name).join(' and ')}. Set runner in the frontmatter or fix match`,
+            ja: `${feature.file}: ${spec} が ${matched.map((candidate) => candidate.name).join(' と ')} の match の両方に当たります。frontmatter に runner を書くか、match を直してください`,
+          }),
+        };
       runner = matched[0] ?? runners.get(verify.runner);
-      if (runner === undefined) return { error: `.bugyo/config.json: verify.runner の ${verify.runner} がありません（使えるのは ${known()}）` };
+      if (runner === undefined) return { error: tr({ en: `.bugyo/config.json: there is no verify.runner ${verify.runner} (known: ${known()})`, ja: `.bugyo/config.json: verify.runner の ${verify.runner} がありません（使えるのは ${known()}）` }) };
     }
     if (runner.runner === 'command' && !runner.command?.trim()) {
-      return { error: `${feature.file}: ${runner.name} で動かすにはコマンドが要ります（.bugyo/config.json の ${runner.name === 'command' ? 'verify.command' : `verify.runners.${runner.name}.command`}）` };
+      const key = runner.name === 'command' ? 'verify.command' : `verify.runners.${runner.name}.command`;
+      return { error: tr({ en: `${feature.file}: ${runner.name} needs a command (${key} in .bugyo/config.json)`, ja: `${feature.file}: ${runner.name} で動かすにはコマンドが要ります（.bugyo/config.json の ${key}）` }) };
     }
     runs.push({ spec, runner });
   }

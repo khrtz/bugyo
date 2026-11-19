@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
+/** このファイルは日本語の出力を確かめる（英語の既定は locale.test.js で確かめる）。子プロセスにも引き継がれる */
+process.env['BUGYO_LOCALE'] = 'ja';
+
 const guard = join(import.meta.dirname, '..', '..', '..', 'plugin', 'hooks', 'guard.mjs');
 
 /**

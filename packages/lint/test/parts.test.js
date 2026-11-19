@@ -176,7 +176,7 @@ test('featureParts: フォルダ名に / を含むか、空の配列なら断る
 });
 
 test('layers: src の外にある層は断る', () => {
-  assert.throws(() => bugyo({ root: layersRoot, layers }), /src（src）の中にありません/);
+  assert.throws(() => bugyo({ root: layersRoot, layers }), /is not inside src \(src\)/);
 });
 
 test('depcruise: layers の場所で構成の境界を止める', () => {

@@ -1,3 +1,4 @@
+import { tr } from './locale.js';
 import { mistakeState } from './mistakes.js';
 
 /**
@@ -25,7 +26,7 @@ const closedAt = (task) => (task.status === 'done' ? task['evidence-at'] : task[
 export function evaluateGate(tasks, mistakes, gate, only) {
   const all = Object.entries(gate.scopes ?? defaultScopes);
   const scopes = only === undefined ? all : all.filter(([name]) => name === only);
-  if (scopes.length === 0) throw new Error(`まとまり "${only}" はありません。使える名前: ${all.map(([name]) => name).join(', ')}`);
+  if (scopes.length === 0) throw new Error(tr({ en: `There is no group "${only}". Known: ${all.map(([name]) => name).join(', ')}`, ja: `まとまり "${only}" はありません。使える名前: ${all.map(([name]) => name).join(', ')}` }));
   const repeated = mistakes.filter((mistake) => ['unruled', 'leak'].includes(mistakeState(mistake))).map((mistake) => mistake.kind);
 
   const results = scopes.map(([name, scope]) => {
@@ -42,11 +43,11 @@ export function evaluateGate(tasks, mistakes, gate, only) {
     const reworked = done.filter((task) => task.rework > 0).length;
     const firstPass = done.filter((task) => task['gate-attempts'] === 1).length;
     const conditions = [
-      { name: 'count', label: '閉じたタスク（完了と中止）', value: recent.length, limit: `${window}件以上`, ok: recent.length >= window },
-      { name: 'dropped', label: '中止したタスク', value: dropped, limit: `${maxDropped}件以下`, ok: dropped <= maxDropped },
-      { name: 'rework', label: '手直しが要ったタスク', value: reworked, limit: `${maxRework}件以下`, ok: reworked <= maxRework },
-      { name: 'first-pass', label: '1回で通ったタスク', value: firstPass, limit: `${minFirstPass}件以上`, ok: firstPass >= minFirstPass },
-      { name: 'repeated-mistakes', label: 'ルール化されていない再発', value: repeated.length, limit: '0種類', ok: repeated.length === 0, kinds: repeated },
+      { name: 'count', label: tr({ en: 'closed tasks (done and dropped)', ja: '閉じたタスク（完了と中止）' }), value: recent.length, limit: tr({ en: `${window} or more`, ja: `${window}件以上` }), ok: recent.length >= window },
+      { name: 'dropped', label: tr({ en: 'dropped tasks', ja: '中止したタスク' }), value: dropped, limit: tr({ en: `${maxDropped} or fewer`, ja: `${maxDropped}件以下` }), ok: dropped <= maxDropped },
+      { name: 'rework', label: tr({ en: 'tasks that needed rework', ja: '手直しが要ったタスク' }), value: reworked, limit: tr({ en: `${maxRework} or fewer`, ja: `${maxRework}件以下` }), ok: reworked <= maxRework },
+      { name: 'first-pass', label: tr({ en: 'tasks that passed on the first try', ja: '1回で通ったタスク' }), value: firstPass, limit: tr({ en: `${minFirstPass} or more`, ja: `${minFirstPass}件以上` }), ok: firstPass >= minFirstPass },
+      { name: 'repeated-mistakes', label: tr({ en: 'repeated mistakes without a rule', ja: 'ルール化されていない再発' }), value: repeated.length, limit: tr({ en: '0 kinds', ja: '0種類' }), ok: repeated.length === 0, kinds: repeated },
     ];
     return { name, types: scope.types, window, passed: conditions.every((condition) => condition.ok), conditions };
   });

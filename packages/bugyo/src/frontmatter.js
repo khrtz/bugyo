@@ -1,3 +1,5 @@
+import { tr } from './locale.js';
+
 /**
  * 先頭の `---` で囲んだ `key: value` 1段だけの frontmatter と本文に分ける。
  *
@@ -7,7 +9,7 @@
  */
 export function parseFrontmatter(file, text) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
-  if (match === null) throw new Error(`${file}: 先頭に --- で囲んだ frontmatter がありません`);
+  if (match === null) throw new Error(tr({ en: `${file}: no frontmatter between --- lines at the top`, ja: `${file}: 先頭に --- で囲んだ frontmatter がありません` }));
   const head = match[1] ?? '';
   const body = match[2] ?? '';
   const fields = Object.fromEntries(
@@ -16,7 +18,7 @@ export function parseFrontmatter(file, text) {
       .filter((line) => line.trim() !== '')
       .map((line) => {
         const at = line.indexOf(':');
-        if (at < 0) throw new Error(`${file}: frontmatter の行 "${line}" は "key: value" の形にしてください`);
+        if (at < 0) throw new Error(tr({ en: `${file}: the frontmatter line "${line}" must look like "key: value"`, ja: `${file}: frontmatter の行 "${line}" は "key: value" の形にしてください` }));
         return [line.slice(0, at).trim(), line.slice(at + 1).trim()];
       }),
   );

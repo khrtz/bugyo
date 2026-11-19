@@ -115,15 +115,15 @@ test('runners: 決められない確かめ方は、動かす前に終了コー�
   setVerify(cwd, { runner: 'command', command: 'node {spec}', runners: { a: { runner: 'command', command: 'node {spec}', match: 'checks/**' }, b: { runner: 'command', command: 'node {spec}', match: '**/*.js' } } });
   const both = bugyo(cwd, 'verify', 'greet');
   assert.equal(both.status, 2);
-  assert.match(both.stderr, /checks\/greet\.js が a と b の match の両方に当たります/);
+  assert.match(both.stderr, /checks\/greet\.js matches the match of both a and b/);
   assert.ok(!existsSync(join(cwd, 'artifacts/verify.json')));
 
   setVerify(cwd, { runner: 'command', command: 'node {spec}' });
   editFeature(cwd, 'spec: checks/greet.js', 'spec: checks/greet.js\nrunner: nope');
   const unknown = bugyo(cwd, 'verify', 'greet');
   assert.equal(unknown.status, 2);
-  assert.match(unknown.stderr, /runner の nope がありません/);
-  assert.ok(featureMapChecks({ cwd }).flatMap((check) => check.problems()).some((problem) => /runner の nope がありません/.test(problem)));
+  assert.match(unknown.stderr, /there is no runner nope/);
+  assert.ok(featureMapChecks({ cwd }).flatMap((check) => check.problems()).some((problem) => /there is no runner nope/.test(problem)));
 });
 
 test('runners: 設定の誤りは読むときに断る', () => {
@@ -200,13 +200,13 @@ test('sandbox: 隔離環境が要る確かめ方は、verify.sandbox のコマ�
   setVerify(cwd, { runner: 'isolated', runners: { isolated: { runner: 'command', command: 'node {spec}', requires: 'sandbox' } } });
   assert.throws(() => loadConfig(cwd), /verify\.sandbox/);
   setVerify(cwd, { runner: 'playwright', runners: { e2e: { runner: 'playwright', evidence: ['x/*.png'] } } });
-  assert.throws(() => loadConfig(cwd), /evidence は、runner が "command"/);
+  assert.throws(() => loadConfig(cwd), /evidence is only for runner "command"/);
 });
 
 test('spec にはコマンドに入れて困る文字を書けない', () => {
   const cwd = plainProject();
   editFeature(cwd, 'spec: checks/greet.js', 'spec: checks/greet.js; rm -rf x');
-  assert.throws(() => loadFeatures(cwd), /英数字/);
+  assert.throws(() => loadFeatures(cwd), /only letters, digits/);
 });
 
 /** playwright の代わり。JSON レポートを書き、--output の場所に MODE を書く */
@@ -306,7 +306,7 @@ test('パッケージマネージャーは packageManager、lockfile の順に�
   assert.equal(taskCommands(loadConfig(cwd)).check, 'bun run check');
 
   writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ packageManager: 'deno' }));
-  assert.throws(() => loadConfig(cwd), /config\.json が不正です/);
+  assert.throws(() => loadConfig(cwd), /config\.json is invalid/);
 });
 
 test('runner が command なのにコマンドがない設定は断る', () => {
@@ -318,7 +318,7 @@ test('runner が command なのにコマンドがない設定は断る', () => {
 test('知らないキーのある設定は断る', () => {
   const cwd = plainProject();
   writeFileSync(join(cwd, '.bugyo/config.json'), JSON.stringify({ verfy: {} }));
-  assert.throws(() => loadConfig(cwd), /config\.json が不正です/);
+  assert.throws(() => loadConfig(cwd), /config\.json is invalid/);
 });
 
 test('route は任意で、spec は相対パスなら形を問わない', () => {
@@ -331,7 +331,7 @@ test('spec に絶対パスや .. は書けない', () => {
   const cwd = plainProject();
   const file = join(cwd, 'docs/features/greet.md');
   writeFileSync(file, readFileSync(file, 'utf8').replace('spec: checks/greet.js', 'spec: ../outside.js'));
-  assert.throws(() => loadFeatures(cwd), /相対パス/);
+  assert.throws(() => loadFeatures(cwd), /relative to the project root/);
 });
 
 test('feature map の検査は設定の場所を使い、すべて通る', () => {
@@ -347,8 +347,8 @@ test('feature map の検査: 対応しない spec と機能のフォルダを見
   writeFileSync(join(cwd, 'checks/orphan.js'), '');
   cpSync(join(cwd, 'lib/greet'), join(cwd, 'lib/stray'), { recursive: true });
   const problems = featureMapChecks({ cwd }).flatMap((check) => check.problems());
-  assert.ok(problems.includes('checks/orphan.js に対応する docs/features/*.md がありません'), problems.join('\n'));
-  assert.ok(problems.includes('lib/stray に対応する docs/features/stray.md がありません'), problems.join('\n'));
+  assert.ok(problems.includes('no docs/features/*.md for checks/orphan.js'), problems.join('\n'));
+  assert.ok(problems.includes('no docs/features/stray.md for lib/stray'), problems.join('\n'));
 });
 
 test('feature map の検査: フォルダがない検査は理由つきで飛ばす', () => {
@@ -357,6 +357,6 @@ test('feature map の検査: フォルダがない検査は理由つきで飛ば
   const checks = featureMapChecks({ cwd, specDir: null });
   assert.deepEqual(
     checks.filter((check) => check.skip !== null).map((check) => check.skip),
-    ['設定で外されています', 'lib がありません'],
+    ['turned off in the config', 'lib does not exist'],
   );
 });

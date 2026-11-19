@@ -34,7 +34,7 @@ import { registerFeatureMapTests } from 'bugyo/vitest';
 registerFeatureMapTests();
 ```
 
-`@playwright/test` and `vitest` are optional peer dependencies; `node-lib` installs neither. The verify output and the result of `bugyo task done` are in English by default; set `"locale": "ja"` in `.bugyo/config.json` for Japanese. The rest of the CLI output is in Japanese for now.
+`@playwright/test` and `vitest` are optional peer dependencies; `node-lib` installs neither. The CLI output is in English by default; set `"locale": "ja"` in `.bugyo/config.json` or `BUGYO_LOCALE=ja` for Japanese.
 
 How it all works and every option are in [docs/foundation.md](https://github.com/khrtz/bugyo/blob/main/docs/foundation.md); adding bugyo to an existing project is in [docs/adopt.md](https://github.com/khrtz/bugyo/blob/main/docs/adopt.md) (both in Japanese).
 

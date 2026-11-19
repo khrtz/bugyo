@@ -5,7 +5,7 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import { joinList, messagesFor, resolveLocale } from './messages.js';
+import { joinList, messagesFor, resolveLocale, say } from './messages.js';
 import { noCommentsFor } from './rules/no-comments.js';
 
 /**
@@ -83,15 +83,20 @@ const banKeys = new Set(['name', 'scope', 'allow', 'imports', 'globals', 'syntax
 export function normalizeBan(spec) {
   const name = spec.name;
   if (typeof name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(name)) {
-    throw new Error(`禁止の name は小文字・数字・ハイフンにしてください（例: no-date-now）: ${String(name)}`);
+    throw new Error(say({ en: `A ban name must use lowercase letters, digits, and hyphens (e.g. no-date-now): ${String(name)}`, ja: `禁止の name は小文字・数字・ハイフンにしてください（例: no-date-now）: ${String(name)}` }));
   }
   const unknown = Object.keys(spec).filter((key) => !banKeys.has(key));
-  if (unknown.length > 0) throw new Error(`禁止 ${name} に知らない項目があります: ${unknown.join(', ')}（使えるのは ${[...banKeys].join(', ')}）`);
+  if (unknown.length > 0) throw new Error(
+      say({
+        en: `The ban ${name} has unknown keys: ${unknown.join(', ')} (allowed: ${[...banKeys].join(', ')})`,
+        ja: `禁止 ${name} に知らない項目があります: ${unknown.join(', ')}（使えるのは ${[...banKeys].join(', ')}）`,
+      }),
+    );
   const scope = spec.scope ?? 'src';
-  if (typeof scope !== 'string' || scope === '') throw new Error(`禁止 ${name} の scope は ${namedScopes.join(' / ')} か glob の文字列です`);
+  if (typeof scope !== 'string' || scope === '') throw new Error(say({ en: `The scope of the ban ${name} is ${namedScopes.join(' / ')} or a glob string`, ja: `禁止 ${name} の scope は ${namedScopes.join(' / ')} か glob の文字列です` }));
   const allow = spec.allow ?? [];
   if (!Array.isArray(allow) || allow.some((place) => typeof place !== 'string' || place === '')) {
-    throw new Error(`禁止 ${name} の allow は、${namedPlaces.join(' / ')} か glob の文字列の配列です`);
+    throw new Error(say({ en: `The allow of the ban ${name} is an array of ${namedPlaces.join(' / ')} or glob strings`, ja: `禁止 ${name} の allow は、${namedPlaces.join(' / ')} か glob の文字列の配列です` }));
   }
   const ban = {
     name,
@@ -114,15 +119,21 @@ export function normalizeBan(spec) {
     const index = list.findIndex((value) => !hasMessage(value));
     if (index !== -1) {
       throw new Error(
-        `禁止 ${name} の ${key}[${String(index)}] に message がありません。止めた相手が次に何をすればよいか（代わりに使うものと置き場所）を message に書いてください（例: { name: 'moment', message: 'src/shared/lib/date.ts の formatDate を使ってください' }）`,
+        say({
+          en: `${key}[${String(index)}] of the ban ${name} has no message. Write in message what to do next: what to use instead and where it lives (e.g. { name: 'moment', message: 'Use formatDate from src/shared/lib/date.ts' })`,
+          ja: `禁止 ${name} の ${key}[${String(index)}] に message がありません。止めた相手が次に何をすればよいか（代わりに使うものと置き場所）を message に書いてください（例: { name: 'moment', message: 'src/shared/lib/date.ts の formatDate を使ってください' }）`,
+        }),
       );
     }
   }
   const combinedSize = ban.imports.paths.length + ban.imports.patterns.length + ban.globals.length + ban.syntax.length + ban.properties.length;
-  if (combinedSize + Object.keys(ban.rules).length === 0) throw new Error(`禁止 ${name} は何も止めていません。imports・globals・syntax・properties・rules のどれかを書いてください`);
+  if (combinedSize + Object.keys(ban.rules).length === 0) throw new Error(say({ en: `The ban ${name} stops nothing. Write one of imports, globals, syntax, properties, or rules`, ja: `禁止 ${name} は何も止めていません。imports・globals・syntax・properties・rules のどれかを書いてください` }));
   if (combinedSize > 0 && !namedScopes.includes(scope)) {
     throw new Error(
-      `禁止 ${name}: imports・globals・syntax・properties は、scope を ${namedScopes.join(' / ')} のどれかにしてください（glob の範囲では、bugyo の禁止と合成したルールが上書きし合うため）。範囲を絞るなら、scope は src のまま allow で除くか、rules で書いてください`,
+      say({
+        en: `The ban ${name}: imports, globals, syntax, and properties need a scope of ${namedScopes.join(' / ')} (in a glob scope, the combined rule would override bugyo's bans). To narrow the range, keep scope src and exclude with allow, or write it in rules`,
+        ja: `禁止 ${name}: imports・globals・syntax・properties は、scope を ${namedScopes.join(' / ')} のどれかにしてください（glob の範囲では、bugyo の禁止と合成したルールが上書きし合うため）。範囲を絞るなら、scope は src のまま allow で除くか、rules で書いてください`,
+      }),
     );
   }
   return ban;
@@ -138,9 +149,9 @@ export function normalizeBan(spec) {
 export function defineBan(spec) {
   const { build, ...rest } = spec;
   if (typeof rest.name !== 'string' || !/^[a-z][a-z0-9-]*$/.test(rest.name)) {
-    throw new Error(`禁止の name は小文字・数字・ハイフンにしてください（例: no-date-now）: ${String(rest.name)}`);
+    throw new Error(say({ en: `A ban name must use lowercase letters, digits, and hyphens (e.g. no-date-now): ${String(rest.name)}`, ja: `禁止の name は小文字・数字・ハイフンにしてください（例: no-date-now）: ${String(rest.name)}` }));
   }
-  if (build !== undefined && typeof build !== 'function') throw new Error(`禁止 ${rest.name} の build は関数です`);
+  if (build !== undefined && typeof build !== 'function') throw new Error(say({ en: `The build of the ban ${rest.name} must be a function`, ja: `禁止 ${rest.name} の build は関数です` }));
   return {
     name: rest.name,
     rank: 10,
@@ -325,7 +336,7 @@ export function resolveLayers(src, layers) {
   const names = (/** @type {string} */ role, /** @type {string[] | undefined} */ value) => {
     const list = value ?? [role];
     if (!Array.isArray(list) || list.length === 0 || list.some((name) => typeof name !== 'string' || !/^[A-Za-z0-9._-]+$/.test(name) || /^\.{1,2}$/.test(name))) {
-      throw new Error(`bugyo({ layers }) の featureParts.${role} は、feature の中のフォルダ名（/ を含まない）の配列にしてください`);
+      throw new Error(say({ en: `featureParts.${role} of bugyo({ layers }) must be an array of folder names inside a feature (no /)`, ja: `bugyo({ layers }) の featureParts.${role} は、feature の中のフォルダ名（/ を含まない）の配列にしてください` }));
     }
     return [...list];
   };
@@ -338,14 +349,19 @@ export function resolveLayers(src, layers) {
     if (value === undefined) return fallback;
     const list = typeof value === 'string' ? [value] : value;
     if (!Array.isArray(list) || (fallback.length > 0 && list.length === 0) || list.some((dir) => typeof dir !== 'string' || dir === '')) {
-      throw new Error(`bugyo({ layers }) の shared.${role} は、フォルダ1つか、フォルダの空でない配列にしてください`);
+      throw new Error(say({ en: `shared.${role} of bugyo({ layers }) must be one folder or a non-empty array of folders`, ja: `bugyo({ layers }) の shared.${role} は、フォルダ1つか、フォルダの空でない配列にしてください` }));
     }
     return list.map(trimSlash);
   };
   const featureParts = { ui: names('ui', parts?.ui), api: names('api', parts?.api), model: names('model', parts?.model) };
   const all = [...featureParts.ui, ...featureParts.api, ...featureParts.model];
   const twice = all.filter((name, index) => all.indexOf(name) !== index);
-  if (twice.length > 0) throw new Error(`bugyo({ layers }) の featureParts で ${[...new Set(twice)].join(', ')} が2つの役割に入っています。1つのフォルダは1つの役割にしてください`);
+  if (twice.length > 0) throw new Error(
+      say({
+        en: `In featureParts of bugyo({ layers }), ${[...new Set(twice)].join(', ')} has two roles. Give each folder one role`,
+        ja: `bugyo({ layers }) の featureParts で ${[...new Set(twice)].join(', ')} が2つの役割に入っています。1つのフォルダは1つの役割にしてください`,
+      }),
+    );
   const resolved = {
     app: trimSlash(layers?.app ?? `${src}/app`),
     features: trimSlash(layers?.features ?? `${src}/features`),
@@ -359,7 +375,12 @@ export function resolveLayers(src, layers) {
     featureParts,
   };
   const outside = [resolved.app, resolved.features, ...Object.values(resolved.shared).flat()].filter((dir) => !dir.startsWith(`${src}/`));
-  if (outside.length > 0) throw new Error(`bugyo({ layers }) の ${outside.join(', ')} が src（${src}）の中にありません。src に層をまとめて入れるフォルダを渡してください`);
+  if (outside.length > 0) throw new Error(
+      say({
+        en: `${outside.join(', ')} of bugyo({ layers }) is not inside src (${src}). Pass as src the folder that holds all the layers`,
+        ja: `bugyo({ layers }) の ${outside.join(', ')} が src（${src}）の中にありません。src に層をまとめて入れるフォルダを渡してください`,
+      }),
+    );
   return resolved;
 }
 
@@ -436,7 +457,7 @@ const sourceKeys = ['src', 'layers', 'parts', 'tsconfig', 'explicitExtensions', 
  */
 function prepareSource(root, ignores, locale, source) {
   const { src = 'src', parts = [common, structure], explicitExtensions = false, tsconfig = 'tsconfig.json' } = source;
-  if (!parts.includes(common)) throw new Error('bugyo({ parts }) には common を必ず入れてください');
+  if (!parts.includes(common)) throw new Error(say({ en: 'bugyo({ parts }) must include common', ja: 'bugyo({ parts }) には common を必ず入れてください' }));
   const layers = resolveLayers(src, source.layers);
   const effectsDirs = source.effectHooksDir === undefined ? layers.shared.lib : [trimSlash(source.effectHooksDir)];
   const apiDirs = source.apiClientDir === undefined ? layers.shared.api : [trimSlash(source.apiClientDir)];
@@ -462,7 +483,7 @@ function prepareSource(root, ignores, locale, source) {
   const seen = new Map();
   for (const ban of bans) seen.set(ban.name, (seen.get(ban.name) ?? 0) + 1);
   const duplicated = [...seen].filter(([, count]) => count > 1).map(([name]) => name);
-  if (duplicated.length > 0) throw new Error(`同じ名前の禁止が2つ以上あります: ${duplicated.join(', ')}。名前を変えてください`);
+  if (duplicated.length > 0) throw new Error(say({ en: `More than one ban has the same name: ${duplicated.join(', ')}. Rename them`, ja: `同じ名前の禁止が2つ以上あります: ${duplicated.join(', ')}。名前を変えてください` }));
   return { context, parts: sorted, built, bans, effectsDirs, apiDirs };
 }
 
@@ -477,26 +498,26 @@ function prepareSource(root, ignores, locale, source) {
  */
 export function bugyo(options) {
   const { root, ignores = [] } = options;
-  if (typeof root !== 'string') throw new Error('bugyo({ root }) に import.meta.dirname を渡してください');
+  if (typeof root !== 'string') throw new Error(say({ en: 'Pass import.meta.dirname to bugyo({ root })', ja: 'bugyo({ root }) に import.meta.dirname を渡してください' }));
   if ('extra' in options) {
-    throw new Error('bugyo({ extra }) はありません。独自の禁止は defineBan({ name, ... }) で作り、parts に足してください');
+    throw new Error(say({ en: 'There is no bugyo({ extra }). Write your own bans with defineBan({ name, ... }) and add them to parts', ja: 'bugyo({ extra }) はありません。独自の禁止は defineBan({ name, ... }) で作り、parts に足してください' }));
   }
   const multi = options.sources !== undefined;
   if (multi) {
     const mixed = sourceKeys.filter((key) => key in options);
-    if (mixed.length > 0) throw new Error(`bugyo({ sources }) を使うときは、${mixed.join(', ')} を sources のそれぞれに書いてください`);
-    if (!Array.isArray(options.sources) || options.sources.length === 0) throw new Error('bugyo({ sources }) には、ソースを1つ以上の配列で渡してください');
+    if (mixed.length > 0) throw new Error(say({ en: `With bugyo({ sources }), write ${mixed.join(', ')} inside each source`, ja: `bugyo({ sources }) を使うときは、${mixed.join(', ')} を sources のそれぞれに書いてください` }));
+    if (!Array.isArray(options.sources) || options.sources.length === 0) throw new Error(say({ en: 'Pass bugyo({ sources }) an array of one or more sources', ja: 'bugyo({ sources }) には、ソースを1つ以上の配列で渡してください' }));
   }
   const locale = resolveLocale(root, options.locale);
   const prepared = (options.sources ?? [options]).map((source) => prepareSource(root, ignores, locale, source));
   const srcs = prepared.map(({ context }) => context.src);
   const nested = srcs.filter((src, index) => srcs.some((other, at) => at !== index && (other === src || src.startsWith(`${other}/`))));
-  if (nested.length > 0) throw new Error(`bugyo({ sources }) の src が重なっています: ${nested.join(', ')}。ソースごとに別のフォルダにしてください`);
+  if (nested.length > 0) throw new Error(say({ en: `The src of bugyo({ sources }) overlap: ${nested.join(', ')}. Use a separate folder for each source`, ja: `bugyo({ sources }) の src が重なっています: ${nested.join(', ')}。ソースごとに別のフォルダにしてください` }));
 
   const banNames = new Set(prepared.flatMap(({ bans }) => bans.map((ban) => ban.name)));
   const severity = options.severity ?? {};
   for (const [name, level] of Object.entries(severity)) {
-    if (level !== 'warn') throw new Error(`bugyo({ severity }) で下げられるのは 'warn' だけです（${name}: ${String(level)}）`);
+    if (level !== 'warn') throw new Error(say({ en: `bugyo({ severity }) can only lower to 'warn' (${name}: ${String(level)})`, ja: `bugyo({ severity }) で下げられるのは 'warn' だけです（${name}: ${String(level)}）` }));
   }
   const warned = new Set(Object.keys(severity).filter((name) => banNames.has(name)));
   const alias = prepared.some(({ bans }) => entriesOf(bans).some((entry) => warned.has(entry.name)));
@@ -694,7 +715,10 @@ function lowerRules(configs, ruleIds, banNames) {
   const unknown = ruleIds.filter((id) => !known.has(id));
   if (unknown.length > 0) {
     throw new Error(
-      `bugyo({ severity }) の ${unknown.join(', ')} は、禁止の名前（${[...banNames].sort().join(', ')}）でも、設定にあるルール ID でもありません`,
+      say({
+        en: `${unknown.join(', ')} in bugyo({ severity }) is neither a ban name (${[...banNames].sort().join(', ')}) nor a rule ID in the config`,
+        ja: `bugyo({ severity }) の ${unknown.join(', ')} は、禁止の名前（${[...banNames].sort().join(', ')}）でも、設定にあるルール ID でもありません`,
+      }),
     );
   }
   const lowered = new Set(ruleIds);

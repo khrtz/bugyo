@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from 'node:path';
 import { z } from 'zod';
 import { parseFrontmatter, stringifyFrontmatter } from './frontmatter.js';
+import { tr } from './locale.js';
 
 export const mistakesDir = '.bugyo/mistakes';
 
@@ -46,7 +47,7 @@ export function loadMistakes(cwd = process.cwd()) {
       const file = `${mistakesDir}/${name}`;
       const { fields, body } = parseFrontmatter(file, readFileSync(join(dir, name), 'utf8'));
       const parsed = Fields.safeParse(fields);
-      if (!parsed.success) throw new Error(`${file}: frontmatter が不正です: ${parsed.error.message}`);
+      if (!parsed.success) throw new Error(tr({ en: `${file}: invalid frontmatter: ${parsed.error.message}`, ja: `${file}: frontmatter が不正です: ${parsed.error.message}` }));
       return { kind: name.replace(/\.md$/, ''), count: parsed.data.count, rule: parsed.data.rule, ruleName: parsed.data['rule-name'], ruledCount: parsed.data['ruled-count'], body, file };
     });
 }
@@ -109,9 +110,9 @@ export function recordMistake(cwd, kind, entry) {
  */
 export function recordRule(cwd, kind, at, name) {
   const mistake = loadMistakes(cwd).find((candidate) => candidate.kind === kind);
-  if (mistake === undefined) throw new Error(`ミスの種類 ${kind} はまだ記録されていません`);
-  if (!existsSync(join(cwd, at))) throw new Error(`${at} がありません。ルールを書いたファイルを --at に渡してください`);
-  if (name !== undefined && !ruleNamePattern.test(name)) throw new Error(`ルールの名前 ${name} は、英数字か @ で始め、英数字と @ . _ : / - だけにしてください`);
+  if (mistake === undefined) throw new Error(tr({ en: `The mistake kind ${kind} has not been recorded`, ja: `ミスの種類 ${kind} はまだ記録されていません` }));
+  if (!existsSync(join(cwd, at))) throw new Error(tr({ en: `${at} does not exist. Pass the file that holds the rule to --at`, ja: `${at} がありません。ルールを書いたファイルを --at に渡してください` }));
+  if (name !== undefined && !ruleNamePattern.test(name)) throw new Error(tr({ en: `The rule name ${name} must start with a letter, digit, or @ and use only letters, digits, and @ . _ : / -`, ja: `ルールの名前 ${name} は、英数字か @ で始め、英数字と @ . _ : / - だけにしてください` }));
   const ruled = { ...mistake, rule: at.split('\\').join('/'), ruleName: name, ruledCount: mistake.count };
   save(cwd, ruled);
   return ruled;
@@ -121,9 +122,18 @@ export function recordRule(cwd, kind, at, name) {
 export function mistakeLine(mistake) {
   const state = mistakeState(mistake);
   const where = mistake.ruleName === undefined ? mistake.rule : `${mistake.ruleName}（${mistake.rule}）`;
-  const rule = mistake.rule === '' ? 'ルール: なし' : `ルール: ${where}  ルール化のとき ${String(mistake.ruledCount ?? 0)}回`;
-  const note = { leak: '  ← ルールが漏れている（ルール化のあとにまた起きた）', unruled: '  ← ルール化が必要', ruled: '', once: '' }[state];
-  return `${mistake.kind} ${mistake.count}回  ${rule}${note}`;
+  const ruled = String(mistake.ruledCount ?? 0);
+  const rule =
+    mistake.rule === ''
+      ? tr({ en: 'rule: none', ja: 'ルール: なし' })
+      : tr({ en: `rule: ${where}  ${ruled} when ruled`, ja: `ルール: ${where}  ルール化のとき ${ruled}回` });
+  const note = {
+    leak: tr({ en: '  ← the rule leaks (it happened again after the rule)', ja: '  ← ルールが漏れている（ルール化のあとにまた起きた）' }),
+    unruled: tr({ en: '  ← needs a rule', ja: '  ← ルール化が必要' }),
+    ruled: '',
+    once: '',
+  }[state];
+  return `${mistake.kind} ${tr({ en: `${mistake.count}x`, ja: `${mistake.count}回` })}  ${rule}${note}`;
 }
 
 /**
@@ -139,7 +149,10 @@ export function mistakeSummary(mistakes) {
 
 /** @param {ReturnType<typeof mistakeSummary>} summary */
 export function mistakeSummaryLine(summary) {
-  return `ミス ${summary.kinds}種類  ルール化済み ${summary.ruled}種類（うちルールが漏れている ${summary.leak}種類）  ルール化が必要 ${summary.unruled}種類  1回だけ ${summary.once}種類`;
+  return tr({
+    en: `mistakes: ${summary.kinds} kinds  ruled ${summary.ruled} (rule leaks: ${summary.leak})  needs a rule ${summary.unruled}  once ${summary.once}`,
+    ja: `ミス ${summary.kinds}種類  ルール化済み ${summary.ruled}種類（うちルールが漏れている ${summary.leak}種類）  ルール化が必要 ${summary.unruled}種類  1回だけ ${summary.once}種類`,
+  });
 }
 
 /** @param {Mistake} mistake */

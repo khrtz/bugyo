@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { z } from 'zod';
 import { parseFrontmatter, stringifyFrontmatter } from './frontmatter.js';
+import { tr } from './locale.js';
 
 export const tasksDir = '.bugyo/tasks';
 export const archiveDir = `${tasksDir}/archive`;
@@ -18,11 +19,11 @@ const idPattern = /^t-\d{3,}$/;
  * 先頭は英数字に限る（先頭の `#` はシェルでコメントに、`-` はオプションになるため）
  */
 export const issuePattern = /^[A-Za-z0-9][A-Za-z0-9#._:/-]*$/;
-/** 作業したモデルとハーネスの名前（`claude-opus-5-5`、`claude-code` など）。frontmatter の1行に収まる文字だけ */
+/** 作業したモデルとハーネスの名前（`model-a`、`cli` など）。frontmatter の1行に収まる文字だけ */
 export const agentNamePattern = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$/;
 const count = z
   .string()
-  .regex(/^\d+$/, '0 以上の整数にしてください')
+  .regex(/^\d+$/, { error: () => tr({ en: 'must be an integer of 0 or more', ja: '0 以上の整数にしてください' }) })
   .transform((value) => Number(value));
 
 /** frontmatter に書ける項目。順番は書き出すときの順番 */
@@ -31,7 +32,10 @@ const Fields = z
     status: z.enum(statuses),
     type: z.enum(types),
     feature: z.string().default(''),
-    issue: z.string().regex(issuePattern, '英数字で始め、英数字と # . _ : / - だけにしてください').optional(),
+    issue: z
+      .string()
+      .regex(issuePattern, { error: () => tr({ en: 'must start with a letter or digit and use only letters, digits, and # . _ : / -', ja: '英数字で始め、英数字と # . _ : / - だけにしてください' }) })
+      .optional(),
     'blocked-by': z
       .string()
       .default('')
@@ -41,10 +45,10 @@ const Fields = z
           .map((id) => id.trim())
           .filter((id) => id !== ''),
       )
-      .refine((ids) => ids.every((id) => idPattern.test(id)), 't-001 の形の id をカンマで区切ってください'),
+      .refine((ids) => ids.every((id) => idPattern.test(id)), { error: () => tr({ en: 'list ids like t-001, separated by commas', ja: 't-001 の形の id をカンマで区切ってください' }) }),
     assignee: z.string().default(''),
-    model: z.string().regex(agentNamePattern, '英数字で始め、英数字と . _ : / @ + - だけにしてください').optional(),
-    harness: z.string().regex(agentNamePattern, '英数字で始め、英数字と . _ : / @ + - だけにしてください').optional(),
+    model: z.string().regex(agentNamePattern, { error: () => tr({ en: 'must start with a letter or digit and use only letters, digits, and . _ : / @ + -', ja: '英数字で始め、英数字と . _ : / @ + - だけにしてください' }) }).optional(),
+    harness: z.string().regex(agentNamePattern, { error: () => tr({ en: 'must start with a letter or digit and use only letters, digits, and . _ : / @ + -', ja: '英数字で始め、英数字と . _ : / @ + - だけにしてください' }) }).optional(),
     rework: count.default(0),
     'gate-attempts': count.default(0),
     created: z.string().default(''),
@@ -82,7 +86,10 @@ function readTask(cwd, file) {
   const id = file.split('/').pop()?.replace(/\.md$/, '') ?? '';
   const { fields, body } = parseFrontmatter(file, readFileSync(join(cwd, file), 'utf8'));
   const parsed = Fields.safeParse(fields);
-  if (!parsed.success) throw new Error(`${file}: frontmatter が不正です: ${parsed.error.issues.map((issue) => `${issue.path.join('.')} ${issue.message}`).join('; ')}`);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((issue) => `${issue.path.join('.')} ${issue.message}`).join('; ');
+    throw new Error(tr({ en: `${file}: invalid frontmatter: ${issues}`, ja: `${file}: frontmatter が不正です: ${issues}` }));
+  }
   const title = /^# (.+)$/m.exec(body)?.[1]?.trim() ?? '';
   return { ...parsed.data, id, title, body, file, archived: file.startsWith(`${archiveDir}/`) };
 }
@@ -126,7 +133,7 @@ export function readLedger(cwd = process.cwd()) {
  */
 export function loadTasks(cwd = process.cwd()) {
   const { tasks, errors } = readLedger(cwd);
-  if (errors.length > 0) throw new Error(`台帳を読めません（bugyo task lint で確かめてください）:\n${errors.join('\n')}`);
+  if (errors.length > 0) throw new Error(`${tr({ en: 'Cannot read the ledger (check it with bugyo task lint):', ja: '台帳を読めません（bugyo task lint で確かめてください）:' })}\n${errors.join('\n')}`);
   return tasks;
 }
 
@@ -136,7 +143,7 @@ export function loadTasks(cwd = process.cwd()) {
  */
 export function findTask(tasks, id) {
   const task = tasks.find((candidate) => candidate.id === id);
-  if (task === undefined) throw new Error(`タスク ${id} はありません`);
+  if (task === undefined) throw new Error(tr({ en: `There is no task ${id}`, ja: `タスク ${id} はありません` }));
   return task;
 }
 
@@ -200,10 +207,10 @@ export function openBlockers(task, tasks) {
 /** @param {Task} task */
 export function taskLine(task) {
   const extras = [
-    task.feature === '' ? '' : `機能: ${task.feature}`,
-    task.issue === undefined ? '' : `課題: ${task.issue}`,
-    task.assignee === '' ? '' : `担当: ${task.assignee}`,
-    task['blocked-by'].length === 0 ? '' : `待ち: ${task['blocked-by'].join(',')}`,
+    task.feature === '' ? '' : tr({ en: 'feature: ', ja: '機能: ' }) + task.feature,
+    task.issue === undefined ? '' : tr({ en: 'issue: ', ja: '課題: ' }) + task.issue,
+    task.assignee === '' ? '' : tr({ en: 'assignee: ', ja: '担当: ' }) + task.assignee,
+    task['blocked-by'].length === 0 ? '' : tr({ en: 'blocked by: ', ja: '待ち: ' }) + task['blocked-by'].join(','),
   ].filter((extra) => extra !== '');
   return `${task.id} [${task.status}/${task.type}] ${task.title}${extras.length === 0 ? '' : `  (${extras.join(', ')})`}`;
 }
