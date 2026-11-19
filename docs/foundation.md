@@ -648,4 +648,4 @@ spec: e2e/invoices.spec.ts, server/tests/invoices.test.ts
 
 ## Claude Code プラグイン
 
-進め方の助言は [plugin](../plugin) のスキルが受け持ちます。必ず守らせたいことはスキルに書かず、上の lint・テスト・検証で止めます。スキルは呼ばれないことがあるからです。
+進め方の助言は [plugin](../plugin/README.ja.md) のスキルが受け持ちます。必ず守らせたいことはスキルに書かず、上の lint・テスト・検証で止めます。スキルは呼ばれないことがあるからです。
