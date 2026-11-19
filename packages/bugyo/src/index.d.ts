@@ -25,7 +25,7 @@ export function loadSweepOrder(cwd?: string): string[];
 export interface BugyoConfig {
   /** bugyo init で使ったテンプレートの名前。bugyo new feature が生成物を選ぶ */
   template?: string | undefined;
-  /** パッケージマネージャー。書かなければ package.json の packageManager か lockfile から決める（見つからなければ pnpm）。commands の既定を選ぶ */
+  /** パッケージマネージャー。書かなければ package.json の packageManager か lockfile から決める（見つからなければ npm）。commands の既定を選ぶ */
   packageManager: 'pnpm' | 'npm' | 'yarn' | 'bun';
   /**
    * bugyo doctor と bugyo baseline で数える、外の lint の結果（SARIF）。`command` があれば実行してから `file` を読む。

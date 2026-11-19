@@ -67,7 +67,7 @@ Agents use four: `ready` → `start` → `show` → `done`. The output is one li
 
 | Command | Used by | What it does |
 | --- | --- | --- |
-| `bugyo task add "<title>" --type <type> [--feature <id>] [--issue <ref>] [--blocked-by <id,...>] [--body "<body>"]` | people, agents | Creates a task. Refuses a `--feature` that is not in the feature map. `--feature` is required for `feature`, `ui-flow`, `ui-look`, and `logic`. Refuses a `--blocked-by` that does not exist. `--issue` starts with a letter or digit and uses only letters, digits, and `# . _ : / -` (a leading `#` starts a comment in the shell, so write `123`, not `#123`) |
+| `bugyo task add "<title>" --type <type> [--feature <id>] [--issue <ref>] [--blocked-by <id,...>] [--body "<body>"]` | people, agents | Creates a task. Refuses a `--feature` that is not in the feature map. `--feature` is required for `feature`, `ui-flow`, `ui-look`, and `logic`. In projects without feature folders (`featureMap.featuresDir` is `null`), `logic` is refused because it could never close. Refuses a `--blocked-by` that does not exist. `--issue` starts with a letter or digit and uses only letters, digits, and `# . _ : / -` (a leading `#` starts a comment in the shell, so write `123`, not `#123`) |
 | `bugyo task ready` | agents | Lists open tasks whose `blocked-by` are all `done`, in creation order |
 | `bugyo task start <id> --as <name> [--model <model>] [--harness <harness>]` | agents | Marks it in progress. Refuses if someone is already on it, if the same name is on another task, or if its `blocked-by` are not done |
 | `bugyo task show <id>` | agents | Prints the body, the feature map to read, and what done requires |

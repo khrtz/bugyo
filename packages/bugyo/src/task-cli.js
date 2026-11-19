@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { configFile, featureRoots, loadConfig, taskCommands } from './config.js';
 import { cliLocale, cliMessages, tr } from './locale.js';
@@ -751,7 +751,7 @@ export function statsCommand(args, cwd = process.cwd()) {
     const file = required(values.export, tr({ en: 'Pass the file to write to --export <file>', ja: '--export <ファイル> に、書き出す先を渡してください' }));
     const commands = Object.fromEntries(Object.entries(taskCommands(loadConfig(cwd))).filter((entry) => entry[1] !== undefined));
     const data = { format: statsFormat.name, version: statsFormat.version, project: projectName(cwd), exportedAt: now(), commands, rows };
-    writeFileSync(join(cwd, file), `${JSON.stringify(data, null, 2)}\n`);
+    writeFileSync(resolve(cwd, file), `${JSON.stringify(data, null, 2)}\n`);
     print(values.json, [tr({ en: `stats: wrote ${rows.length} rows to ${file}`, ja: `stats: ${rows.length}行を ${file} に書き出しました` })], { file, rows: rows.length });
     return 0;
   }
@@ -828,7 +828,7 @@ function projectName(cwd) {
 function compareStats(files, json, cwd) {
   if (files.length === 0) throw new UsageError(tr({ en: 'Usage: bugyo stats --compare <file>...', ja: '使い方: bugyo stats --compare <ファイル>...' }));
   const exports = files.map((file) => {
-    const path = join(cwd, file);
+    const path = resolve(cwd, file);
     if (!existsSync(path)) throw new Error(tr({ en: `${file} does not exist`, ja: `${file} がありません` }));
     /** @type {unknown} */
     let data;

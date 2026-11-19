@@ -494,6 +494,10 @@ test('stats --export で JSON に書き出し、--compare でいくつものプ�
   assert.equal(exported.commands.check, 'node scripts/check.js');
   assert.equal(exported.rows[0].cost.tokens.sum, 100);
 
+  const absolute = join(b, 'stats-abs.json');
+  assert.equal(bugyo(a, 'stats', '--export', absolute).status, 0, '絶対パスにも書き出せる');
+  assert.equal(JSON.parse(readFileSync(absolute, 'utf8')).format, 'bugyo-stats');
+  assert.match(ok(a, 'stats', '--compare', join(a, 'stats.json'), absolute).stdout, /^stats: 2つのプロジェクトを比べます/m, '絶対パスでも比べられる');
   const other = join(a, 'other.json');
   writeFileSync(other, JSON.stringify({ ...JSON.parse(readFileSync(join(b, 'stats.json'), 'utf8')), project: 'other' }));
   const compared = ok(a, 'stats', '--compare', 'stats.json', 'other.json').stdout;

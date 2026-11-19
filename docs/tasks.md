@@ -75,7 +75,7 @@ frontmatter は `key: value` の1段だけで、feature map と同じ読み方�
 
 | コマンド | 使う人 | すること |
 | --- | --- | --- |
-| `bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]` | 人・エージェント | タスクを作る。`--feature` が feature map になければ断る。`feature` `ui-flow` `ui-look` `logic` では `--feature` が必須。存在しない `--blocked-by` も断る。`--issue` は英数字で始め、英数字と `# . _ : / -` だけ（先頭の `#` はシェルでコメントになるので、`#123` ではなく `123`） |
+| `bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]` | 人・エージェント | タスクを作る。`--feature` が feature map になければ断る。`feature` `ui-flow` `ui-look` `logic` では `--feature` が必須。機能のフォルダがない（`featureMap.featuresDir` が `null`）プロジェクトでは、`logic` は閉じられないので断る。存在しない `--blocked-by` も断る。`--issue` は英数字で始め、英数字と `# . _ : / -` だけ（先頭の `#` はシェルでコメントになるので、`#123` ではなく `123`） |
 | `bugyo task ready` | エージェント | 未着手で、`blocked-by` がすべて `done` のタスクを、作った順に出す |
 | `bugyo task start <id> --as <名前> [--model <モデル>] [--harness <ハーネス>]` | エージェント | 作業中にする。すでに誰かが作業中なら断る。同じ名前で別のタスクが作業中のときも、`blocked-by` が終わっていないときも断る |
 | `bugyo task show <id>` | エージェント | 本文、読むべき feature map、完了に必要なものを出す |

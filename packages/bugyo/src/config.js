@@ -435,7 +435,7 @@ export function commonDir(dirs) {
  * @returns {{ check?: string, test?: string, verify?: string }}
  */
 export function taskCommands(config) {
-  const source = config.commands ?? defaultCommandsBy[config.packageManager ?? 'pnpm'];
+  const source = config.commands ?? defaultCommandsBy[config.packageManager ?? 'npm'];
   return Object.fromEntries(
     Object.entries(source).filter(([, command]) => typeof command === 'string' && command.trim() !== ''),
   );

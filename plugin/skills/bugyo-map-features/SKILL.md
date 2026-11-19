@@ -17,7 +17,7 @@ The feature map tells the next agent what each feature is, how to reach it, how 
 
 Each feature needs a `spec`: a file that really operates the feature and fails when it is broken.
 
-- Prefer an existing E2E test or script that already does this (it must live under `featureMap.specDir` with `featureMap.specSuffix`, or `pnpm test` reports it as unmapped)
+- Prefer an existing E2E test or script that already does this. Any path works for `spec`, but every file under `featureMap.specDir` ending with `featureMap.specSuffix` must belong to some feature, or `pnpm test` reports it as unmapped
 - If there is none, write one in the spec folder. It must exercise the feature from the outside (drive the screen, run the command, call the endpoint), not call internal functions
 - Run `pnpm verify <id>` (or the project's verify command) and see it pass. Then break the feature on purpose once, see it fail, and undo the break
 
