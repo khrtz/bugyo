@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { configFile, loadConfig } from './config.js';
+import { configFile, loadConfig, taskCommands } from './config.js';
 import { cliLocale, cliMessages, tr } from './locale.js';
 import { collectEvidence, requirements, testsHash } from './evidence.js';
 import { featureDir, loadFeatures } from './feature-map.js';
@@ -11,10 +11,11 @@ import { isMistakeKind, loadMistakes, mistakeJson, mistakeLine, mistakeState, mi
 import { claimTask, fetchClaims, listRecords, openClaims, reassignClaim, readRecord, releaseClaim, reserveId } from './claims.js';
 import { changedArchiveIds, duplicateIdsAgainst, notifyVerified, recheckTask } from './recheck.js';
 import { commandExists, ranNoTests, runCommand, tail } from './run.js';
-import { percent, taskStats, wideInterval, wilsonInterval } from './stats.js';
+import { percent, readStatsExport, statsFormat, taskStats, wideInterval, wilsonInterval } from './stats.js';
 import { lintTasks } from './task-lint.js';
 import {
   agentNamePattern,
+  amountPattern,
   evidenceDir,
   findTask,
   isTaskId,
@@ -39,7 +40,8 @@ export const taskUsage = () =>
   bugyo task start <id> --as <name> [--model <model>] [--harness <harness>]  mark as active
   bugyo task show <id>                   the body, what to read, and what done requires
   bugyo task repro <id> [--expect "<text>"] -- <command>  bugfix: record that the test fails before the fix
-  bugyo task done <id> [--model <model>] [--harness <harness>]  collect evidence and close the task if it passes
+  bugyo task done <id> [--model <model>] [--harness <harness>] [--tokens <n>] [--usd <amount>]  collect evidence and close the task if it passes
+                                         (--tokens / --usd: what the work cost since it started or was last reworked)
   bugyo task rework <id> -r "<reason>" --kind <mistake kind> [--as <name>]
   bugyo task drop <id> -r "<reason>"
   bugyo task ls [--all]                  list tasks (--all includes done and dropped)
@@ -51,15 +53,17 @@ export const taskUsage = () =>
   bugyo mistake ls                       mistakes per kind with their rules, and how many kinds became rules
   bugyo mistake rule <kind> --at <path> [--name <rule name>]  record that a mistake became a rule
   bugyo gate [--scope <group>]           decide, per group of task types, whether to widen what agents may do
-  bugyo stats                            results of closed tasks per task type, model, and harness
-  (without --model and --harness, BUGYO_MODEL and BUGYO_HARNESS are used)
+  bugyo stats [--export <file>]          results of closed tasks per task type, model, and harness (--export writes them as JSON)
+  bugyo stats --compare <file>...        compare results exported from several projects
+  (without --model, --harness, --tokens, and --usd, BUGYO_MODEL, BUGYO_HARNESS, BUGYO_TOKENS, and BUGYO_USD are used)
   (every command prints short JSON with --json)`,
     ja: `  bugyo task add "<タイトル>" --type <種類> [--feature <id>] [--issue <参照>] [--blocked-by <id,...>] [--body "<本文>"]
   bugyo task ready                       未着手でブロックされていないタスク
   bugyo task start <id> --as <名前> [--model <モデル>] [--harness <ハーネス>]  作業中にする
   bugyo task show <id>                   本文、読むもの、完了に必要なもの
   bugyo task repro <id> [--expect "<文言>"] -- <コマンド>  bugfix: 直す前に失敗することを記録する
-  bugyo task done <id> [--model <モデル>] [--harness <ハーネス>]  証拠を取り、通れば閉じる
+  bugyo task done <id> [--model <モデル>] [--harness <ハーネス>] [--tokens <数>] [--usd <金額>]  証拠を取り、通れば閉じる
+                                         （--tokens / --usd: 着手か前の手直しから閉じるまでにかかったコスト）
   bugyo task rework <id> -r "<理由>" --kind <ミスの種類> [--as <名前>]
   bugyo task drop <id> -r "<理由>"
   bugyo task ls [--all]                  一覧（--all で完了・中止も）
@@ -71,8 +75,9 @@ export const taskUsage = () =>
   bugyo mistake ls                       ミスの種類ごとの回数とルール、ルール化済みの種類の数
   bugyo mistake rule <種類> --at <パス> [--name <ルールの名前>]  ルールに変えたことを記録する
   bugyo gate [--scope <まとまり>]        任せる範囲を広げてよいかを、作業の種類のまとまりごとに計算する
-  bugyo stats                            閉じたタスクの実績を、作業の種類・モデル・ハーネスごとに出す
-  （--model と --harness を省くと、環境変数 BUGYO_MODEL と BUGYO_HARNESS を使う）
+  bugyo stats [--export <ファイル>]      閉じたタスクの実績を、作業の種類・モデル・ハーネスごとに出す（--export で JSON に書き出す）
+  bugyo stats --compare <ファイル>...    いくつものプロジェクトから書き出した実績を並べて比べる
+  （--model・--harness・--tokens・--usd を省くと、環境変数 BUGYO_MODEL・BUGYO_HARNESS・BUGYO_TOKENS・BUGYO_USD を使う）
   （どれも --json で短い JSON を出す）`,
   });
 
@@ -94,6 +99,10 @@ function parse(args) {
         as: { type: 'string' },
         model: { type: 'string' },
         harness: { type: 'string' },
+        tokens: { type: 'string' },
+        usd: { type: 'string' },
+        export: { type: 'string' },
+        compare: { type: 'boolean' },
         reason: { type: 'string', short: 'r' },
         kind: { type: 'string' },
         at: { type: 'string' },
@@ -336,6 +345,32 @@ function agentOf(values, task) {
 }
 
 /**
+ * 閉じるまでにかかったコスト。--tokens / --usd、なければ環境変数 BUGYO_TOKENS / BUGYO_USD。
+ * 閉じたときだけ、タスクに記録済みの値に足す（手直しのあとにまた閉じれば、その分も足す）。
+ *
+ * @param {{ tokens?: string | undefined, usd?: string | undefined }} values
+ * @param {import('./tasks.js').Task} task
+ * @returns {{ 'cost-tokens'?: number, 'cost-usd'?: string }}
+ */
+function costOf(values, task) {
+  const tokens = values.tokens?.trim() || process.env['BUGYO_TOKENS']?.trim() || undefined;
+  const usd = values.usd?.trim() || process.env['BUGYO_USD']?.trim() || undefined;
+  if (tokens !== undefined && !/^\d+$/.test(tokens)) throw new UsageError(tr({ en: `--tokens "${tokens}" must be an integer of 0 or more`, ja: `--tokens の "${tokens}" は 0 以上の整数にしてください` }));
+  if (usd !== undefined && !amountPattern.test(usd)) throw new UsageError(tr({ en: `--usd "${usd}" must be a decimal number of 0 or more`, ja: `--usd の "${usd}" は 0 以上の10進数にしてください` }));
+  const added = (/** @type {string | undefined} */ recorded, /** @type {string} */ value) => {
+    const digits = Math.max(decimals(recorded ?? '0'), decimals(value));
+    return (Number(recorded ?? '0') + Number(value)).toFixed(digits);
+  };
+  return {
+    ...(tokens === undefined ? {} : { 'cost-tokens': (task['cost-tokens'] ?? 0) + Number(tokens) }),
+    ...(usd === undefined ? {} : { 'cost-usd': added(task['cost-usd'], usd) }),
+  };
+}
+
+/** @param {string} value */
+const decimals = (value) => value.split('.')[1]?.length ?? 0;
+
+/**
  * @param {string[]} args
  * @param {string} cwd
  */
@@ -344,6 +379,7 @@ function done(args, cwd) {
   const id = required(positionals[0], tr({ en: 'Usage: bugyo task done <id>', ja: '使い方: bugyo task done <id>' }));
   const config = loadConfig(cwd);
   const task = findTask(loadTasks(cwd), id);
+  const cost = costOf(values, task);
   if (task.status === 'open') throw new Error(tr({ en: `${id} is still open. Run bugyo task start ${id} --as <name> first`, ja: `${id} はまだ open です。先に bugyo task start ${id} --as <名前>` }));
   if (task.status !== 'active') throw new Error(tr({ en: `${id} is ${task.status}. Only active tasks can be done`, ja: `${id} は ${task.status} です。done にできるのは active のタスクだけです` }));
   const missing = requirements(task, config).filter((step) => step.kind === 'command' && step.name !== 'repro' && step.command === undefined);
@@ -365,6 +401,7 @@ function done(args, cwd) {
   }
   const closed = saveTask(cwd, {
     ...attempt,
+    ...cost,
     status: 'done',
     'evidence-file': outcome.file,
     'evidence-tree': outcome.tree,
@@ -699,9 +736,17 @@ function gateWarnings(scopes) {
  * @param {string} [cwd]
  */
 export function statsCommand(args, cwd = process.cwd()) {
-  const { values } = parse(args);
+  const { values, positionals } = parse(args);
+  if (values.compare) return compareStats(positionals, values.json, cwd);
   const rows = taskStats(loadTasks(cwd));
-  const rate = (/** @type {number} */ part, /** @type {number} */ whole) => (whole === 0 ? '-' : percent(part / whole));
+  if (values.export !== undefined) {
+    const file = required(values.export, tr({ en: 'Pass the file to write to --export <file>', ja: '--export <ファイル> に、書き出す先を渡してください' }));
+    const commands = Object.fromEntries(Object.entries(taskCommands(loadConfig(cwd))).filter((entry) => entry[1] !== undefined));
+    const data = { format: statsFormat.name, version: statsFormat.version, project: projectName(cwd), exportedAt: now(), commands, rows };
+    writeFileSync(join(cwd, file), `${JSON.stringify(data, null, 2)}\n`);
+    print(values.json, [tr({ en: `stats: wrote ${rows.length} rows to ${file}`, ja: `stats: ${rows.length}行を ${file} に書き出しました` })], { file, rows: rows.length });
+    return 0;
+  }
   const lines =
     rows.length === 0
       ? [tr({ en: 'stats: no closed tasks yet', ja: 'stats: 閉じたタスクはまだありません' })]
@@ -710,16 +755,101 @@ export function statsCommand(args, cwd = process.cwd()) {
             en: 'stats: results of closed tasks (done and dropped). First pass and rework are shares of done tasks; dropped is a share of closed tasks',
             ja: 'stats: 閉じたタスク（完了と中止）の実績。1回で通った・手直しは完了の中の割合、中止は閉じたタスクの中の割合',
           }),
-          ...rows.map((row) => {
-            const low = percent(row.firstPassInterval.low);
-            const high = percent(row.firstPassInterval.high);
-            return tr({
-              en: `  ${row.type}  model: ${row.model}  harness: ${row.harness}  closed ${row.closed}  first pass ${rate(row.firstPass, row.done)}${row.done === 0 ? '' : ` (95% interval ${low}–${high})`}  rework ${rate(row.reworked, row.done)}  dropped ${rate(row.dropped, row.closed)}`,
-              ja: `  ${row.type}  モデル: ${row.model}  ハーネス: ${row.harness}  閉じた ${row.closed}件  1回で通った ${rate(row.firstPass, row.done)}${row.done === 0 ? '' : `（95% 区間 ${low}〜${high}）`}  手直し ${rate(row.reworked, row.done)}  中止 ${rate(row.dropped, row.closed)}`,
-            });
-          }),
+          ...rows.flatMap((row) => statsLines(row, '')),
         ];
   print(values.json, lines, { rows });
+  return 0;
+}
+
+/**
+ * @param {import('./stats.js').StatsRow} row
+ * @param {string} label
+ */
+function statsLines(row, label) {
+  const rate = (/** @type {number} */ part, /** @type {number} */ whole) => (whole === 0 ? '-' : percent(part / whole));
+  const low = percent(row.firstPassInterval.low);
+  const high = percent(row.firstPassInterval.high);
+  const main = tr({
+    en: `  ${label}${row.type}  model: ${row.model}  harness: ${row.harness}  closed ${row.closed}  first pass ${rate(row.firstPass, row.done)}${row.done === 0 ? '' : ` (95% interval ${low}–${high})`}  rework ${rate(row.reworked, row.done)}  dropped ${rate(row.dropped, row.closed)}`,
+    ja: `  ${label}${row.type}  モデル: ${row.model}  ハーネス: ${row.harness}  閉じた ${row.closed}件  1回で通った ${rate(row.firstPass, row.done)}${row.done === 0 ? '' : `（95% 区間 ${low}〜${high}）`}  手直し ${rate(row.reworked, row.done)}  中止 ${rate(row.dropped, row.closed)}`,
+  });
+  const cost = row.cost ?? { tokens: { tasks: 0, firstPass: 0, sum: 0 }, usd: { tasks: 0, firstPass: 0, sum: 0 } };
+  const parts = [
+    costPart(cost.tokens, row.done, (value) => Math.round(value).toLocaleString('en-US'), { en: 'tokens', ja: 'トークン' }),
+    costPart(cost.usd, row.done, (value) => (value < 1 ? value.toFixed(3) : value.toFixed(2)), { en: 'USD', ja: 'USD' }),
+  ].filter((part) => part !== undefined);
+  return parts.length === 0 ? [main] : [main, ...parts.map((part) => `    ${part}`)];
+}
+
+/**
+ * @param {import('./stats.js').CostSum} total
+ * @param {number} done
+ * @param {(value: number) => string} format
+ * @param {{ en: string, ja: string }} unit
+ */
+function costPart(total, done, format, unit) {
+  if (total.tasks === 0) return undefined;
+  const perFirstPass = total.firstPass === 0 ? '-' : format(total.sum / total.firstPass);
+  return tr({
+    en: `cost in ${unit.en}: ${format(total.sum / total.tasks)} per done task, ${perFirstPass} per first pass (recorded on ${total.tasks} of ${done} done tasks)`,
+    ja: `コスト（${unit.ja}）: 完了1件あたり ${format(total.sum / total.tasks)}、1回で通った1件あたり ${perFirstPass}（記録のある完了 ${total.tasks}/${done}件）`,
+  });
+}
+
+/** @param {string} cwd */
+function projectName(cwd) {
+  const file = join(cwd, 'package.json');
+  if (existsSync(file)) {
+    try {
+      const name = JSON.parse(readFileSync(file, 'utf8')).name;
+      if (typeof name === 'string' && name !== '') return name;
+    } catch {
+      return basename(cwd);
+    }
+  }
+  return basename(cwd);
+}
+
+/**
+ * 書き出した実績をいくつも並べて比べる。完了に要るコマンドがプロジェクトで違えば、同じ種類でも中身が違うことを知らせる。
+ *
+ * @param {string[]} files
+ * @param {boolean | undefined} json
+ * @param {string} cwd
+ */
+function compareStats(files, json, cwd) {
+  if (files.length === 0) throw new UsageError(tr({ en: 'Usage: bugyo stats --compare <file>...', ja: '使い方: bugyo stats --compare <ファイル>...' }));
+  const exports = files.map((file) => {
+    const path = join(cwd, file);
+    if (!existsSync(path)) throw new Error(tr({ en: `${file} does not exist`, ja: `${file} がありません` }));
+    /** @type {unknown} */
+    let data;
+    try {
+      data = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      throw new Error(tr({ en: `${file} is not JSON`, ja: `${file} は JSON ではありません` }));
+    }
+    return readStatsExport(data, file, tr);
+  });
+  const types = [...new Set(exports.flatMap((data) => data.rows.map((row) => row.type)))].sort();
+  const lines = [tr({ en: `stats: comparing ${exports.length} projects: ${exports.map((data) => data.project).join(', ')}`, ja: `stats: ${exports.length}つのプロジェクトを比べます: ${exports.map((data) => data.project).join(', ')}` })];
+  for (const type of types) {
+    lines.push(`${type}`);
+    for (const data of exports) for (const row of data.rows.filter((candidate) => candidate.type === type)) lines.push(...statsLines(row, `[${data.project}] `));
+  }
+  const warnings = [];
+  for (const step of ['check', 'test', 'verify']) {
+    const used = new Set(exports.map((data) => data.commands[step] ?? '-'));
+    if (used.size > 1) {
+      warnings.push(
+        tr({
+          en: `commands.${step} differs between projects (${exports.map((data) => `${data.project}: ${data.commands[step] ?? '-'}`).join(', ')}). The same task type may need different checks, so compare with care`,
+          ja: `commands.${step} がプロジェクトで違います（${exports.map((data) => `${data.project}: ${data.commands[step] ?? '-'}`).join('、')}）。同じ種類でも確かめる中身が違うので、比べるときは気をつけてください`,
+        }),
+      );
+    }
+  }
+  print(json, [...lines, ...warnings.map((warning) => `warn  ${warning}`)], { projects: exports.map((data) => ({ project: data.project, exportedAt: data.exportedAt, commands: data.commands, rows: data.rows })), warnings });
   return 0;
 }
 

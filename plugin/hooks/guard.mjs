@@ -8,7 +8,7 @@ import { isAbsolute, join } from 'node:path';
 import { hookLocale } from './project.mjs';
 
 /** CLI だけが書く、タスク台帳の frontmatter の項目 */
-const managedField = /^(status|assignee|model|harness|rework|gate-attempts|tests-hash|repro(-[a-z]+)?|drop-reason|dropped-at|evidence-[a-z]+)\s*:/m;
+const managedField = /^(status|assignee|model|harness|cost-tokens|cost-usd|rework|gate-attempts|tests-hash|repro(-[a-z]+)?|drop-reason|dropped-at|evidence-[a-z]+)\s*:/m;
 
 const rules = [
   {

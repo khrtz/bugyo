@@ -17,7 +17,7 @@ npx bugyo init my-lib --template node-lib # TypeScript library / CLI with no UI
 | `bugyo task add` / `ready` / `start` / `show` / `repro` / `done` / `rework` / `drop` / `ls` / `lint` | The task ledger. Only `done` collects evidence and closes a task ([docs/tasks.en.md](https://github.com/khrtz/bugyo/blob/main/docs/tasks.en.md)) |
 | `bugyo mistake ls` / `rule` | Mistakes per kind, and which rule each became |
 | `bugyo gate` | Decide whether to widen what agents may do |
-| `bugyo stats` | Results of closed tasks per task type, model, and harness |
+| `bugyo stats` | Results of closed tasks per task type, model, and harness, with cost when recorded. `--export` and `--compare` compare projects |
 | `bugyo doctor` / `baseline` | Count violations per ban before adopting the rules, and keep a baseline that can only shrink |
 
 ```ts

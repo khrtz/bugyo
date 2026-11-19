@@ -48,6 +48,7 @@ The frontmatter is a single level of `key: value`, read the same way as the feat
 | `issue` | Optional. A reference to an outside issue tracker (`123`, `PROJ-45`, an issue URL, ...). When CI re-collects the evidence and it passes, the `notify.verified` command reports to it |
 | `blocked-by` | Ids of tasks that must be done first (comma-separated) |
 | `assignee` | The name of the agent or person working on it |
+| `cost-tokens` / `cost-usd` | Optional. What the work cost until it closed (tokens and USD). The CLI adds them only when the task closes, from `--tokens` / `--usd` of `done` (or the environment variables `BUGYO_TOKENS` / `BUGYO_USD`). If the task closes again after rework, that cost is added too |
 | `model` / `harness` | Optional. The names of the model and harness that did the work. The CLI writes them from `--model` / `--harness` of `start` and `done` (or the environment variables `BUGYO_MODEL` / `BUGYO_HARNESS`). `bugyo stats` splits results by them |
 | `rework` | How many times a person sent it back after it was done |
 | `gate-attempts` | How many times `done` tried to close it. Keeps counting after rework |
@@ -71,7 +72,7 @@ Agents use four: `ready` → `start` → `show` → `done`. The output is one li
 | `bugyo task start <id> --as <name> [--model <model>] [--harness <harness>]` | agents | Marks it in progress. Refuses if someone is already on it, if the same name is on another task, or if its `blocked-by` are not done |
 | `bugyo task show <id>` | agents | Prints the body, the feature map to read, and what done requires |
 | `bugyo task repro <id> [--expect "<text>"] -- <test command>` | agents | For `bugfix`. Checks that the command fails before the fix, and records the exit code, the tail of the output, and the hash of the test files. Refuses a command that passes now, one whose first command is not found (also exit codes 127 / 9009), one that ran no tests, and one whose output lacks the `--expect` text |
-| `bugyo task done <id> [--model <model>] [--harness <harness>]` | agents | Collects the evidence and closes the task if it passes. Otherwise prints why and keeps it in progress |
+| `bugyo task done <id> [--model <model>] [--harness <harness>] [--tokens <n>] [--usd <amount>]` | agents | Collects the evidence and closes the task if it passes. Otherwise prints why and keeps it in progress. Pass to `--tokens` / `--usd` what the work cost since it started or was last reworked (recorded only when it passes) |
 | `bugyo task rework <id> -r "<reason>" --kind <mistake kind> [--as <name>]` | people | Moves a done task back to in progress and records the rework and the kind of mistake. The assignee stays the same; if that person is on another task it refuses, so name another assignee with `--as` |
 | `bugyo task drop <id> -r "<reason>"` | people | Drops it. A done task cannot be dropped. Also clears the claim |
 | `bugyo task release <id>` | people | Clears the claim of a stuck agent. Does not change the ledger file |
@@ -81,7 +82,7 @@ Agents use four: `ready` → `start` → `show` → `done`. The output is one li
 | `bugyo task pr-check [--branch <name>] [--base <ref>]` | CI | Checks that the PR's work is linked to a task. Passes if the branch name is `task/<id>` (a description may follow, as in `task/t-001-login`) and that task is in the ledger, or if a task file changed in the diff from `--base`. The branch name comes from `--branch`, then `GITHUB_HEAD_REF`, then the current branch |
 | `bugyo mistake ls` / `rule <kind> --at <path> [--name <rule name>]` | people, agents | The list of mistakes with the number of kinds that became rules, and recording that one became a rule |
 | `bugyo gate` | people | Decides whether to widen what agents may do. 0 on pass, 1 on fail |
-| `bugyo stats` | people | Results of closed tasks per task type, model, and harness |
+| `bugyo stats [--export <file>]` / `--compare <file>...` | people | Results of closed tasks per task type, model, and harness. Also exports them and compares across projects |
 
 `show` prints enough that an agent knows "what to read and what to deliver" from it alone. Commands appear after the config strings are substituted.
 
@@ -319,4 +320,29 @@ stats: results of closed tasks (done and dropped). First pass and rework are sha
 
 - Model and harness come from the task's `model` / `harness`. Pass `--model` / `--harness` to `start` or `done`, or set the environment variables `BUGYO_MODEL` / `BUGYO_HARNESS`. Without either, they count as `-`
 - The first-pass and rework rates are counted among done tasks, and the dropped rate among closed tasks. The first-pass rate also shows its 95% interval
+- If any task recorded a cost, a cost line follows its row. "Per done task" is the average over done tasks with a recorded cost. "Per first pass" is the total cost of those tasks divided by how many of them passed on the first try (the cost of rework and failures is carried by the tasks that passed)
+- Harnesses report cost in different ways, so bugyo only records the values it is given. Tasks without a record are left out of the cost
 - `--json` prints the counts per row
+
+```
+  chore  model: model-a  harness: cli  closed 3  first pass 33.3% (95% interval 6.1%–79.2%)  rework 33.3%  dropped 0.0%
+    cost in tokens: 2,250 per done task, - per first pass (recorded on 2 of 3 done tasks)
+```
+
+### Exporting and comparing
+
+`bugyo stats --export <file>` writes the results as JSON: the project name (`name` in `package.json`, or the folder name), when it was exported, the commands done requires (`commands`), and the results per row.
+
+`bugyo stats --compare <file>...` lines up exports from several projects per task type.
+
+```
+$ bugyo stats --compare web.json api.json
+stats: comparing 2 projects: web, api
+chore
+  [web] chore  model: model-a  harness: cli  closed 4  first pass 75.0% (95% interval 30.1%–95.4%)  rework 0.0%  dropped 0.0%
+  [api] chore  model: model-a  harness: cli  closed 2  first pass 50.0% (95% interval 9.5%–90.5%)  rework 50.0%  dropped 0.0%
+warn  commands.test differs between projects (web: pnpm test, api: pnpm test:all). The same task type may need different checks, so compare with care
+```
+
+- Task type names are the same in every project, but the commands done requires differ per project. If `check`, `test`, or `verify` in `commands` differ, it says so with `warn`
+- The export format has a version (`version`); unreadable versions and files not written by `--export` are refused

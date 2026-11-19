@@ -25,6 +25,8 @@ const count = z
   .string()
   .regex(/^\d+$/, { error: () => tr({ en: 'must be an integer of 0 or more', ja: '0 以上の整数にしてください' }) })
   .transform((value) => Number(value));
+/** 金額。0 以上の10進数（`0.42` など） */
+export const amountPattern = /^\d+(\.\d+)?$/;
 
 /** frontmatter に書ける項目。順番は書き出すときの順番 */
 const Fields = z
@@ -49,6 +51,11 @@ const Fields = z
     assignee: z.string().default(''),
     model: z.string().regex(agentNamePattern, { error: () => tr({ en: 'must start with a letter or digit and use only letters, digits, and . _ : / @ + -', ja: '英数字で始め、英数字と . _ : / @ + - だけにしてください' }) }).optional(),
     harness: z.string().regex(agentNamePattern, { error: () => tr({ en: 'must start with a letter or digit and use only letters, digits, and . _ : / @ + -', ja: '英数字で始め、英数字と . _ : / @ + - だけにしてください' }) }).optional(),
+    'cost-tokens': count.optional(),
+    'cost-usd': z
+      .string()
+      .regex(amountPattern, { error: () => tr({ en: 'must be a decimal number of 0 or more', ja: '0 以上の10進数にしてください' }) })
+      .optional(),
     rework: count.default(0),
     'gate-attempts': count.default(0),
     created: z.string().default(''),
@@ -173,6 +180,8 @@ export function saveTask(cwd, task) {
     assignee: task.assignee,
     model: task.model,
     harness: task.harness,
+    'cost-tokens': task['cost-tokens'],
+    'cost-usd': task['cost-usd'],
     rework: task.rework,
     'gate-attempts': task['gate-attempts'],
     created: task.created,
@@ -227,6 +236,8 @@ export function taskJson(task) {
     assignee: task.assignee,
     ...(task.model === undefined ? {} : { model: task.model }),
     ...(task.harness === undefined ? {} : { harness: task.harness }),
+    ...(task['cost-tokens'] === undefined ? {} : { costTokens: task['cost-tokens'] }),
+    ...(task['cost-usd'] === undefined ? {} : { costUsd: Number(task['cost-usd']) }),
     blockedBy: task['blocked-by'],
     rework: task.rework,
     gateAttempts: task['gate-attempts'],

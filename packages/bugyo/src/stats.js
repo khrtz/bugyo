@@ -32,7 +32,11 @@ export const percent = (value) => `${(value * 100).toFixed(1)}%`;
  *   reworked: number,
  *   dropped: number,
  *   firstPassInterval: { low: number, high: number },
+ *   cost: { tokens: CostSum, usd: CostSum },
  * }} StatsRow
+ *
+ * 完了したタスクのうち、コストを記録したものの合計。`tasks` は記録した件数、`firstPass` はそのうち1回で通った件数
+ * @typedef {{ tasks: number, firstPass: number, sum: number }} CostSum
  */
 
 /**
@@ -50,17 +54,75 @@ export function taskStats(tasks) {
     const model = task.model ?? '-';
     const harness = task.harness ?? '-';
     const key = `${task.type}\0${model}\0${harness}`;
-    const row = rows.get(key) ?? { type: task.type, model, harness, closed: 0, done: 0, firstPass: 0, reworked: 0, dropped: 0, firstPassInterval: { low: 0, high: 1 } };
+    const row = rows.get(key) ?? {
+      type: task.type,
+      model,
+      harness,
+      closed: 0,
+      done: 0,
+      firstPass: 0,
+      reworked: 0,
+      dropped: 0,
+      firstPassInterval: { low: 0, high: 1 },
+      cost: { tokens: { tasks: 0, firstPass: 0, sum: 0 }, usd: { tasks: 0, firstPass: 0, sum: 0 } },
+    };
     row.closed += 1;
     if (task.status === 'dropped') row.dropped += 1;
     else {
       row.done += 1;
       if (task['gate-attempts'] === 1) row.firstPass += 1;
       if (task.rework > 0) row.reworked += 1;
+      addCost(row.cost.tokens, task['cost-tokens'], task['gate-attempts'] === 1);
+      addCost(row.cost.usd, task['cost-usd'] === undefined ? undefined : Number(task['cost-usd']), task['gate-attempts'] === 1);
     }
     rows.set(key, row);
   }
   return [...rows.values()]
     .map((row) => ({ ...row, firstPassInterval: wilsonInterval(row.firstPass, row.done) }))
     .sort((a, b) => a.type.localeCompare(b.type) || a.model.localeCompare(b.model) || a.harness.localeCompare(b.harness));
+}
+
+/**
+ * @param {CostSum} total
+ * @param {number | undefined} value
+ * @param {boolean} firstPass
+ */
+function addCost(total, value, firstPass) {
+  if (value === undefined) return;
+  total.tasks += 1;
+  total.sum = Math.round((total.sum + value) * 1e6) / 1e6;
+  if (firstPass) total.firstPass += 1;
+}
+
+/** 書き出したファイルの形の名前と版。読むときにこれで見分ける */
+export const statsFormat = { name: 'bugyo-stats', version: 1 };
+
+/**
+ * @typedef {{
+ *   format: string,
+ *   version: number,
+ *   project: string,
+ *   exportedAt: string,
+ *   commands: Record<string, string>,
+ *   rows: StatsRow[],
+ * }} StatsExport
+ */
+
+/**
+ * 書き出した実績のファイルを読む。形が違えば断る。
+ *
+ * @param {unknown} data
+ * @param {string} file
+ * @param {(text: { en: string, ja: string }) => string} tr
+ * @returns {StatsExport}
+ */
+export function readStatsExport(data, file, tr) {
+  const record = /** @type {Record<string, unknown>} */ (data);
+  if (typeof data !== 'object' || data === null || record['format'] !== statsFormat.name || !Array.isArray(record['rows'])) {
+    throw new Error(tr({ en: `${file} is not a file written by bugyo stats --export`, ja: `${file} は bugyo stats --export で書いたファイルではありません` }));
+  }
+  if (record['version'] !== statsFormat.version) {
+    throw new Error(tr({ en: `${file} has format version ${String(record['version'])}; this bugyo reads version ${statsFormat.version}`, ja: `${file} の形の版は ${String(record['version'])} です。この bugyo が読めるのは ${statsFormat.version} です` }));
+  }
+  return /** @type {StatsExport} */ (data);
 }

@@ -98,6 +98,17 @@ test('既定は英語: new feature の feature map は英語の見出しで作�
   assert.match(done.stdout, /^FAIL t-001 .*fill the four headings of docs\/features\/shout\.md: docs\/features\/shout\.md has empty or template headings: What is there, How to reach it, How to check it, Where it lies \(gate-attempts: 1\)$/m);
 });
 
+test('既定は英語: stats のコストの行と書き出し', () => {
+  const cwd = project();
+  bugyo(cwd, ['task', 'add', 'Fix greeting', '--type', 'chore']);
+  bugyo(cwd, ['task', 'start', 't-001', '--as', 'w1']);
+  assert.equal(bugyo(cwd, ['task', 'done', 't-001', '--tokens', '1200', '--usd', '0.5']).status, 0);
+  const text = bugyo(cwd, ['stats']).stdout;
+  assert.match(text, /^ {4}cost in tokens: 1,200 per done task, 1,200 per first pass \(recorded on 1 of 1 done tasks\)$/m);
+  assert.match(text, /^ {4}cost in USD: 0\.500 per done task/m);
+  assert.match(bugyo(cwd, ['stats', '--export', 'out.json']).stdout, /^stats: wrote 1 rows to out\.json$/m);
+});
+
 test('init のあとのコマンドは、実行したパッケージマネージャーに合わせる', () => {
   const root = mkdtempSync(join(tmpdir(), 'bugyo-locale-'));
   const npm = bugyo(root, ['init', 'with-npm', '--template', 'node-lib'], { npm_config_user_agent: 'npm/11.0.0 node/v24.0.0' });
