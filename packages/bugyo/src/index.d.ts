@@ -167,5 +167,10 @@ export interface BugyoPlaywrightOptions {
   port?: number;
   /** dev サーバーを起動するコマンド。既定は `vite --port <port> --strictPort`（node_modules/.bin の vite を使う） */
   command?: string;
+  /**
+   * 同じポートですでに動いているサーバーを使い回すか。既定は false で、ポートが使われていれば起動せずに失敗する
+   * （別のプロジェクトのサーバーを撮って証拠にしないため）。使い回すのは、そのサーバーがこのプロジェクトのものだと決まっているときだけにする
+   */
+  reuseExistingServer?: boolean;
   overrides?: PlaywrightTestConfig;
 }

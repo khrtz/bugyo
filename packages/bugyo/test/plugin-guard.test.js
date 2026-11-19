@@ -50,11 +50,26 @@ test('タスク台帳は、状態の項目の書き換えだけを断り、本�
 });
 
 test('コマンドは、守るファイルを書き換える形だけを断る', () => {
-  for (const command of ['echo {} > .bugyo/config.json', "sed -i 's/a/b/' .bugyo/tasks/t-001.md", 'rm .bugyo/evidence/t-001.json', 'cp x eslint-suppressions.json']) {
+  for (const command of [
+    'echo {} > .bugyo/config.json',
+    'echo {} >> "./.bugyo/baseline.json"',
+    'cat x >.bugyo/tasks/t-001.md',
+    "sed -i 's/a/b/' .bugyo/tasks/t-001.md",
+    'rm .bugyo/evidence/t-001.json',
+    'cp x eslint-suppressions.json',
+  ]) {
     assert.notEqual(run('Bash', { command }), undefined, command);
   }
   assert.notEqual(run('PowerShell', { command: "Set-Content .bugyo\\config.json '{}'" }), undefined);
-  for (const command of ['cat .bugyo/config.json', 'git add .bugyo/tasks/t-001.md', 'pnpm exec bugyo task done t-001', 'pnpm check 2>&1 | tail', 'echo hi > notes.txt']) {
+  for (const command of [
+    'cat .bugyo/config.json',
+    'git add .bugyo/tasks/t-001.md',
+    'pnpm exec bugyo task done t-001',
+    'pnpm check 2>&1 | tail',
+    'echo hi > notes.txt',
+    'gh pr create --body "`.bugyo/config.json` の `pullRequests` と `bugyo task pr-check --branch <名前>` を足した"',
+    'cat .bugyo/config.json > /tmp/config-copy.json',
+  ]) {
     assert.equal(run('Bash', { command }), undefined, command);
   }
 });
