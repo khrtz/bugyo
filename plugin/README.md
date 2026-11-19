@@ -1,6 +1,6 @@
 # bugyo（Claude Code プラグイン）
 
-bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature map）を使うプロジェクトで、Claude Code が正しい進め方を選べるようにするスキル集と、完了の判定を決めるファイルを守るフックです。
+bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature map）を使うプロジェクトで、Claude Code が正しい進め方を選べるようにするスキル集と、タスク台帳に沿って作業させ、完了の判定を決めるファイルを守るフックです。
 
 ## 入っているもの
 
@@ -12,10 +12,17 @@ bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature ma
 | skill | `bugyo-critique` | 証拠を先に見る批判的レビュー |
 | skill | `bugyo-explain` | 仕組みをコードを辿って説明する |
 | agent | `slop-reviewer` | 差分を独立した目でレビューするサブエージェント |
+| hook | `SessionStart`（`hooks/session-start.mjs`） | セッションの始めに、作業中と着手できるタスクを見せる（下を参照） |
 | hook | `PreToolUse`（`hooks/guard.mjs`） | 完了の判定を決めるファイルの直接の書き換えを断る（下を参照） |
-| hook | `Stop`（`hooks/stop-check.mjs`） | 作業を終える前に `bugyo task lint` を実行し、落ちたら終わらせない（下を参照） |
+| hook | `Stop`（`hooks/stop-check.mjs`） | 作業を終える前に `bugyo task lint` を実行し、落ちたら終わらせない。作業中のタスクが残っていれば知らせる（下を参照） |
 
 ## フック
+
+どのフックも、`.bugyo/tasks` のあるフォルダを作業中のフォルダから上へ探し、`node_modules` の `bugyo` を使います。台帳か `node_modules/bugyo` が見つからなければ何もしません。
+
+### タスクを見せる（`SessionStart`）
+
+セッションの始め（再開と `/clear` のあとも）に、作業中のタスク、着手できるタスク（`bugyo task ready`。10件まで）、着手と完了のコマンドをエージェントに渡します。
 
 ### 書き換えを断る（`PreToolUse`）
 
@@ -30,12 +37,12 @@ bugyo の土台（`@bugyo/lint` と `bugyo` CLI、`docs/features` の feature ma
 
 ### 終わる前に台帳を確かめる（`Stop`）
 
-エージェントが作業を終えようとすると、`.bugyo/tasks` のあるフォルダを作業中のフォルダから上へ探し、`node_modules` の `bugyo` で `bugyo task lint` を実行します。落ちたら、その出力と直し方を返して作業を続けさせます。
+エージェントが作業を終えようとすると、`bugyo task lint` を実行します。落ちたら、その出力と直し方を返して作業を続けさせます。
 
 - 止めるのは1回だけです。直したあと、または直せないまま続けて終わろうとしたときは止めません
-- 台帳か `node_modules/bugyo` が見つからなければ何もしません
+- 台帳が正しくても `active` なタスクが残っていれば、止めずに、`bugyo task done` か `drop` を使うよう人へ知らせます
 
-どちらのフックも、動かすには Node が要ります。
+どのフックも、動かすには Node が要ります。
 
 ## インストール
 

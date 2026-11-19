@@ -98,7 +98,7 @@ Details are in [docs/foundation.md](docs/foundation.md) and [docs/tasks.md](docs
 | [packages/lint](packages/lint) — `@bugyo/lint` | ESLint flat config (the common and structure parts, the comment and `fetch` bans, `defineBan` for your own bans), dependency-cruiser rules, a strict tsconfig. No React dependency |
 | [packages/lint-react](packages/lint-react) — `@bugyo/lint-react` | The React part (react-hooks) and bans (where `useEffect` may live, no timers in UI) added on top of `@bugyo/lint` |
 | [packages/bugyo](packages/bugyo) — `bugyo` | CLI (`init` / `new feature` / `verify` / `task` / `mistake` / `gate`), feature map loader and consistency tests, Playwright config |
-| [plugin](plugin) | Claude Code plugin (five skills, a review subagent, a hook that refuses direct edits to the files that decide completion, and a hook that runs `bugyo task lint` before the agent stops) |
+| [plugin](plugin) | Claude Code plugin (five skills, a review subagent, and hooks that show the tasks when a session starts, refuse direct edits to the files that decide completion, and run `bugyo task lint` before the agent stops) |
 | [examples/todo-app](examples/todo-app) | A React (Vite) sample; the source of `bugyo init --template react-vite` (the default) |
 | [examples/node-lib](examples/node-lib) | A TypeScript library / CLI sample with no UI and no React, Vite, or Playwright; the source of `bugyo init --template node-lib` |
 

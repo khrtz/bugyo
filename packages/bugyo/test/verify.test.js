@@ -285,6 +285,7 @@ test('設定がなければ playwright 方式と今までの場所になる', ()
     gate: { window: 20, maxRework: 2, minFirstPass: 16, maxDropped: 2 },
     claims: {},
     notify: {},
+    pullRequests: { allowBranches: [] },
   });
 });
 

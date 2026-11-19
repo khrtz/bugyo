@@ -253,6 +253,10 @@ const Config = z
       .object({ verified: z.string().trim().min(1).optional() })
       .strict()
       .prefault({}),
+    pullRequests: z
+      .object({ allowBranches: z.array(z.string().trim().min(1)).default([]) })
+      .strict()
+      .prefault({}),
   })
   .strict();
 

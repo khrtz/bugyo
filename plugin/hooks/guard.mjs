@@ -24,7 +24,13 @@ const rules = [
   },
 ];
 
-const taskFile = /(^|\/)\.bugyo\/tasks\/.+\.md$/;
+/**
+ * コマンドの中の、守るファイルのパス。リダイレクトは、行き先がこのパスのときだけ書き換えとみなす
+ * （PR の本文などの文の中に、パスと `<名前>` の `>` が一緒に出てくるだけでは断らない）
+ */
+const protectedInCommand = String.raw`\.bugyo/(config\.json|evidence/|baseline\.json|tasks/)|eslint-suppressions\.json|dependency-cruiser-known-violations`;
+
+const taskFile =/(^|\/)\.bugyo\/tasks\/.+\.md$/;
 const taskReason =
   'タスク台帳の状態の項目（status・assignee・rework・gate-attempts・repro・evidence など）は bugyo task のコマンドだけが書きます。bugyo task start / done / rework / drop を使ってください';
 
@@ -47,9 +53,10 @@ const managedLines = (text) =>
 export function denyReason(toolName, input, cwd) {
   if (toolName === 'Bash' || toolName === 'PowerShell') {
     const command = normalize(String(input.command ?? ''));
-    const touches = /\.bugyo\/(config\.json|evidence\/|baseline\.json|tasks\/)|eslint-suppressions\.json|dependency-cruiser-known-violations/.test(command);
-    const writes = /(^|[^0-9&>])>{1,2}(?!&)|\btee\b|\bsed\s+(-[a-zA-Z]*i|--in-place)|\b(rm|mv|cp|truncate)\s|Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item/.test(command);
-    return touches && writes
+    const touches = new RegExp(protectedInCommand).test(command);
+    const redirects = new RegExp(`(^|[^0-9&>])>{1,2}(?!&)\\s*["']?[^\\s"'|;&<>]*(${protectedInCommand})`).test(command);
+    const writes = /\btee\b|\bsed\s+(-[a-zA-Z]*i|--in-place)|\b(rm|mv|cp|truncate)\s|Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|Copy-Item/.test(command);
+    return redirects || (touches && writes)
       ? 'コマンドで、完了の判定を決めるファイル（.bugyo/config.json・証拠・ベースライン・タスク台帳）を書き換えようとしています。設定は人が変えるものです。証拠・ベースライン・台帳は bugyo task と bugyo baseline のコマンドで変えてください'
       : undefined;
   }

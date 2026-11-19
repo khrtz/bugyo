@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * 証拠（動画・スクリーンショット・トレース・HTMLレポート）を artifacts/ に残す Playwright 設定を作る。
  * dev サーバーの起動と停止は Playwright の webServer に任せる。
+ * 既定では、同じポートで動いているサーバーを使い回さない。別のプロジェクトのサーバーを撮って証拠にしないため。
  *
  * @param {import('./index.js').BugyoPlaywrightOptions} [options]
  */
@@ -26,7 +27,7 @@ export function defineBugyoConfig(options = {}) {
     webServer: {
       command,
       url: `http://localhost:${port}`,
-      reuseExistingServer: !process.env['CI'],
+      reuseExistingServer: options.reuseExistingServer ?? false,
       timeout: 60_000,
     },
     ...options.overrides,

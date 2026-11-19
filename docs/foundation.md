@@ -465,6 +465,7 @@ export default defineBugyoConfig({ port: 5173 });
 | --- | --- | --- |
 | `port` | `5173` | dev サーバーのポート |
 | `command` | `vite --port <port> --strictPort` | dev サーバーを起動するコマンド。`node_modules/.bin` の `vite` を使うので、パッケージマネージャーを問わない |
+| `reuseExistingServer` | `false` | 同じポートですでに動いているサーバーを使い回すか。既定では使い回さず、ポートが使われていれば失敗する（別のプロジェクトのサーバーを撮って証拠にしないため） |
 | `overrides` | なし | Playwright の設定を上書きする |
 
 この設定は次のように動きます。
